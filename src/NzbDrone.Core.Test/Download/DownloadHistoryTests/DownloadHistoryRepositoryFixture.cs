@@ -28,6 +28,15 @@ namespace NzbDrone.Core.Test.Download.DownloadHistoryTests
         }
 
         [Test]
+        public void should_persist_managed_version_identity()
+        {
+            var history = Builder<DownloadHistory>.CreateNew().With(h => h.Id = 0).With(h => h.MovieVersionId = 201).Build();
+            Subject.Insert(history);
+
+            Assert.That(Subject.Get(history.Id).MovieVersionId, Is.EqualTo(201));
+        }
+
+        [Test]
         public void should_delete_history_items_by_movieId()
         {
             var items = Builder<DownloadHistory>.CreateListOfSize(5)

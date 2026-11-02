@@ -97,6 +97,14 @@ namespace NzbDrone.Core.Movies
 
         public Movie AddMovie(Movie newMovie)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                return AddMovieCore(newMovie);
+            }
+        }
+
+        private Movie AddMovieCore(Movie newMovie)
+        {
             _compositeProfilePolicy.EnsureAssignable(newMovie.QualityProfileId);
             var movie = _movieRepository.Insert(newMovie);
 
@@ -106,6 +114,14 @@ namespace NzbDrone.Core.Movies
         }
 
         public List<Movie> AddMovies(List<Movie> newMovies)
+        {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                return AddMoviesCore(newMovies);
+            }
+        }
+
+        private List<Movie> AddMoviesCore(List<Movie> newMovies)
         {
             foreach (var profileId in newMovies.Select(m => m.QualityProfileId).Distinct())
             {
@@ -222,7 +238,16 @@ namespace NzbDrone.Core.Movies
 
         public void DeleteMovie(int movieId, bool deleteFiles, bool addImportListExclusion = false)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                DeleteMovieCore(movieId, deleteFiles, addImportListExclusion);
+            }
+        }
+
+        private void DeleteMovieCore(int movieId, bool deleteFiles, bool addImportListExclusion)
+        {
             var movie = _movieRepository.Get(movieId);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
 
             _movieRepository.Delete(movieId);
             _eventAggregator.PublishEvent(new MoviesDeletedEvent(new List<Movie> { movie }, deleteFiles, addImportListExclusion));
@@ -231,7 +256,16 @@ namespace NzbDrone.Core.Movies
 
         public void DeleteMovies(List<int> movieIds, bool deleteFiles, bool addImportListExclusion = false)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                DeleteMoviesCore(movieIds, deleteFiles, addImportListExclusion);
+            }
+        }
+
+        private void DeleteMoviesCore(List<int> movieIds, bool deleteFiles, bool addImportListExclusion)
+        {
             var moviesToDelete = _movieRepository.Get(movieIds).ToList();
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(moviesToDelete);
 
             _movieRepository.DeleteMany(movieIds);
 
@@ -255,7 +289,16 @@ namespace NzbDrone.Core.Movies
 
         public Movie UpdateMovie(Movie movie)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                return UpdateMovieCore(movie);
+            }
+        }
+
+        private Movie UpdateMovieCore(Movie movie)
+        {
             var storedMovie = GetMovie(movie.Id);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { storedMovie });
 
             _compositeProfilePolicy.EnsureAssignable(movie.QualityProfileId);
 
@@ -269,6 +312,15 @@ namespace NzbDrone.Core.Movies
 
         public List<Movie> UpdateMovie(List<Movie> movies, bool useExistingRelativeFolder)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                return UpdateMovieCore(movies, useExistingRelativeFolder);
+            }
+        }
+
+        private List<Movie> UpdateMovieCore(List<Movie> movies, bool useExistingRelativeFolder)
+        {
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(GetMovies(movies.Select(m => m.Id)));
             foreach (var profileId in movies.Select(m => m.QualityProfileId).Distinct())
             {
                 _compositeProfilePolicy.EnsureAssignable(profileId);

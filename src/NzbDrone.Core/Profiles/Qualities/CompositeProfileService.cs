@@ -41,6 +41,14 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                return SaveDefinitions(profileId, definitions);
+            }
+        }
+
+        private List<CompositeProfileVersion> SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions)
+        {
             _profiles.Get(profileId);
             if (definitions == null)
             {
@@ -90,9 +98,12 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public void Delete(int profileId)
         {
-            _profiles.Get(profileId);
-            EnsureUnused(profileId, _definitions.ForProfile(profileId));
-            _definitions.DeleteDefinitions(profileId);
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                _profiles.Get(profileId);
+                EnsureUnused(profileId, _definitions.ForProfile(profileId));
+                _definitions.DeleteDefinitions(profileId);
+            }
         }
 
         private void EnsureUnused(int profileId, List<CompositeProfileVersion> existing)

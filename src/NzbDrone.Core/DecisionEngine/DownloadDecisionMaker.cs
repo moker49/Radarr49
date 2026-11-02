@@ -78,6 +78,7 @@ namespace NzbDrone.Core.DecisionEngine
                     {
                         var remoteMovie = _parsingService.Map(parsedMovieInfo, report.ImdbId.ToString(), report.TmdbId, searchCriteria);
                         remoteMovie.Release = report;
+                        remoteMovie.MovieVersionId = report.PendingMovieVersionId;
                         remoteMovie.ReleaseSource = GetReleaseSource(pushedRelease, searchCriteria);
 
                         if (remoteMovie.Movie == null)

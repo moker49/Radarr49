@@ -13,6 +13,7 @@ namespace Radarr.Api.V3.History
     public class HistoryResource : RestResource
     {
         public int MovieId { get; set; }
+        public int? MovieVersionId { get; set; }
         public string SourceTitle { get; set; }
         public List<Language> Languages { get; set; }
         public QualityModel Quality { get; set; }
@@ -46,6 +47,7 @@ namespace Radarr.Api.V3.History
                 Id = model.Id,
 
                 MovieId = model.MovieId,
+                MovieVersionId = model.MovieVersionId,
                 SourceTitle = model.SourceTitle,
                 Languages = model.Languages,
                 Quality = model.Quality,

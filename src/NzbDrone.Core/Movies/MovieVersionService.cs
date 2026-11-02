@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.Movies
@@ -8,6 +9,8 @@ namespace NzbDrone.Core.Movies
     public interface IMovieVersionService
     {
         List<ResolvedMovieVersion> Resolve(Movie movie);
+        ResolvedMovieVersion Get(Movie movie, int movieVersionId);
+        Movie ForVersion(Movie movie, int movieVersionId);
     }
 
     public class MovieVersionService : IMovieVersionService
@@ -15,14 +18,40 @@ namespace NzbDrone.Core.Movies
         private readonly ICompositeProfileVersionRepository _definitions;
         private readonly IMovieVersionRepository _versions;
         private readonly IQualityProfileService _profiles;
+        private readonly IMediaFileService _files;
 
         public MovieVersionService(ICompositeProfileVersionRepository definitions,
                                    IMovieVersionRepository versions,
-                                   IQualityProfileService profiles)
+                                   IQualityProfileService profiles,
+                                   IMediaFileService files)
         {
             _definitions = definitions;
             _versions = versions;
             _profiles = profiles;
+            _files = files;
+        }
+
+        public ResolvedMovieVersion Get(Movie movie, int movieVersionId)
+        {
+            if (movieVersionId <= 0)
+            {
+                throw new InvalidOperationException("A persisted managed version ID is required.");
+            }
+
+            return Resolve(movie).SingleOrDefault(v => v.Id == movieVersionId) ??
+                throw new InvalidOperationException("The download's managed version no longer belongs to this movie and profile.");
+        }
+
+        public Movie ForVersion(Movie movie, int movieVersionId)
+        {
+            var version = Get(movie, movieVersionId);
+            var file = version.MovieFileId.HasValue ? _files.GetMovie(version.MovieFileId.Value) : null;
+            if (version.MovieFileId.HasValue && (file == null || file.MovieId != movie.Id))
+            {
+                throw new InvalidOperationException("The managed version's file does not belong to this movie.");
+            }
+
+            return movie.WithVersion(version, file);
         }
 
         public List<ResolvedMovieVersion> Resolve(Movie movie)

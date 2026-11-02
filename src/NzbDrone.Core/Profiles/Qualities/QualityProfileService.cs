@@ -81,6 +81,14 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public void Delete(int id)
         {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                DeleteProfile(id);
+            }
+        }
+
+        private void DeleteProfile(int id)
+        {
             _compositeProfilePolicy.EnsureProfileDeletionAllowed(id);
             if (_movieService.GetAllMovies().Any(c => c.QualityProfileId == id) || _importListFactory.All().Any(c => c.QualityProfileId == id) || _collectionService.GetAllCollections().Any(c => c.QualityProfileId == id))
             {

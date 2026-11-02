@@ -44,6 +44,10 @@ namespace NzbDrone.Core.Parser.Model
         [JsonIgnore]
         public PendingReleaseReason? PendingReleaseReason { get; set; }
 
+        // Restored from a pending row when that release is reprocessed, not supplied by indexers.
+        [JsonIgnore]
+        public int? PendingMovieVersionId { get; set; }
+
         public int Age
         {
             get { return DateTime.UtcNow.Subtract(PublishDate).Days; }

@@ -23,6 +23,7 @@ namespace NzbDrone.Core.Parser.Model
         public DownloadClientItem DownloadItem { get; set; }
         public ParsedMovieInfo FolderMovieInfo { get; set; }
         public Movie Movie { get; set; }
+        public int? MovieVersionId { get; set; }
         public List<DeletedMovieFile> OldFiles { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }

@@ -88,7 +88,7 @@ namespace NzbDrone.Core.Download.Pending
 
         public void AddMany(List<Tuple<DownloadDecision, PendingReleaseReason>> decisions)
         {
-            foreach (var movieDecisions in decisions.GroupBy(v => v.Item1.RemoteMovie.Movie.Id))
+            foreach (var movieDecisions in decisions.GroupBy(v => (v.Item1.RemoteMovie.Movie.Id, v.Item1.RemoteMovie.MovieVersionId)))
             {
                 var movie = movieDecisions.First().Item1.RemoteMovie.Movie;
                 var alreadyPending = _repository.AllByMovieId(movie.Id);
@@ -98,7 +98,8 @@ namespace NzbDrone.Core.Download.Pending
                     var decision = pair.Item1;
                     var reason = pair.Item2;
 
-                    var existingReports = alreadyPending ?? Enumerable.Empty<PendingRelease>();
+                    var existingReports = (alreadyPending ?? Enumerable.Empty<PendingRelease>())
+                        .Where(p => p.MovieVersionId == decision.RemoteMovie.MovieVersionId);
 
                     var matchingReports = existingReports.Where(MatchingReleasePredicate(decision.RemoteMovie.Release)).ToList();
 
@@ -151,6 +152,7 @@ namespace NzbDrone.Core.Download.Pending
                 var release = p.Release;
 
                 release.PendingReleaseReason = p.Reason;
+                release.PendingMovieVersionId = p.MovieVersionId;
 
                 return release;
             }).ToList();
@@ -200,7 +202,7 @@ namespace NzbDrone.Core.Download.Pending
             }
 
             // Return best quality release for each movie
-            var deduped = queued.Where(q => q.Movie != null).GroupBy(q => q.Movie.Id).Select(g =>
+            var deduped = queued.Where(q => q.Movie != null).GroupBy(q => (q.Movie.Id, q.RemoteMovie.MovieVersionId)).Select(g =>
             {
                 var movies = g.First().Movie;
 
@@ -222,7 +224,7 @@ namespace NzbDrone.Core.Download.Pending
             var targetItem = FindPendingRelease(queueId);
             var movieReleases = _repository.AllByMovieId(targetItem.MovieId);
 
-            var releasesToRemove = movieReleases.Where(c => c.ParsedMovieInfo.PrimaryMovieTitle == targetItem.ParsedMovieInfo.PrimaryMovieTitle);
+            var releasesToRemove = movieReleases.Where(c => c.MovieVersionId == targetItem.MovieVersionId && c.ParsedMovieInfo.PrimaryMovieTitle == targetItem.ParsedMovieInfo.PrimaryMovieTitle);
 
             _repository.DeleteMany(releasesToRemove.Select(c => c.Id));
         }
@@ -283,6 +285,7 @@ namespace NzbDrone.Core.Download.Pending
                 release.RemoteMovie = new RemoteMovie
                 {
                     Movie = movie,
+                    MovieVersionId = release.MovieVersionId,
                     MovieMatchType = release.AdditionalInfo?.MovieMatchType ?? MovieMatchType.Unknown,
                     ReleaseSource = release.AdditionalInfo?.ReleaseSource ?? ReleaseSourceType.Unknown,
                     ParsedMovieInfo = release.ParsedMovieInfo,
@@ -355,6 +358,7 @@ namespace NzbDrone.Core.Download.Pending
             var release = new PendingRelease
             {
                 MovieId = decision.RemoteMovie.Movie.Id,
+                MovieVersionId = decision.RemoteMovie.MovieVersionId,
                 ParsedMovieInfo = decision.RemoteMovie.ParsedMovieInfo,
                 Release = decision.RemoteMovie.Release,
                 Title = decision.RemoteMovie.Release.Title,
@@ -403,7 +407,7 @@ namespace NzbDrone.Core.Download.Pending
         {
             var pendingReleases = GetPendingReleases(remoteMovie.Movie.Id);
 
-            var existingReports = pendingReleases.Where(r => r.RemoteMovie.Movie.Id == remoteMovie.Movie.Id)
+            var existingReports = pendingReleases.Where(r => r.RemoteMovie.Movie.Id == remoteMovie.Movie.Id && r.MovieVersionId == remoteMovie.MovieVersionId)
                                                              .ToList();
 
             if (existingReports.Empty())
@@ -435,7 +439,8 @@ namespace NzbDrone.Core.Download.Pending
 
             foreach (var rejectedRelease in rejected)
             {
-                var matching = pending.Where(MatchingReleasePredicate(rejectedRelease.RemoteMovie.Release));
+                var matching = pending.Where(p => p.MovieId == rejectedRelease.RemoteMovie.Movie?.Id &&
+                    p.MovieVersionId == rejectedRelease.RemoteMovie.MovieVersionId).Where(MatchingReleasePredicate(rejectedRelease.RemoteMovie.Release));
 
                 foreach (var pendingRelease in matching)
                 {

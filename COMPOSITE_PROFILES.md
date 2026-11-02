@@ -43,17 +43,35 @@ the earlier one is unavailable. Primary selection is independent of download ord
   labels, priority 0/1 and exactly one primary. Nested/self references and converting an
   assigned profile are rejected. Reordering preserves IDs in one database transaction;
   failed saves roll back. Removing an unused draft removes only its definitions.
+- Backend assignment/conversion is transactional and idempotent. Existing files require
+  explicit definition-to-file mappings; every stored file must be accounted for exactly
+  once. Stale movie/file/definition snapshots fail without partial writes. No conversion
+  or activation route calls this primitive yet.
+- Configuration, conversion, ordinary movie mutations and profile deletion share a
+  mutation lock, with database transactions protecting multi-row changes. Legacy mutation
+  protection also runs in the movie service so controller preflight cannot be bypassed
+  by a concurrent conversion.
+- History, download history and pending rows persist nullable MovieVersionId; old rows
+  remain unversioned. Tracking restores the persisted movie/version, applies an isolated
+  child-profile/file context, and blocks missing/conflicting identities. Pending add,
+  removal and queue grouping distinguish versions. Reprocessing carries a transient
+  pending version marker back into decision-making.
+- GET `/api/v3/movie/{movieId}/versions` exposes implicit or explicit version state.
+  History resources also expose MovieVersionId.
 
 ## Remaining sequence
 
 1. Profile-owned size settings are implemented; extend their use to child profile context
    when version-aware download evaluation is wired in.
-2. Draft configuration and legacy edit/delete protections are implemented. Add atomic
-   movie conversion and assignment reconciliation before activation. Preserve files and
-   require explicit assignment when ambiguous. Coordinate configuration changes with
-   assignment/profile deletion to avoid races when activation is introduced.
-3. Persist version identity through search, RSS, pending releases, history, queue and
-   tracked downloads; implement prefer-first scheduling and concurrency controls.
+2. Draft configuration, legacy protections and backend atomic conversion are implemented.
+   Add version-aware activation/conversion orchestration, events and assignment
+   reconciliation, including files and downloads already in flight, before exposing it.
+3. Extend search/RSS evaluation to all child contexts and scope queue/history/delay
+   comparisons to each version. Identity persistence/recovery is implemented, but pending
+   re-evaluation still needs child context attachment, and normal downloads still have a
+   movie-wide grouping. Implement prefer-first scheduling, concurrency controls and durable
+   dispatch reservations. Missing identity after a dispatch/history-write crash must block
+   rather than guess the import target.
 4. Scope imports, upgrades, scans, renames, moves, housekeeping and extra files to versions.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
@@ -71,9 +89,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | DecisionEngine/Specifications | Evaluate child profile and its existing file |
 | DecisionEngine/DownloadDecisionComparer.cs | Profile size resolution implemented; supply child context in version-aware evaluation |
 | Download/ProcessDownloadDecisions.cs | Deduplicate and prioritize by version |
-| Download/Pending/PendingRelease.cs | Persist version identity |
-| Download/TrackedDownloads/TrackedDownload.cs | Recover intended version after restart |
-| History/History.cs | Persist original download assignment |
+| Download/Pending/PendingRelease.cs | Identity persisted; scope remaining decision/delay evaluation to child context |
+| Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
+| History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
 | Radarr.Api.V3 movie/file/profile controllers | Shared guards implemented; audit command/manual-import routes before activation |
 | Organizer, extras, housekeeping and notifications | Audit file selection and scope to version |
 
@@ -89,6 +107,15 @@ webpack build. The draft configuration/protection stage passed 86 relevant core 
 eight API tests, including existing movie-update/download behavior and new configuration,
 database rollback and bulk preflight cases. Existing ImageSharp audit warnings are nonfatal
 only in test commands; repository warning policy is unchanged.
+
+The assignment/identity stage passes 140 relevant core tests and 10 API tests, with one
+existing ignored test. Coverage includes migration preservation, atomic rollback,
+idempotency, isolated child contexts, persisted identity, restart recovery and cross-version
+pending isolation. A broader decision-maker test, `broken_report_shouldnt_blowup_the_process`, expects
+three error logs but captures none in this environment. It also fails with this stage's
+decision-maker change removed; its assertion has not been weakened or changed.
+It is excluded from the passing regression run and recorded separately in
+`_temp/decision-maker-baseline.log`.
 
 ## Draft configuration API
 

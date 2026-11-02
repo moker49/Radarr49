@@ -29,6 +29,15 @@ namespace NzbDrone.Core.Test.HistoryTests
         }
 
         [Test]
+        public void should_persist_managed_version_identity()
+        {
+            var history = Builder<MovieHistory>.CreateNew().With(h => h.Id = 0).With(h => h.MovieVersionId = 201).With(h => h.Quality = new QualityModel()).With(h => h.Languages = new List<Language>()).Build();
+            Subject.Insert(history);
+
+            Assert.That(Subject.Get(history.Id).MovieVersionId, Is.EqualTo(201));
+        }
+
+        [Test]
         public void should_read_write_dictionary()
         {
             var history = Builder<MovieHistory>.CreateNew()

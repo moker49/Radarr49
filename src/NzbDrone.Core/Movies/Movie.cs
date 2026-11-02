@@ -37,6 +37,18 @@ namespace NzbDrone.Core.Movies
 
         public bool HasFile => MovieFileId > 0;
 
+        internal Movie WithVersion(ResolvedMovieVersion version, MovieFile file)
+        {
+            var context = (Movie)MemberwiseClone();
+
+            // Keep the selected composite ID for ownership checks and legacy summaries.
+            context.QualityProfile = version.QualityProfile;
+            context.MovieFileId = version.MovieFileId ?? 0;
+            context.MovieFile = file;
+            context.Monitored = version.Monitored;
+            return context;
+        }
+
         // compatibility properties
         public string Title
         {

@@ -86,6 +86,7 @@ namespace NzbDrone.Core.Test.Download.Pending.PendingReleaseServiceTests
             var heldReleases = Builder<PendingRelease>.CreateListOfSize(1)
                                                    .All()
                                                    .With(h => h.MovieId = _movie.Id)
+                                                   .With(h => h.MovieVersionId = null)
                                                    .With(h => h.Title = title)
                                                    .With(h => h.Release = release)
                                                    .With(h => h.Reason = reason)
@@ -101,6 +102,18 @@ namespace NzbDrone.Core.Test.Download.Pending.PendingReleaseServiceTests
             Subject.Add(_temporarilyRejected, PendingReleaseReason.Delay);
 
             VerifyInsert();
+        }
+
+        [Test]
+        public void pending_release_for_other_version_should_not_suppress_add()
+        {
+            GivenHeldRelease(_release.Title, _release.Indexer, _release.PublishDate);
+            _heldReleases[0].MovieVersionId = 201;
+            _remoteMovie.MovieVersionId = 202;
+
+            Subject.Add(_temporarilyRejected, PendingReleaseReason.Delay);
+
+            Mocker.GetMock<IPendingReleaseRepository>().Verify(s => s.Insert(It.Is<PendingRelease>(p => p.MovieVersionId == 202)), Times.Once());
         }
 
         [Test]

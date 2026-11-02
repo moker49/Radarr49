@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
@@ -160,6 +161,38 @@ namespace NzbDrone.Core.Test.MoviesTests
             _definitions[0].IsPrimary = true;
 
             Assert.Throws<InvalidOperationException>(() => Subject.Resolve(_movie));
+        }
+
+        [Test]
+        public void version_context_should_not_mutate_shared_movie()
+        {
+            WithComposite();
+            var originalProfile = _movie.QualityProfile;
+            var context = Subject.ForVersion(_movie, 202);
+
+            Assert.That(context, Is.Not.SameAs(_movie));
+            Assert.That(context.QualityProfile.Id, Is.EqualTo(12));
+            Assert.That(context.MovieFileId, Is.Zero);
+            Assert.That(_movie.MovieFileId, Is.EqualTo(50));
+            Assert.That(_movie.QualityProfile, Is.SameAs(originalProfile));
+            Assert.That(context.QualityProfileId, Is.EqualTo(_movie.QualityProfileId));
+        }
+
+        [Test]
+        public void foreign_version_id_should_be_rejected()
+        {
+            WithComposite();
+
+            Assert.Throws<InvalidOperationException>(() => Subject.Get(_movie, 999));
+        }
+
+        [Test]
+        public void foreign_movie_file_should_be_rejected()
+        {
+            WithComposite();
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetMovie(50)).Returns(new MovieFile { Id = 50, MovieId = 999 });
+
+            Assert.Throws<InvalidOperationException>(() => Subject.ForVersion(_movie, 201));
         }
     }
 }

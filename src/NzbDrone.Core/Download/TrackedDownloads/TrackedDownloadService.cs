@@ -5,6 +5,7 @@ using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.Download.History;
 using NzbDrone.Core.History;
@@ -40,6 +41,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _movieVersions;
 
         private readonly ICached<TrackedDownload> _cache;
 
@@ -50,7 +52,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                                       ICustomFormatCalculationService formatCalculator,
                                       IEventAggregator eventAggregator,
                                       ICacheManager cacheManager,
-                                      Logger logger)
+                                      Logger logger,
+                                      IMovieVersionService movieVersions)
         {
             _parsingService = parsingService;
             _historyService = historyService;
@@ -59,6 +62,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _formatCalculator = formatCalculator;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _movieVersions = movieVersions;
 
             _cache = cacheManager.GetCache<TrackedDownload>(GetType());
         }
@@ -111,7 +115,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                 DownloadItem = downloadItem,
                 Protocol = downloadClient.Protocol,
                 IsTrackable = true,
-                HasNotifiedManualInteractionRequired = existingItem?.HasNotifiedManualInteractionRequired ?? false
+                HasNotifiedManualInteractionRequired = existingItem?.HasNotifiedManualInteractionRequired ?? false,
+                MovieVersionId = existingItem?.MovieVersionId
             };
 
             try
@@ -175,7 +180,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     }
                 }
 
-                if (trackedDownload.RemoteMovie != null)
+                if (RestoreVersion(trackedDownload, downloadHistory, historyItems) && trackedDownload.RemoteMovie != null)
                 {
                     _aggregationService.Augment(trackedDownload.RemoteMovie);
 
@@ -191,6 +196,11 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             }
             catch (MultipleMoviesFoundException e)
             {
+                if (trackedDownload.MovieVersionId.HasValue)
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                }
+
                 _logger.Debug(e, "Found multiple movies for " + downloadItem.Title);
 
                 trackedDownload.Warn("Unable to import automatically, found multiple movies: {0}", string.Join(", ", e.Movies));
@@ -243,11 +253,89 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         private void UpdateCachedItem(TrackedDownload trackedDownload)
         {
+            var movieId = trackedDownload.RemoteMovie?.Movie?.Id;
             var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
 
-            trackedDownload.RemoteMovie = parsedMovieInfo == null ? null : _parsingService.Map(parsedMovieInfo, "", 0, null);
+            trackedDownload.RemoteMovie = parsedMovieInfo == null ? null :
+                trackedDownload.MovieVersionId.HasValue && movieId.HasValue ? _parsingService.Map(parsedMovieInfo, movieId.Value) :
+                _parsingService.Map(parsedMovieInfo, "", 0, null);
+
+            if (!RestoreVersion(trackedDownload, null, new List<MovieHistory>()))
+            {
+                return;
+            }
 
             _aggregationService.Augment(trackedDownload.RemoteMovie);
+        }
+
+        private bool RestoreVersion(TrackedDownload trackedDownload, DownloadHistory downloadHistory, List<MovieHistory> history)
+        {
+            var ids = history.Where(h => h.MovieVersionId.HasValue).Select(h => h.MovieVersionId.Value)
+                .Concat(new[] { downloadHistory?.MovieVersionId, trackedDownload.MovieVersionId }.Where(id => id.HasValue).Select(id => id.Value))
+                .Distinct().ToList();
+            if (ids.Count == 0)
+            {
+                try
+                {
+                    if (trackedDownload.State == TrackedDownloadState.Downloading && trackedDownload.RemoteMovie?.Movie != null &&
+                        _movieVersions.Resolve(trackedDownload.RemoteMovie.Movie)?.Any(v => v.Id.HasValue) == true)
+                    {
+                        trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                        trackedDownload.Warn("No managed version was recorded for this download. Select its destination version manually.");
+                        return false;
+                    }
+                }
+                catch (Exception e) when (e is InvalidOperationException || e is ModelNotFoundException)
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn("Unable to resolve managed versions: {0}", e.Message);
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (ids.Count != 1)
+            {
+                trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                trackedDownload.Warn("Conflicting managed version assignments in download history. Select the intended version manually.");
+                return false;
+            }
+
+            trackedDownload.MovieVersionId = ids[0];
+            var authoritativeMovieId = history.FirstOrDefault(h => h.MovieVersionId.HasValue)?.MovieId ??
+                (downloadHistory?.MovieVersionId.HasValue == true ? downloadHistory.MovieId : trackedDownload.RemoteMovie?.Movie?.Id);
+            if (history.Any(h => h.MovieVersionId.HasValue && h.MovieId != authoritativeMovieId) ||
+                (downloadHistory?.MovieVersionId.HasValue == true && downloadHistory.MovieId != authoritativeMovieId))
+            {
+                trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                trackedDownload.Warn("Conflicting movie ownership in versioned download history. Select the intended version manually.");
+                return false;
+            }
+
+            var parsed = trackedDownload.RemoteMovie?.ParsedMovieInfo;
+            if (authoritativeMovieId.HasValue && parsed != null && trackedDownload.RemoteMovie?.Movie?.Id != authoritativeMovieId)
+            {
+                trackedDownload.RemoteMovie = _parsingService.Map(parsed, authoritativeMovieId.Value);
+            }
+
+            try
+            {
+                if (trackedDownload.RemoteMovie?.Movie == null || trackedDownload.RemoteMovie.Movie.Id != authoritativeMovieId)
+                {
+                    throw new InvalidOperationException("The originally assigned movie could not be restored.");
+                }
+
+                trackedDownload.RemoteMovie.Movie = _movieVersions.ForVersion(trackedDownload.RemoteMovie.Movie, ids[0]);
+                trackedDownload.RemoteMovie.MovieVersionId = ids[0];
+                return true;
+            }
+            catch (Exception e) when (e is InvalidOperationException || e is ModelNotFoundException)
+            {
+                trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                trackedDownload.Warn("Unable to restore the managed version assignment: {0}", e.Message);
+                return false;
+            }
         }
 
         private static TrackedDownloadState GetStateFromHistory(DownloadHistoryEventType eventType)

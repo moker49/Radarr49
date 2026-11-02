@@ -107,7 +107,8 @@ namespace NzbDrone.Core.History
             _logger.Debug("Trying to find downloadId for {0} from history", trackedDownload.ImportedMovie.Path);
 
             var movieId = trackedDownload.MovieInfo.Movie.Id;
-            var movieHistory = _historyRepository.FindDownloadHistory(movieId, trackedDownload.ImportedMovie.Quality);
+            var movieHistory = _historyRepository.FindDownloadHistory(movieId, trackedDownload.ImportedMovie.Quality)
+                .Where(h => h.MovieVersionId == trackedDownload.MovieInfo.MovieVersionId).ToList();
 
             var processedDownloadId = movieHistory
                 .Where(c => c.EventType != MovieHistoryEventType.Grabbed && c.DownloadId != null)
@@ -140,7 +141,8 @@ namespace NzbDrone.Core.History
                 Languages = message.Movie.Languages,
                 SourceTitle = message.Movie.Release.Title,
                 DownloadId = message.DownloadId,
-                MovieId = message.Movie.Movie.Id
+                MovieId = message.Movie.Movie.Id,
+                MovieVersionId = message.Movie.MovieVersionId
             };
 
             history.Data.Add("Indexer", message.Movie.Release.Indexer);
@@ -201,6 +203,7 @@ namespace NzbDrone.Core.History
                 SourceTitle = message.ImportedMovie.SceneName ?? Path.GetFileNameWithoutExtension(message.MovieInfo.Path),
                 DownloadId = downloadId,
                 MovieId = movie.Id,
+                MovieVersionId = message.MovieInfo.MovieVersionId,
             };
 
             history.Data.Add("FileId", message.ImportedMovie.Id.ToString());
@@ -275,6 +278,7 @@ namespace NzbDrone.Core.History
             var history = new MovieHistory
             {
                 EventType = MovieHistoryEventType.DownloadIgnored,
+                MovieVersionId = message.TrackedDownload?.MovieVersionId,
                 Date = DateTime.UtcNow,
                 Quality = message.Quality,
                 SourceTitle = message.SourceTitle,
@@ -303,6 +307,7 @@ namespace NzbDrone.Core.History
             var history = new MovieHistory
             {
                 EventType = MovieHistoryEventType.DownloadFailed,
+                MovieVersionId = message.TrackedDownload?.MovieVersionId,
                 Date = DateTime.UtcNow,
                 Quality = message.Quality,
                 Languages = message.Languages,

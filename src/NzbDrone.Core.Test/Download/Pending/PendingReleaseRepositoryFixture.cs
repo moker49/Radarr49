@@ -28,6 +28,15 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void should_persist_managed_version_identity()
+        {
+            var pending = Builder<PendingRelease>.CreateNew().With(p => p.Id = 0).With(p => p.MovieVersionId = 201).With(p => p.Release = new ReleaseInfo()).With(p => p.ParsedMovieInfo = new ParsedMovieInfo()).Build();
+            Subject.Insert(pending);
+
+            Assert.That(Subject.Get(pending.Id).MovieVersionId, Is.EqualTo(201));
+        }
+
+        [Test]
         public void should_delete_files_by_movieId()
         {
             var files = Builder<PendingRelease>.CreateListOfSize(5)

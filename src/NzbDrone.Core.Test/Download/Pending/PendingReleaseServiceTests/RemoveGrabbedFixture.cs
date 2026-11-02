@@ -26,6 +26,18 @@ namespace NzbDrone.Core.Test.Download.Pending.PendingReleaseServiceTests
         private RemoteMovie _remoteMovie;
         private List<PendingRelease> _heldReleases;
 
+        [Test]
+        public void grabbing_one_version_must_not_clear_the_other_versions_pending_release()
+        {
+            GivenHeldRelease(new QualityModel(Quality.HDTV720p));
+            _heldReleases[0].MovieVersionId = 201;
+            _remoteMovie.MovieVersionId = 202;
+
+            Subject.Handle(new MovieGrabbedEvent(_remoteMovie));
+
+            Mocker.GetMock<IPendingReleaseRepository>().Verify(s => s.Delete(It.IsAny<PendingRelease>()), Times.Never());
+        }
+
         [SetUp]
         public void Setup()
         {
@@ -89,6 +101,7 @@ namespace NzbDrone.Core.Test.Download.Pending.PendingReleaseServiceTests
             var heldReleases = Builder<PendingRelease>.CreateListOfSize(1)
                                                    .All()
                                                    .With(h => h.MovieId = _movie.Id)
+                                                   .With(h => h.MovieVersionId = null)
                                                    .With(h => h.Release = _release.JsonClone())
                                                    .With(h => h.ParsedMovieInfo = parsedMovieInfo)
                                                    .Build();

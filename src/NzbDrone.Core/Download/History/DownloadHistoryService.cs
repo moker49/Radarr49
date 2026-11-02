@@ -102,6 +102,7 @@ namespace NzbDrone.Core.Download.History
             var history = new DownloadHistory
             {
                 EventType = DownloadHistoryEventType.DownloadGrabbed,
+                MovieVersionId = message.Movie.MovieVersionId,
                 MovieId = message.Movie.Movie.Id,
                 DownloadId = message.DownloadId,
                 SourceTitle = message.Movie.Release.Title,
@@ -144,6 +145,7 @@ namespace NzbDrone.Core.Download.History
             var history = new DownloadHistory
             {
                 EventType = DownloadHistoryEventType.FileImported,
+                MovieVersionId = message.MovieInfo.MovieVersionId,
                 MovieId = message.ImportedMovie.MovieId,
                 DownloadId = downloadId,
                 SourceTitle = message.MovieInfo.Path,
@@ -165,6 +167,7 @@ namespace NzbDrone.Core.Download.History
             var history = new DownloadHistory
             {
                 EventType = DownloadHistoryEventType.DownloadImported,
+                MovieVersionId = message.TrackedDownload.MovieVersionId,
                 MovieId = message.MovieId,
                 DownloadId = downloadItem.DownloadId,
                 SourceTitle = downloadItem.Title,
@@ -190,6 +193,7 @@ namespace NzbDrone.Core.Download.History
             var history = new DownloadHistory
             {
                 EventType = DownloadHistoryEventType.DownloadFailed,
+                MovieVersionId = message.TrackedDownload.MovieVersionId,
                 MovieId = message.MovieId,
                 DownloadId = message.DownloadId,
                 SourceTitle = message.SourceTitle,
@@ -209,6 +213,7 @@ namespace NzbDrone.Core.Download.History
             var history = new DownloadHistory
             {
                 EventType = DownloadHistoryEventType.DownloadIgnored,
+                MovieVersionId = message.TrackedDownload?.MovieVersionId,
                 MovieId = message.MovieId,
                 DownloadId = message.DownloadId,
                 SourceTitle = message.SourceTitle,
