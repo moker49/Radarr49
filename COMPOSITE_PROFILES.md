@@ -141,6 +141,21 @@ the earlier one is unavailable. Primary selection is independent of download ord
   physical changes, including direct command requests. Bulk preflight protects mixed
   selections, and individual moves recheck under the per-movie lock. The explicit managed
   folder move/recovery workflow is not implemented or exposed yet.
+- Explicit version-file deletion targets movie, version and exact current file IDs. It
+  rejects stale/replaced files, active target reservations, unresolved/targeted tracked
+  downloads, shared file registrations, overlapping movie folders and unavailable roots
+  before recycling. Another version's identified active download does not block deletion.
+  The assignment row remains; unmonitoring defaults to that version only and can be
+  explicitly disabled, independently of the global automatic-unmonitor setting.
+- The repository rechecks exact version/profile ownership and active reservations under
+  the movie row lock. File-row removal, assignment detachment, optional version unmonitoring
+  and primary summary clearing commit together. Imported reservation rows remain as audit
+  history; only the deleted file's effective release ownership expires. Active reservations
+  are never cancelled or silently released by deletion.
+- Extras recycling now checks video registrations and claims across subtitles, metadata
+  and other extras, not just the current provider's category. Shared metadata, including
+  recognized shared files with older file-owned registrations, is preserved. Paths outside
+  the movie folder or overlapping another movie are not recycled as sidecars.
 
 ## Remaining sequence
 
@@ -153,11 +168,14 @@ the earlier one is unavailable. Primary selection is independent of download ord
    import context, and add end-to-end recovery checks before activation. Manual imports of
    a reserved download must retain its bound client/download identity; never infer that
    association from a sole pending job. Keep active and currently owned reservations during
-   housekeeping; reconcile/cascade them explicitly when version-aware deletion is added.
+   housekeeping. Targeted file deletion now preserves reservation audit rows and expires
+   only ownership of the detached file. Whole-movie/version removal still needs explicit
+   reservation/pending/history reconciliation; it is not exposed.
 4. Import/replacement, transactional file ownership and basic naming/rename paths are
    implemented. Scans, sidecar association, shared metadata and relevant file/metadata
    housekeeping are also implemented. Explicit manual-import backend/API selection is
-   implemented. Finish managed folder moves and version-aware deletion; audit notifications
+   implemented. Targeted version-file deletion is implemented. Finish managed folder moves;
+   audit notifications
    and remaining command paths. Legacy folder moves are protected, not enabled for composites.
    Managed download script imports are rejected pending dedicated
    support. Existing standard recycle-before-transfer behavior remains: a transfer failure
@@ -245,6 +263,35 @@ command preflight, child-context preservation, completion verification and legac
 protection. Logs: `_temp/composite-manual-regression.log` and
 `_temp/composite-manual-api-tests.log`.
 
+The targeted-deletion stage passes a 1,102-test core regression (five existing skips) and
+25 API tests, including trailing-separator handling and both primary-delete monitoring choices.
+The documented logging-expectation test remains excluded. Coverage includes real SQLite
+ownership rollback, active-reservation rechecks, secondary-file/root-monitor preservation,
+release-ownership expiration without deleting audit rows, exact-file API forwarding,
+cross-provider extras claims, stale requests and filesystem failures. Logs:
+`_temp/composite-version-delete-regression.log`,
+`_temp/composite-version-delete-api-tests.log` and
+`_temp/composite-version-delete-path-tests.log`.
+
+## File operation recovery still required before activation
+
+Targeted deletion currently follows the existing recycle-before-database pattern. A failed
+recycle does not detach ownership. A crash after recycling but before the database commit
+can still leave the registered target in the recycle bin, and a crash after the commit
+can interrupt asynchronous extras cleanup. There is no durable filesystem-operation
+journal or automatic physical rollback yet. Exact file IDs prevent a retry from deleting
+a replacement, but callers must refresh on stale/missing assignments rather than assuming
+the previous request completed. Composite activation remains disabled.
+
+The folder-move audit found that DiskTransferService.TransferFolder can recursively merge
+into an existing destination, overwrite file paths, and move files incrementally across
+filesystems. A managed move must not just unblock MoveMovieCommand. Its implementation
+needs a persisted operation/manifest, destination conflict checks, verification before
+committing the new movie path, and restart reconciliation of partial transfers. An initial
+root-folder move can preserve the movie folder basename and all relative paths, avoiding
+filename changes in the same operation. Source cleanup and post-commit events/extras work
+must be recoverable, and incomplete operations must block conflicting writes/acquisition.
+
 ## Draft configuration API
 
 Use an unused ordinary profile as the parent (give it the desired composite name first).
@@ -264,6 +311,19 @@ continues to list the parent, but assignment currently returns HTTP 409. Legacy 
 deletes against protected targets also return HTTP 409 with an explanation; this applies
 to the built-in legacy interface as well as external clients. The future legacy add
 workflow will be enabled once version assignments, downloads and imports are ready.
+
+## Version-file deletion API
+
+DELETE `/api/v3/movie/{movieId}/versions/{movieVersionId}/file/{movieFileId}` removes only
+the exact currently assigned file. `unmonitor=true` is the default; explicitly pass
+`unmonitor=false` to preserve that version's monitoring. The movie, other version,
+definition IDs and selected composite profile are retained. Successful deletion returns
+HTTP 204. Stale/mismatched identities, active downloads or ownership/path conflicts return
+HTTP 409 before physical changes; positive IDs are required. Ordinary/implicit versions
+cannot use this route. Legacy movie/file delete endpoints continue to reject composites.
+
+This route does not cancel client jobs, remove a version definition or delete the whole
+movie. If a reservation is active, reconcile it explicitly before attempting deletion.
 
 ## Manual import API
 

@@ -35,11 +35,13 @@ namespace NzbDrone.Core.Extras.Files
         private readonly IDiskProvider _diskProvider;
         private readonly IRecycleBinProvider _recycleBinProvider;
         private readonly Logger _logger;
+        private readonly IExtraFileDeletionGuard _deletionGuard;
 
         public ExtraFileService(IExtraFileRepository<TExtraFile> repository,
                                 IMovieService movieService,
                                 IDiskProvider diskProvider,
                                 IRecycleBinProvider recycleBinProvider,
+                                IExtraFileDeletionGuard deletionGuard,
                                 Logger logger)
         {
             _repository = repository;
@@ -47,6 +49,7 @@ namespace NzbDrone.Core.Extras.Files
             _diskProvider = diskProvider;
             _recycleBinProvider = recycleBinProvider;
             _logger = logger;
+            _deletionGuard = deletionGuard;
         }
 
         public List<TExtraFile> GetFilesByMovie(int movieId)
@@ -123,12 +126,13 @@ namespace NzbDrone.Core.Extras.Files
 
                 foreach (var extra in _repository.GetFilesByMovieFile(movieFile.Id))
                 {
-                    var path = Path.Combine(movie.Path, extra.RelativePath);
-                    if (files.Any(f => f.MovieFileId != movieFile.Id && f.RelativePath.Equals(extra.RelativePath, StringComparison.OrdinalIgnoreCase)))
+                    if (!_deletionGuard.CanRecycle(movie, movieFile.Id, extra.RelativePath) ||
+                        files.Any(f => f.MovieFileId != movieFile.Id && string.Equals(f.RelativePath, extra.RelativePath, StringComparison.OrdinalIgnoreCase)))
                     {
                         continue;
                     }
 
+                    var path = Path.Combine(movie.Path, extra.RelativePath);
                     if (_diskProvider.FileExists(path))
                     {
                         // Send to the recycling bin so they can be recovered if necessary

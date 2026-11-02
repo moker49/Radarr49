@@ -26,6 +26,7 @@ namespace NzbDrone.Core.Test.Extras
             var movie = new Movie { Id = 1, Path = @"C:\Movies\300 (2006)".AsOsAgnostic() };
             _extras = new List<SubtitleFile> { new SubtitleFile { Id = 1, MovieId = 1, MovieFileId = 11, RelativePath = "SDR.en.srt" } };
             Mocker.GetMock<IMovieService>().Setup(v => v.GetMovie(1)).Returns(movie);
+            Mocker.GetMock<IExtraFileDeletionGuard>().Setup(v => v.CanRecycle(movie, 11, It.IsAny<string>())).Returns(true);
             Mocker.GetMock<IExtraFileRepository<SubtitleFile>>().Setup(v => v.GetFilesByMovieFile(11)).Returns(_extras);
             Mocker.GetMock<IExtraFileRepository<SubtitleFile>>().Setup(v => v.GetFilesByMovie(1)).Returns(() => _extras);
             Mocker.GetMock<IDiskProvider>().Setup(v => v.FileExists(It.IsAny<string>())).Returns(true);

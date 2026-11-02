@@ -4,6 +4,7 @@ using Dapper;
 using FizzWare.NBuilder;
 using NUnit.Framework;
 using NzbDrone.Core.Datastore;
+using NzbDrone.Core.Download;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
@@ -119,6 +120,80 @@ namespace NzbDrone.Core.Test.MediaFiles
             Assert.Throws<InvalidOperationException>(() => Subject.InsertForVersion(file, _hdr.Id));
             Assert.That(Version(_hdr.Id).MovieFileId, Is.Null);
             Assert.That(Subject.GetFilesByMovie(_movie.Id), Is.Empty);
+        }
+
+        [Test]
+        public void explicit_delete_should_preserve_other_version_file_monitoring_and_root_monitoring()
+        {
+            var sdr = Subject.InsertForVersion(File("SDR.mkv"), _sdr.Id);
+            var hdr = Subject.InsertForVersion(File("HDR.mkv"), _hdr.Id);
+
+            Subject.DeleteManagedVersionFile(hdr, _hdr.Id, true);
+
+            Assert.That(Version(_hdr.Id).MovieFileId, Is.Null);
+            Assert.That(Version(_hdr.Id).Monitored, Is.False);
+            Assert.That(Version(_sdr.Id).MovieFileId, Is.EqualTo(sdr.Id));
+            Assert.That(Version(_sdr.Id).Monitored, Is.True);
+            Assert.That(PrimaryFileId(), Is.EqualTo(sdr.Id));
+            Assert.That(Db.Single<Movie>().Monitored, Is.EqualTo(_movie.Monitored));
+        }
+
+        [Test]
+        public void explicit_delete_should_reject_stale_or_wrong_version_without_detaching_any_file()
+        {
+            var sdr = Subject.InsertForVersion(File("SDR.mkv"), _sdr.Id);
+            var hdr = Subject.InsertForVersion(File("HDR.mkv"), _hdr.Id);
+
+            Assert.Throws<InvalidOperationException>(() => Subject.DeleteManagedVersionFile(hdr, _sdr.Id, true));
+
+            Assert.That(Version(_hdr.Id).MovieFileId, Is.EqualTo(hdr.Id));
+            Assert.That(Version(_sdr.Id).MovieFileId, Is.EqualTo(sdr.Id));
+            Assert.That(Subject.GetFilesByMovie(_movie.Id).Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void explicit_delete_should_recheck_active_reservation_in_transaction()
+        {
+            var sdr = Subject.InsertForVersion(File("SDR.mkv"), _sdr.Id);
+            Db.Insert(new DownloadReservation { MovieId = _movie.Id, MovieVersionId = _sdr.Id, DownloadClientId = 2, DownloadId = "job", SourceTitle = "300 SDR", State = DownloadReservationState.Submitted });
+
+            Assert.Throws<InvalidOperationException>(() => Subject.DeleteManagedVersionFile(sdr, _sdr.Id, true));
+
+            Assert.That(Version(_sdr.Id).MovieFileId, Is.EqualTo(sdr.Id));
+            Assert.That(Version(_sdr.Id).Monitored, Is.True);
+            Assert.That(PrimaryFileId(), Is.EqualTo(sdr.Id));
+        }
+
+        [Test]
+        public void deletion_should_expire_only_target_imported_release_ownership_and_keep_reservation_audit()
+        {
+            var sdr = Subject.InsertForVersion(File("SDR.mkv"), _sdr.Id);
+            var hdr = Subject.InsertForVersion(File("HDR.mkv"), _hdr.Id);
+            Db.Insert(new DownloadReservation { MovieId = _movie.Id, MovieVersionId = _sdr.Id, DownloadClientId = 2, DownloadId = "sdr", SourceTitle = "300 SDR", ImportedMovieFileId = sdr.Id, State = DownloadReservationState.Imported });
+            Db.Insert(new DownloadReservation { MovieId = _movie.Id, MovieVersionId = _hdr.Id, DownloadClientId = 2, DownloadId = "hdr", SourceTitle = "300 HDR", ImportedMovieFileId = hdr.Id, State = DownloadReservationState.Imported });
+            var reservations = Mocker.Resolve<DownloadReservationRepository>();
+
+            Subject.DeleteManagedVersionFile(hdr, _hdr.Id, true);
+
+            Assert.That(reservations.FindForDownload(2, "hdr"), Is.Empty);
+            Assert.That(reservations.FindForDownload(2, "sdr").Count, Is.EqualTo(1));
+            Assert.That(Db.All<DownloadReservation>().Count, Is.EqualTo(2));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void explicit_primary_delete_should_clear_summary_without_promoting_secondary(bool unmonitor)
+        {
+            var sdr = Subject.InsertForVersion(File("SDR.mkv"), _sdr.Id);
+            var hdr = Subject.InsertForVersion(File("HDR.mkv"), _hdr.Id);
+
+            Subject.DeleteManagedVersionFile(sdr, _sdr.Id, unmonitor);
+
+            Assert.That(PrimaryFileId(), Is.Zero);
+            Assert.That(Version(_sdr.Id).MovieFileId, Is.Null);
+            Assert.That(Version(_sdr.Id).Monitored, Is.EqualTo(!unmonitor));
+            Assert.That(Version(_hdr.Id).MovieFileId, Is.EqualTo(hdr.Id));
+            Assert.That(Version(_hdr.Id).Monitored, Is.True);
         }
     }
 }

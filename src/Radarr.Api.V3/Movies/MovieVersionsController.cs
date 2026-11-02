@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using Radarr.Http;
 
@@ -11,11 +12,13 @@ namespace Radarr.Api.V3.Movies
     {
         private readonly IMovieService _movies;
         private readonly IMovieVersionService _versions;
+        private readonly IMovieVersionFileDeletionService _deletions;
 
-        public MovieVersionsController(IMovieService movies, IMovieVersionService versions)
+        public MovieVersionsController(IMovieService movies, IMovieVersionService versions, IMovieVersionFileDeletionService deletions)
         {
             _movies = movies;
             _versions = versions;
+            _deletions = deletions;
         }
 
         [HttpGet]
@@ -33,6 +36,13 @@ namespace Radarr.Api.V3.Movies
                 Monitored = v.Monitored,
                 MovieFileId = v.MovieFileId
             }).ToList();
+        }
+
+        [HttpDelete("{movieVersionId:int}/file/{movieFileId:int}")]
+        public IActionResult DeleteFile(int movieId, int movieVersionId, int movieFileId, bool unmonitor = true)
+        {
+            _deletions.Delete(movieId, movieVersionId, movieFileId, unmonitor);
+            return NoContent();
         }
     }
 

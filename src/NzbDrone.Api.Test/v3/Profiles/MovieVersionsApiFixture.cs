@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Mvc;
+using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Test.Common;
@@ -43,6 +46,20 @@ namespace NzbDrone.Api.Test.v3.Profiles
             Assert.That(versions.Select(v => v.Id), Is.EqualTo(new int?[] { 201, 202 }));
             Assert.That(versions.Select(v => v.QualityProfileId), Is.EqualTo(new[] { 5, 6 }));
             Assert.That(versions.All(v => !v.IsImplicit), Is.True);
+        }
+
+        [Test]
+        public void version_file_delete_should_forward_exact_identity_and_default_unmonitor_choice()
+        {
+            Assert.That(Subject.DeleteFile(1, 7, 11), Is.InstanceOf<NoContentResult>());
+            Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 7, 11, true), Times.Once());
+        }
+
+        [Test]
+        public void version_file_delete_should_allow_preserving_monitoring_explicitly()
+        {
+            Subject.DeleteFile(1, 8, 12, false);
+            Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 8, 12, false), Times.Once());
         }
     }
 }

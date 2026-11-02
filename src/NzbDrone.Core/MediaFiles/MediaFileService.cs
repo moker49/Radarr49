@@ -17,6 +17,7 @@ namespace NzbDrone.Core.MediaFiles
         void Update(MovieFile movieFile);
         void Update(List<MovieFile> movieFile);
         void Delete(MovieFile movieFile, DeleteMediaFileReason reason);
+        void DeleteManagedVersionFile(MovieFile movieFile, int movieVersionId, bool unmonitor);
         List<MovieFile> GetFilesByMovie(int movieId);
         List<MovieFile> GetFilesByMovies(IEnumerable<int> movieIds);
         List<MovieFile> GetFilesWithoutMediaInfo();
@@ -112,7 +113,15 @@ namespace NzbDrone.Core.MediaFiles
             }
         }
 
-        private void DeleteCore(MovieFile movieFile, DeleteMediaFileReason reason)
+        public void DeleteManagedVersionFile(MovieFile movieFile, int movieVersionId, bool unmonitor)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movieFile.MovieId))
+            {
+                DeleteCore(movieFile, DeleteMediaFileReason.Manual, movieVersionId, unmonitor);
+            }
+        }
+
+        private void DeleteCore(MovieFile movieFile, DeleteMediaFileReason reason, int? expectedVersionId = null, bool unmonitor = false)
         {
             // Little hack so we have the movie attached for the event consumers
             if (movieFile.Movie == null)
@@ -122,7 +131,9 @@ namespace NzbDrone.Core.MediaFiles
 
             movieFile.Path = Path.Combine(movieFile.Movie.Path, movieFile.RelativePath);
 
-            var versionId = _mediaFileRepository.DeleteForVersion(movieFile, (reason == DeleteMediaFileReason.Manual || reason == DeleteMediaFileReason.MissingFromDisk) && _config.AutoUnmonitorPreviouslyDownloadedMovies);
+            var versionId = expectedVersionId.HasValue
+                ? _mediaFileRepository.DeleteManagedVersionFile(movieFile, expectedVersionId.Value, unmonitor)
+                : _mediaFileRepository.DeleteForVersion(movieFile, (reason == DeleteMediaFileReason.Manual || reason == DeleteMediaFileReason.MissingFromDisk) && _config.AutoUnmonitorPreviouslyDownloadedMovies);
             movieFile.MovieVersionId = versionId;
             if (!versionId.HasValue)
             {

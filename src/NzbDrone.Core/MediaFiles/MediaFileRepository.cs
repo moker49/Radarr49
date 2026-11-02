@@ -19,6 +19,7 @@ namespace NzbDrone.Core.MediaFiles
         List<MovieFile> GetFilesWithRelativePath(int movieId, string relativePath);
         MovieFile InsertForVersion(MovieFile movieFile, int movieVersionId);
         int? DeleteForVersion(MovieFile movieFile, bool unmonitor);
+        int DeleteManagedVersionFile(MovieFile movieFile, int movieVersionId, bool unmonitor);
     }
 
     public class MediaFileRepository : BasicRepository<MovieFile>, IMediaFileRepository
@@ -74,10 +75,25 @@ namespace NzbDrone.Core.MediaFiles
 
         public int? DeleteForVersion(MovieFile movieFile, bool unmonitor)
         {
+            return DeleteForVersionCore(movieFile, unmonitor, null);
+        }
+
+        public int DeleteManagedVersionFile(MovieFile movieFile, int movieVersionId, bool unmonitor)
+        {
+            return DeleteForVersionCore(movieFile, unmonitor, movieVersionId) ?? throw new InvalidOperationException("The selected file is no longer owned by this version.");
+        }
+
+        private int? DeleteForVersionCore(MovieFile movieFile, bool unmonitor, int? expectedVersionId)
+        {
             using var connection = _database.OpenConnection();
             var versionId = connection.QuerySingleOrDefault<int?>("SELECT \"Id\" FROM \"MovieVersions\" WHERE \"MovieId\" = @MovieId AND \"MovieFileId\" = @Id", movieFile);
             if (!versionId.HasValue)
             {
+                if (expectedVersionId.HasValue)
+                {
+                    throw new InvalidOperationException("The selected file is no longer owned by this version.");
+                }
+
                 return null;
             }
 
@@ -86,7 +102,25 @@ namespace NzbDrone.Core.MediaFiles
             versionId = connection.QuerySingleOrDefault<int?>("SELECT \"Id\" FROM \"MovieVersions\" WHERE \"MovieId\" = @MovieId AND \"MovieFileId\" = @Id", movieFile, transaction);
             if (!versionId.HasValue)
             {
+                if (expectedVersionId.HasValue)
+                {
+                    throw new InvalidOperationException("The selected file is no longer owned by this version.");
+                }
+
                 return null;
+            }
+
+            if (expectedVersionId.HasValue)
+            {
+                if (versionId != expectedVersionId || connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" WHERE v.\"Id\" = @versionId AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", new { versionId }, transaction) != 1)
+                {
+                    throw new InvalidOperationException("The selected file is no longer owned by this movie and profile version.");
+                }
+
+                if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"DownloadReservations\" WHERE \"MovieId\" = @movieId AND \"MovieVersionId\" = @versionId AND \"State\" IN (0, 1, 2, 5)", new { movieId = movieFile.MovieId, versionId }, transaction) != 0)
+                {
+                    throw new InvalidOperationException("This version has an active download reservation. Reconcile it before deleting its file.");
+                }
             }
 
             connection.Execute("UPDATE \"MovieVersions\" SET \"MovieFileId\" = NULL WHERE \"Id\" = @versionId", new { versionId }, transaction);
