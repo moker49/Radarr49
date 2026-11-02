@@ -101,6 +101,28 @@ the earlier one is unavailable. Primary selection is independent of download ord
 - Singular movie repository joins now consistently select MovieFileId, so queries cannot
   load an arbitrary secondary file. Completed downloads require their own verified imported
   reservation; history and import-result checks cannot complete a different version.
+- Scans serialize their disk snapshot, cleanup and events with imports/conversion/renames.
+  They reload the root, validate the version registry before cleanup, preserve registered
+  assignments, refresh file media info in each child context and publish a fresh primary
+  summary. Unassigned video files still require explicit version selection; matching a
+  filename label alone does not assign a video.
+- Existing subtitles and other sidecars resolve against actual registered video paths,
+  with exact basename or dot-suffix matching in the same directory. Ambiguous or unmatched
+  files stay unmanaged. Aggregation preserves explicit version context before subtitle
+  parsing. Managed download extras use the source video's basename and do not use the
+  broad movie-title or single-video subtitle fallback. Generic names and nested subtitle
+  layouts that cannot be matched safely remain for explicit handling.
+- Recognized shared artwork and movie/folder NFOs have no file owner. File-specific
+  metadata retains the matched version's file ID. Providers generating one shared NFO
+  write it only from the primary version; refresh reuses the existing record. Shared
+  metadata survives version removal, while per-file extras remain scoped to their owner.
+- Extras scan/cover/rename events serialize with imports. Delayed deletion checks whether
+  a replacement registered the same sidecar path before recycling it, and metadata-only
+  file refresh preserves sidecars. Duplicate metadata records sharing the retained path
+  are removed without recycling that physical file.
+- Housekeeping preserves files owned by MovieVersions even when they are not the primary.
+  Metadata deduplication now distinguishes movie, file owner, consumer and path, retaining
+  both versions' NFOs and shared metadata while removing all true duplicate records.
 
 ## Remaining sequence
 
@@ -115,8 +137,10 @@ the earlier one is unavailable. Primary selection is independent of download ord
    association from a sole pending job. Keep active and currently owned reservations during
    housekeeping; reconcile/cascade them explicitly when version-aware deletion is added.
 4. Import/replacement, transactional file ownership and basic naming/rename paths are
-   implemented. Finish scans, folder moves, housekeeping, extras/metadata and explicit
-   manual-import routes. Managed download script imports are rejected pending dedicated
+   implemented. Scans, sidecar association, shared metadata and relevant file/metadata
+   housekeeping are also implemented. Finish folder moves, version-aware deletion and
+   explicit manual-import routes; audit notifications and remaining command paths.
+   Managed download script imports are rejected pending dedicated
    support. Existing standard recycle-before-transfer behavior remains: a transfer failure
    can leave the target's previous file in the recycle bin; there is no physical rollback.
    Audit crash recovery between file transfer, registration, extras and import events.
@@ -132,7 +156,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Movies/MovieService.cs | Managed file-event ownership/summary updates implemented |
 | MediaFiles/UpgradeMediaFileService.cs | Targeted replacement and pre-recycle checks implemented |
 | MediaFiles/MovieImport/ImportApprovedMovie.cs | Movie/version grouping and validation implemented |
-| MediaFiles/DiskScanService.cs | Preserve assignments and stop on ambiguous new files |
+| MediaFiles/DiskScanService.cs | Serialized snapshots, preserved assignments and per-file contexts implemented; new video assignments remain explicit |
 | DecisionEngine/Specifications | Child contexts and scoped queue/history/delay checks implemented |
 | DecisionEngine/DownloadDecisionComparer.cs | Effective child profile size settings implemented |
 | Download/ProcessDownloadDecisions.cs | Version grouping and prefer-first scheduling implemented; reservation races become pending releases |
@@ -140,7 +164,8 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
 | History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
 | Radarr.Api.V3 movie/file/profile controllers | Shared guards implemented; audit command/manual-import routes before activation |
-| Organizer, extras, housekeeping and notifications | Audit file selection and scope to version |
+| Extras and housekeeping | Per-file sidecars, shared metadata and secondary-file preservation implemented |
+| Organizer folder moves and notifications | Audit file selection and scope to version |
 
 The critical lifecycle test is add, acquire SDR and HDR, upgrade SDR, restart, rescan,
 and verify HDR is untouched and both assignments survive. Also test unavailable SDR,
@@ -184,6 +209,15 @@ query joins, cross-version replacement isolation, pre-write collisions, reservat
 imports/completion, child profile enforcement, exact naming and protected legacy deletion.
 Legacy test builders now explicitly leave version IDs null where they represent old rows.
 Logs: `_temp/composite-import-regression.log` and `_temp/composite-import-api-tests.log`.
+
+The scan/extras stage passes a broader 1,031-test core regression (five existing skips),
+17 compatibility API tests and two additional real-SQLite scan persistence tests. The latter run repeated scans
+with two registered versions, then verify missing-secondary cleanup preserves the primary
+assignment and summary. Targeted tests cover actual sidecar matching, subtitle aggregation,
+shared/file-specific metadata, delayed cleanup and housekeeping preservation. The documented
+baseline logging-expectation test remains excluded. Logs:
+`_temp/composite-scan-extras-regression.log`, `_temp/composite-scan-persistence.log` and
+`_temp/composite-scan-extras-api.log`.
 
 ## Draft configuration API
 

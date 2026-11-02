@@ -14,15 +14,18 @@ namespace NzbDrone.Core.Extras.Others
         private readonly IExtraFileService<OtherExtraFile> _otherExtraFileService;
         private readonly IParsingService _parsingService;
         private readonly Logger _logger;
+        private readonly IExtraFileVersionService _versions;
 
         public ExistingOtherExtraImporter(IExtraFileService<OtherExtraFile> otherExtraFileService,
                                           IParsingService parsingService,
+                                          IExtraFileVersionService versions,
                                           Logger logger)
             : base(otherExtraFileService)
         {
             _otherExtraFileService = otherExtraFileService;
             _parsingService = parsingService;
             _logger = logger;
+            _versions = versions;
         }
 
         public override int Order => 2;
@@ -36,6 +39,12 @@ namespace NzbDrone.Core.Extras.Others
 
             foreach (var possibleExtraFile in filterResult.FilesOnDisk)
             {
+                var context = _versions.Resolve(movie, possibleExtraFile);
+                if (context == null)
+                {
+                    continue;
+                }
+
                 var extension = Path.GetExtension(possibleExtraFile);
 
                 if (extension.IsNullOrWhiteSpace())
@@ -55,7 +64,7 @@ namespace NzbDrone.Core.Extras.Others
                 var extraFile = new OtherExtraFile
                 {
                     MovieId = movie.Id,
-                    MovieFileId = movie.MovieFileId,
+                    MovieFileId = context.MovieFileId,
                     RelativePath = movie.Path.GetRelativePath(possibleExtraFile),
                     Extension = extension
                 };

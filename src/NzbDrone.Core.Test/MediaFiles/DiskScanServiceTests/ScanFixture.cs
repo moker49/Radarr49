@@ -9,6 +9,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.Events;
+using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
@@ -73,6 +74,37 @@ namespace NzbDrone.Core.Test.MediaFiles.DiskScanServiceTests
                   .Setup(s => s.FolderExists(folder))
                   .Returns(true);
             }
+        }
+
+        [Test]
+        public void scan_should_refresh_each_registered_file_in_its_own_version_context()
+        {
+            GivenMovieFolder();
+            var sdr = new MovieFile { Id = 11, MovieId = _movie.Id, RelativePath = "Movie - SDR.mkv", Size = 1 };
+            var hdr = new MovieFile { Id = 12, MovieId = _movie.Id, RelativePath = "Movie - HDR.mkv", Size = 1 };
+            GivenFiles(new[] { Path.Combine(_movie.Path, sdr.RelativePath), Path.Combine(_movie.Path, hdr.RelativePath) });
+            Mocker.GetMock<IMediaFileService>().Setup(v => v.GetFilesByMovie(_movie.Id)).Returns(new List<MovieFile> { sdr, hdr });
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { Id = 7, MovieFileId = 11 },
+                new ResolvedMovieVersion { Id = 8, MovieFileId = 12 }
+            });
+
+            Subject.Scan(_movie);
+
+            Mocker.GetMock<IUpdateMediaInfo>().Verify(v => v.Update(sdr, It.Is<Movie>(m => m.ManagedVersion.Id == 7 && m.MovieFileId == 11)), Times.Once());
+            Mocker.GetMock<IUpdateMediaInfo>().Verify(v => v.Update(hdr, It.Is<Movie>(m => m.ManagedVersion.Id == 8 && m.MovieFileId == 12)), Times.Once());
+            Mocker.GetMock<IMakeImportDecision>().Verify(v => v.GetImportDecisions(It.Is<List<string>>(f => f.Count == 0), _movie, false), Times.Once());
+        }
+
+        [Test]
+        public void invalid_version_registry_should_prevent_scan_cleanup()
+        {
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Throws(new System.InvalidOperationException("Incomplete assignments"));
+
+            Assert.Throws<System.InvalidOperationException>(() => Subject.Scan(_movie));
+
+            Mocker.GetMock<IMediaFileTableCleanupService>().Verify(v => v.Clean(It.IsAny<Movie>(), It.IsAny<List<string>>()), Times.Never());
         }
 
         private void GivenMovieFolder()

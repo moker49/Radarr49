@@ -43,6 +43,8 @@ namespace NzbDrone.Core.Test.Extras.Subtitles
                                                .Build();
 
             _localMovie = Builder<LocalMovie>.CreateNew()
+                                                 .With(l => l.MovieVersionId = null)
+                                                 .With(l => l.DownloadReservationId = null)
                                                  .With(l => l.Movie = _movie)
                                                  .With(l => l.Path = Path.Combine(_releaseFolder, "Movie.Title.2022.mkv").AsOsAgnostic())
                                                  .With(l => l.FileMovieInfo = new ParsedMovieInfo
@@ -68,6 +70,35 @@ namespace NzbDrone.Core.Test.Extras.Subtitles
             var results = Subject.ImportFiles(_localMovie, _movieFile, files, true).ToList();
 
             results.Count.Should().Be(0);
+        }
+
+        [Test]
+        public void managed_import_should_only_take_subtitles_matching_its_source_video()
+        {
+            _localMovie.MovieVersionId = 7;
+            _localMovie.Path = Path.Combine(_releaseFolder, "Movie.Title.2022.SDR.mkv");
+            var files = new List<string>
+            {
+                Path.Combine(_releaseFolder, "Movie.Title.2022.SDR.en.srt"),
+                Path.Combine(_releaseFolder, "Movie.Title.2022.HDR.en.srt"),
+                Path.Combine(_releaseFolder, "sub.srt")
+            };
+
+            var result = Subject.ImportFiles(_localMovie, _movieFile, files, true).ToList();
+
+            result.Should().HaveCount(1);
+            result.Single().MovieFileId.Should().Be(_movieFile.Id);
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.GetFiles(_releaseFolder, true), Times.Never());
+        }
+
+        [Test]
+        public void managed_import_should_not_use_the_single_video_fallback()
+        {
+            _localMovie.MovieVersionId = 7;
+            var files = new List<string> { Path.Combine(_releaseFolder, "sub.srt") };
+            Mocker.GetMock<IDiskProvider>().Setup(v => v.GetFiles(_releaseFolder, true)).Returns(new[] { _localMovie.Path });
+
+            Subject.ImportFiles(_localMovie, _movieFile, files, true).Should().BeEmpty();
         }
 
         [Test]

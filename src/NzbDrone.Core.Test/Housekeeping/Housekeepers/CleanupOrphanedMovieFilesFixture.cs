@@ -49,5 +49,26 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
             AllStoredModels.Should().HaveCount(1);
             Db.All<Movie>().Should().Contain(e => e.MovieFileId == AllStoredModels.First().Id);
         }
+
+        [Test]
+        public void should_preserve_secondary_version_file_while_removing_unowned_files()
+        {
+            var movie = Builder<Movie>.CreateNew().BuildNew();
+            Db.Insert(movie);
+            var files = Builder<MovieFile>.CreateListOfSize(3).All()
+                .With(f => f.MovieId = movie.Id)
+                .With(f => f.Quality = new QualityModel())
+                .With(f => f.Languages = new List<Language> { Language.English }).BuildListOfNew();
+            Db.InsertMany(files);
+            movie.MovieFileId = files[0].Id;
+            Db.Update(movie);
+            Db.Insert(new MovieVersion { MovieId = movie.Id, CompositeProfileVersionId = 1, MovieFileId = files[0].Id });
+            Db.Insert(new MovieVersion { MovieId = movie.Id, CompositeProfileVersionId = 2, MovieFileId = files[1].Id });
+
+            Subject.Clean();
+
+            AllStoredModels.Select(f => f.Id).Should().BeEquivalentTo(new[] { files[0].Id, files[1].Id });
+            Db.All<MovieVersion>().Select(v => v.MovieFileId).Should().BeEquivalentTo(new int?[] { files[0].Id, files[1].Id });
+        }
     }
 }

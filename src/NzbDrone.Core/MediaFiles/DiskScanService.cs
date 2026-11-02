@@ -43,6 +43,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IUpdateMediaInfo _updateMediaInfoService;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _versions;
 
         public DiskScanService(IDiskProvider diskProvider,
                                IMakeImportDecision importDecisionMaker,
@@ -54,6 +55,7 @@ namespace NzbDrone.Core.MediaFiles
                                IRootFolderService rootFolderService,
                                IUpdateMediaInfo updateMediaInfoService,
                                IEventAggregator eventAggregator,
+                               IMovieVersionService versions,
                                Logger logger)
         {
             _diskProvider = diskProvider;
@@ -67,6 +69,7 @@ namespace NzbDrone.Core.MediaFiles
             _updateMediaInfoService = updateMediaInfoService;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _versions = versions;
         }
 
         private static readonly Regex ExcludedExtrasSubFolderRegex = new Regex(@"(?:\\|\/|^)(?:extras|extrafanart|behind the scenes|deleted scenes|featurettes|interviews|other|scenes|sample[s]?|shorts|trailers)(?:\\|\/)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -75,6 +78,17 @@ namespace NzbDrone.Core.MediaFiles
         private static readonly Regex ExcludedFilesRegex = new Regex(@"^\.(_|unmanic|DS_Store$)|^Thumbs\.db$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public void Scan(Movie movie)
+        {
+            // Serialize the disk snapshot and cleanup with imports, renames and conversion.
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                movie = _movieService.GetMovie(movie.Id) ?? movie;
+                _versions.Resolve(movie);
+                ScanCore(movie);
+            }
+        }
+
+        private void ScanCore(Movie movie)
         {
             var rootFolder = _rootFolderService.GetBestRootFolderPath(movie.Path);
 
@@ -134,6 +148,7 @@ namespace NzbDrone.Core.MediaFiles
             CleanMediaFiles(movie, mediaFileList);
 
             var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
+            var versions = _versions.Resolve(movie);
             var unmappedFiles = MediaFileService.FilterExistingFiles(mediaFileList, movieFiles, movie);
 
             var decisionsStopwatch = Stopwatch.StartNew();
@@ -158,7 +173,10 @@ namespace NzbDrone.Core.MediaFiles
 
                 file.Size = fileSize;
 
-                if (!_updateMediaInfoService.Update(file, movie))
+                var version = versions?.SingleOrDefault(v => v.Id.HasValue && v.MovieFileId == file.Id);
+                var context = version == null ? movie : movie.WithVersion(version, file);
+                file.MovieVersionId = version?.Id;
+                if (!_updateMediaInfoService.Update(file, context))
                 {
                     filesToUpdate.Add(file);
                 }
@@ -188,6 +206,7 @@ namespace NzbDrone.Core.MediaFiles
 
         private void CompletedScanning(Movie movie, List<string> possibleExtraFiles)
         {
+            movie = _movieService.GetMovie(movie.Id) ?? movie;
             _logger.Info("Completed scanning disk for {0}", movie.Title);
             _eventAggregator.PublishEvent(new MovieScannedEvent(movie, possibleExtraFiles));
         }

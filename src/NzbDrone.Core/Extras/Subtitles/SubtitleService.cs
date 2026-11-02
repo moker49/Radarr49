@@ -115,6 +115,7 @@ namespace NzbDrone.Core.Extras.Subtitles
             var sourcePath = localMovie.Path;
             var sourceFolder = _diskProvider.GetParentFolder(sourcePath);
             var sourceFileName = Path.GetFileNameWithoutExtension(sourcePath);
+            var managed = localMovie.MovieVersionId.HasValue || localMovie.Movie.ManagedVersion?.Id.HasValue == true;
 
             var matchingFiles = new List<string>();
 
@@ -122,6 +123,16 @@ namespace NzbDrone.Core.Extras.Subtitles
             {
                 try
                 {
+                    if (managed)
+                    {
+                        if (ExtraFileVersionService.Matches(sourcePath, file))
+                        {
+                            matchingFiles.Add(file);
+                        }
+
+                        continue;
+                    }
+
                     // Filename match
                     if (Path.GetFileNameWithoutExtension(file).StartsWithIgnoreCase(sourceFileName))
                     {
@@ -150,7 +161,7 @@ namespace NzbDrone.Core.Extras.Subtitles
             }
 
             // Use any sub if only episode in folder
-            if (matchingFiles.Count == 0 && filteredFiles.Count > 0)
+            if (!managed && matchingFiles.Count == 0 && filteredFiles.Count > 0)
             {
                 var videoFiles = _diskProvider.GetFiles(sourceFolder, true)
                                               .Where(file => MediaFileExtensions.Extensions.Contains(Path.GetExtension(file)))

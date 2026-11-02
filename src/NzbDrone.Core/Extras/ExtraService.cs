@@ -32,12 +32,14 @@ namespace NzbDrone.Core.Extras
         private readonly IDiskProvider _diskProvider;
         private readonly IConfigService _configService;
         private readonly List<IManageExtraFiles> _extraFileManagers;
+        private readonly IMovieVersionService _versions;
 
         public ExtraService(IMediaFileService mediaFileService,
                             IMovieService movieService,
                             IDiskProvider diskProvider,
                             IConfigService configService,
                             IEnumerable<IManageExtraFiles> extraFileManagers,
+                            IMovieVersionService versions,
                             Logger logger)
         {
             _mediaFileService = mediaFileService;
@@ -45,13 +47,17 @@ namespace NzbDrone.Core.Extras
             _diskProvider = diskProvider;
             _configService = configService;
             _extraFileManagers = extraFileManagers.OrderBy(e => e.Order).ToList();
+            _versions = versions;
         }
 
         public void ImportMovie(LocalMovie localMovie, MovieFile movieFile, bool isReadOnly)
         {
-            ImportExtraFiles(localMovie, movieFile, isReadOnly);
+            lock (MovieVersionImportSynchronization.ForMovie(localMovie.Movie.Id))
+            {
+                ImportExtraFiles(localMovie, movieFile, isReadOnly);
 
-            CreateAfterMovieImport(localMovie.Movie, movieFile);
+                CreateAfterMovieImport(localMovie.Movie, movieFile);
+            }
         }
 
         public void ImportExtraFiles(LocalMovie localMovie, MovieFile movieFile, bool isReadOnly)
@@ -110,64 +116,81 @@ namespace NzbDrone.Core.Extras
         {
             if (message.Updated)
             {
-                var movie = message.Movie;
-
-                foreach (var extraFileManager in _extraFileManagers)
+                WithMovieLock(message.Movie, movie =>
                 {
-                    extraFileManager.CreateAfterMediaCoverUpdate(movie);
-                }
+                    foreach (var extraFileManager in _extraFileManagers)
+                    {
+                        extraFileManager.CreateAfterMediaCoverUpdate(movie);
+                    }
+                });
             }
         }
 
         public void Handle(MovieScannedEvent message)
         {
-            var movie = message.Movie;
-            var movieFiles = GetMovieFiles(movie.Id);
-
-            foreach (var extraFileManager in _extraFileManagers)
+            WithMovieLock(message.Movie, movie =>
             {
-                extraFileManager.CreateAfterMovieScan(movie, movieFiles);
-            }
+                var movieFiles = GetMovieFiles(movie);
+                foreach (var extraFileManager in _extraFileManagers)
+                {
+                    extraFileManager.CreateAfterMovieScan(movie, movieFiles);
+                }
+            });
         }
 
         public void Handle(MovieFolderCreatedEvent message)
         {
-            var movie = message.Movie;
-
-            foreach (var extraFileManager in _extraFileManagers)
+            WithMovieLock(message.Movie, movie =>
             {
-                extraFileManager.CreateAfterMovieFolder(movie, message.MovieFolder);
-            }
+                foreach (var extraFileManager in _extraFileManagers)
+                {
+                    extraFileManager.CreateAfterMovieFolder(movie, message.MovieFolder);
+                }
+            });
         }
 
         public void MoveFilesAfterRename(Movie movie, MovieFile movieFile)
         {
-            var movieFiles = new List<MovieFile> { movieFile };
-
-            foreach (var extraFileManager in _extraFileManagers)
+            WithMovieLock(movie, current =>
             {
-                extraFileManager.MoveFilesAfterRename(movie, movieFiles);
-            }
+                var movieFiles = new List<MovieFile> { movieFile };
+                foreach (var extraFileManager in _extraFileManagers)
+                {
+                    extraFileManager.MoveFilesAfterRename(current, movieFiles);
+                }
+            });
         }
 
         public void Handle(MovieRenamedEvent message)
         {
-            var movie = message.Movie;
-            var movieFiles = GetMovieFiles(movie.Id);
-
-            foreach (var extraFileManager in _extraFileManagers)
+            WithMovieLock(message.Movie, movie =>
             {
-                extraFileManager.MoveFilesAfterRename(movie, movieFiles);
+                var movieFiles = GetMovieFiles(movie);
+                foreach (var extraFileManager in _extraFileManagers)
+                {
+                    extraFileManager.MoveFilesAfterRename(movie, movieFiles);
+                }
+            });
+        }
+
+        private void WithMovieLock(Movie movie, Action<Movie> action)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                action(_movieService.GetMovie(movie.Id) ?? movie);
             }
         }
 
-        private List<MovieFile> GetMovieFiles(int movieId)
+        private List<MovieFile> GetMovieFiles(Movie movie)
         {
-            var movieFiles = _mediaFileService.GetFilesByMovie(movieId);
+            var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
+            var versions = _versions.Resolve(movie);
 
             foreach (var movieFile in movieFiles)
             {
-                movieFile.Movie = _movieService.GetMovie(movieId);
+                var version = versions?.SingleOrDefault(v => v.Id.HasValue && v.MovieFileId == movieFile.Id);
+                movieFile.MovieVersionId = version?.Id;
+                movieFile.Movie = version == null ? movie : movie.WithVersion(version, movieFile);
             }
 
             return movieFiles;

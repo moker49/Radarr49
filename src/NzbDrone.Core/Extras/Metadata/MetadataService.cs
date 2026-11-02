@@ -29,6 +29,7 @@ namespace NzbDrone.Core.Extras.Metadata
         private readonly IMediaFileAttributeService _mediaFileAttributeService;
         private readonly IMetadataFileService _metadataFileService;
         private readonly Logger _logger;
+        private readonly IExtraFileVersionService _versions;
 
         public MetadataService(IConfigService configService,
                                IDiskProvider diskProvider,
@@ -40,6 +41,7 @@ namespace NzbDrone.Core.Extras.Metadata
                                IHttpClient httpClient,
                                IMediaFileAttributeService mediaFileAttributeService,
                                IMetadataFileService metadataFileService,
+                               IExtraFileVersionService versions,
                                Logger logger)
             : base(configService, diskProvider, diskTransferService, logger)
         {
@@ -53,6 +55,7 @@ namespace NzbDrone.Core.Extras.Metadata
             _mediaFileAttributeService = mediaFileAttributeService;
             _metadataFileService = metadataFileService;
             _logger = logger;
+            _versions = versions;
         }
 
         public override int Order => 0;
@@ -115,10 +118,11 @@ namespace NzbDrone.Core.Extras.Metadata
         public override IEnumerable<ExtraFile> CreateAfterMovieImport(Movie movie, MovieFile movieFile)
         {
             var files = new List<MetadataFile>();
+            var existing = _versions.IsManaged(movie) ? _metadataFileService.GetFilesByMovie(movie.Id) : new List<MetadataFile>();
 
             foreach (var consumer in _metadataFactory.Enabled())
             {
-                files.AddIfNotNull(ProcessMovieMetadata(consumer, movie, movieFile, new List<MetadataFile>()));
+                files.AddIfNotNull(ProcessMovieMetadata(consumer, movie, movieFile, GetMetadataFilesForConsumer(consumer, existing)));
             }
 
             _metadataFileService.Upsert(files);
@@ -217,11 +221,24 @@ namespace NzbDrone.Core.Extras.Metadata
             }
 
             var fullPath = Path.Combine(movie.Path, movieFileMetadata.RelativePath);
+            int? fileId = movieFile.Id;
+            var managed = _versions.IsManaged(movie);
+            if (managed && !ExtraFileVersionService.Matches(Path.Combine(movie.Path, movieFile.RelativePath), fullPath))
+            {
+                // A provider may choose one shared movie.nfo. Only the primary writes it,
+                // and it must survive removal or upgrade of either version.
+                if (movie.ManagedVersion?.IsPrimary == false || (movie.ManagedVersion == null && movie.MovieFileId != movieFile.Id))
+                {
+                    return null;
+                }
+
+                fileId = null;
+            }
 
             _otherExtraFileRenamer.RenameOtherExtraFile(movie, fullPath);
 
             var existingMetadata = GetMetadataFile(movie, existingMetadataFiles, c => c.Type == MetadataType.MovieMetadata &&
-                                                                                  c.MovieFileId == movieFile.Id);
+                                                                                  c.MovieFileId == fileId && (!managed || c.RelativePath == movieFileMetadata.RelativePath));
 
             if (existingMetadata != null)
             {
@@ -239,7 +256,7 @@ namespace NzbDrone.Core.Extras.Metadata
                            new MetadataFile
                            {
                                MovieId = movie.Id,
-                               MovieFileId = movieFile.Id,
+                               MovieFileId = fileId,
                                Consumer = consumer.GetType().Name,
                                Type = MetadataType.MovieMetadata,
                                RelativePath = movieFileMetadata.RelativePath,
@@ -355,7 +372,11 @@ namespace NzbDrone.Core.Extras.Metadata
 
                 _logger.Debug("Removing duplicate Metadata file: {0}", path);
 
-                _recycleBinProvider.DeleteFile(path);
+                if (!file.RelativePath.Equals(matchingMetadataFiles[0].RelativePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _recycleBinProvider.DeleteFile(path);
+                }
+
                 _metadataFileService.Delete(file.Id);
             }
 

@@ -88,6 +88,7 @@ namespace NzbDrone.Core.Extras.Others
             var sourcePath = localMovie.Path;
             var sourceFolder = _diskProvider.GetParentFolder(sourcePath);
             var sourceFileName = Path.GetFileNameWithoutExtension(sourcePath);
+            var managed = localMovie.MovieVersionId.HasValue || localMovie.Movie.ManagedVersion?.Id.HasValue == true;
             var matchingFiles = new List<string>();
             var hasNfo = false;
 
@@ -95,6 +96,11 @@ namespace NzbDrone.Core.Extras.Others
             {
                 try
                 {
+                    if (managed && !ExtraFileVersionService.Matches(sourcePath, file))
+                    {
+                        continue;
+                    }
+
                     // Filter out duplicate NFO files
                     if (file.EndsWith(".nfo", StringComparison.InvariantCultureIgnoreCase))
                     {

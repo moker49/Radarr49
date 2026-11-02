@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,10 +17,12 @@ namespace NzbDrone.Core.Extras.Metadata
         private readonly IParsingService _parsingService;
         private readonly Logger _logger;
         private readonly List<IMetadata> _consumers;
+        private readonly IExtraFileVersionService _versions;
 
         public ExistingMetadataImporter(IExtraFileService<MetadataFile> metadataFileService,
                                         IEnumerable<IMetadata> consumers,
                                         IParsingService parsingService,
+                                        IExtraFileVersionService versions,
                                         Logger logger)
         : base(metadataFileService)
         {
@@ -27,6 +30,7 @@ namespace NzbDrone.Core.Extras.Metadata
             _parsingService = parsingService;
             _logger = logger;
             _consumers = consumers.ToList();
+            _versions = versions;
         }
 
         public override int Order => 0;
@@ -37,6 +41,7 @@ namespace NzbDrone.Core.Extras.Metadata
 
             var metadataFiles = new List<MetadataFile>();
             var filterResult = FilterAndClean(movie, filesOnDisk, importedFiles, fileNameBeforeRename is not null);
+            var managed = _versions.IsManaged(movie);
 
             foreach (var possibleMetadataFile in filterResult.FilesOnDisk)
             {
@@ -59,6 +64,24 @@ namespace NzbDrone.Core.Extras.Metadata
                     if (metadata.Type == MetadataType.MovieImage ||
                         metadata.Type == MetadataType.MovieMetadata)
                     {
+                        if (managed)
+                        {
+                            var context = _versions.Resolve(movie, possibleMetadataFile, true);
+                            var stem = Path.GetFileNameWithoutExtension(possibleMetadataFile);
+                            var shared = metadata.Type == MetadataType.MovieImage ||
+                                stem.Equals("movie", StringComparison.OrdinalIgnoreCase) ||
+                                stem.Equals(Path.GetFileName(movie.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), StringComparison.OrdinalIgnoreCase);
+                            if (context == null && !shared)
+                            {
+                                continue;
+                            }
+
+                            metadata.MovieFileId = context?.MovieFileId;
+                            metadata.Extension = Path.GetExtension(possibleMetadataFile);
+                            metadataFiles.Add(metadata);
+                            break;
+                        }
+
                         var minimalInfo = _parsingService.ParseMinimalPathMovieInfo(possibleMetadataFile);
 
                         if (minimalInfo == null)

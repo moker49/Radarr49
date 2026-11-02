@@ -9,15 +9,20 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Aggregation.Aggregators
         public int Order => 1;
 
         private readonly IMovieService _movieService;
+        private readonly IMovieVersionService _versions;
 
-        public AggregateMovie(IMovieService movieService)
+        public AggregateMovie(IMovieService movieService, IMovieVersionService versions)
         {
             _movieService = movieService;
+            _versions = versions;
         }
 
         public LocalMovie Aggregate(LocalMovie localMovie, DownloadClientItem downloadClientItem)
         {
-            localMovie.Movie = _movieService.GetMovie(localMovie.Movie.Id);
+            var versionId = localMovie.MovieVersionId ?? localMovie.Movie.ManagedVersion?.Id;
+            var movie = _movieService.GetMovie(localMovie.Movie.Id);
+            localMovie.Movie = versionId.HasValue ? _versions.ForVersion(movie, versionId.Value) : movie;
+            localMovie.MovieVersionId = versionId;
 
             return localMovie;
         }

@@ -17,10 +17,12 @@ namespace NzbDrone.Core.Extras.Subtitles
         private readonly IAggregationService _aggregationService;
         private readonly IParsingService _parsingService;
         private readonly Logger _logger;
+        private readonly IExtraFileVersionService _versions;
 
         public ExistingSubtitleImporter(IExtraFileService<SubtitleFile> subtitleFileService,
                                         IAggregationService aggregationService,
                                         IParsingService parsingService,
+                                        IExtraFileVersionService versions,
                                         Logger logger)
             : base(subtitleFileService)
         {
@@ -28,6 +30,7 @@ namespace NzbDrone.Core.Extras.Subtitles
             _aggregationService = aggregationService;
             _parsingService = parsingService;
             _logger = logger;
+            _versions = versions;
         }
 
         public override int Order => 1;
@@ -45,6 +48,12 @@ namespace NzbDrone.Core.Extras.Subtitles
 
                 if (SubtitleFileExtensions.Extensions.Contains(extension))
                 {
+                    var context = _versions.Resolve(movie, possibleSubtitleFile);
+                    if (context == null)
+                    {
+                        continue;
+                    }
+
                     var minimalInfo = _parsingService.ParseMinimalPathMovieInfo(possibleSubtitleFile);
 
                     if (minimalInfo == null)
@@ -56,7 +65,8 @@ namespace NzbDrone.Core.Extras.Subtitles
                     var localMovie = new LocalMovie
                     {
                         FileMovieInfo = minimalInfo,
-                        Movie = movie,
+                        Movie = context,
+                        MovieVersionId = context.ManagedVersion?.Id,
                         Path = possibleSubtitleFile,
                         FileNameBeforeRename = fileNameBeforeRename
                     };
@@ -74,7 +84,7 @@ namespace NzbDrone.Core.Extras.Subtitles
                     var subtitleFile = new SubtitleFile
                     {
                         MovieId = movie.Id,
-                        MovieFileId = movie.MovieFileId,
+                        MovieFileId = context.MovieFileId,
                         RelativePath = movie.Path.GetRelativePath(possibleSubtitleFile),
                         Language = localMovie.SubtitleInfo.Language,
                         LanguageTags = localMovie.SubtitleInfo.LanguageTags,

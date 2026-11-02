@@ -40,6 +40,8 @@ namespace NzbDrone.Core.Test.Extras.Others
                                                .Build();
 
             _localMovie = Builder<LocalMovie>.CreateNew()
+                                                 .With(l => l.MovieVersionId = null)
+                                                 .With(l => l.DownloadReservationId = null)
                                                  .With(l => l.Movie = _movie)
                                                  .With(l => l.Path = Path.Combine(_releaseFolder, "Movie.Title.2022.mkv").AsOsAgnostic())
                                                  .With(l => l.FileMovieInfo = new ParsedMovieInfo
@@ -65,6 +67,20 @@ namespace NzbDrone.Core.Test.Extras.Others
             results.Count.Should().Be(1);
 
             results[0].RelativePath.AsOsAgnostic().PathEquals(expectedOutputPath.AsOsAgnostic()).Should().Be(true);
+        }
+
+        [Test]
+        public void managed_import_should_not_take_another_versions_nfo()
+        {
+            _localMovie.MovieVersionId = 7;
+            _localMovie.Path = Path.Combine(_releaseFolder, "Movie.Title.2022.SDR.mkv");
+            var files = new List<string>
+            {
+                Path.Combine(_releaseFolder, "Movie.Title.2022.HDR.nfo"),
+                Path.Combine(_releaseFolder, "Movie.Title.2022.SDR.nfo")
+            };
+
+            Subject.ImportFiles(_localMovie, _movieFile, files, true).Should().ContainSingle();
         }
 
         [Test]

@@ -25,6 +25,27 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
             AllStoredModels.Count.Should().Be(files.Count);
         }
 
+        [TestCase(null)]
+        [TestCase(12)]
+        public void should_remove_all_true_duplicates_and_preserve_other_version_paths(int? movieFileId)
+        {
+            var duplicates = Builder<MetadataFile>.CreateListOfSize(3).All()
+                .With(f => f.MovieId = 1)
+                .With(f => f.MovieFileId = movieFileId)
+                .With(f => f.Type = MetadataType.MovieMetadata)
+                .With(f => f.Consumer = "XbmcMetadata")
+                .With(f => f.RelativePath = "SDR.nfo").BuildListOfNew();
+            Db.InsertMany(duplicates);
+            var hdr = new MetadataFile { MovieId = 1, MovieFileId = 13, Type = MetadataType.MovieMetadata, Consumer = "XbmcMetadata", RelativePath = "HDR.nfo", Extension = ".nfo" };
+            Db.Insert(hdr);
+
+            Subject.Clean();
+
+            AllStoredModels.Should().HaveCount(2);
+            AllStoredModels.Should().Contain(f => f.Id == hdr.Id);
+            AllStoredModels.Should().Contain(f => f.Id == duplicates[2].Id);
+        }
+
         [Test]
         public void should_not_delete_metadata_files_for_different_movie()
         {
@@ -40,7 +61,7 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
         }
 
         [Test]
-        public void should_delete_metadata_files_when_they_are_for_the_same_movie_and_consumer()
+        public void should_preserve_different_version_metadata_for_the_same_movie_and_consumer()
         {
             var files = Builder<MetadataFile>.CreateListOfSize(2)
                                              .All()
@@ -51,7 +72,7 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
 
             Db.InsertMany(files);
             Subject.Clean();
-            AllStoredModels.Count.Should().Be(1);
+            AllStoredModels.Count.Should().Be(2);
         }
 
         [Test]
@@ -94,7 +115,7 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
         }
 
         [Test]
-        public void should_delete_metadata_files_when_they_are_for_the_same_movie_file_and_consumer()
+        public void should_preserve_different_paths_for_the_same_movie_file_and_consumer()
         {
             var files = Builder<MetadataFile>.CreateListOfSize(2)
                                              .All()
@@ -105,7 +126,7 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
 
             Db.InsertMany(files);
             Subject.Clean();
-            AllStoredModels.Count.Should().Be(1);
+            AllStoredModels.Count.Should().Be(2);
         }
 
         [Test]

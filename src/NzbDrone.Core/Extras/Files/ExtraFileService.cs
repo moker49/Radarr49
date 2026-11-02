@@ -102,19 +102,32 @@ namespace NzbDrone.Core.Extras.Files
 
         public void HandleAsync(MovieFileDeletedEvent message)
         {
+            lock (MovieVersionImportSynchronization.ForMovie(message.MovieFile.MovieId))
+            {
+                DeleteForMovieFile(message);
+            }
+        }
+
+        private void DeleteForMovieFile(MovieFileDeletedEvent message)
+        {
             var movieFile = message.MovieFile;
 
-            if (message.Reason == DeleteMediaFileReason.NoLinkedEpisodes)
+            if (message.Reason == DeleteMediaFileReason.NoLinkedEpisodes || message.Reason == DeleteMediaFileReason.ManualOverride)
             {
                 _logger.Debug("Removing movie file from DB as part of cleanup routine, not deleting extra files from disk.");
             }
             else
             {
                 var movie = _movieService.GetMovie(message.MovieFile.MovieId);
+                var files = _repository.GetFilesByMovie(movieFile.MovieId);
 
                 foreach (var extra in _repository.GetFilesByMovieFile(movieFile.Id))
                 {
                     var path = Path.Combine(movie.Path, extra.RelativePath);
+                    if (files.Any(f => f.MovieFileId != movieFile.Id && f.RelativePath.Equals(extra.RelativePath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
 
                     if (_diskProvider.FileExists(path))
                     {

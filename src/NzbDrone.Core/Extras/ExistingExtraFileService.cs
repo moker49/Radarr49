@@ -27,6 +27,14 @@ namespace NzbDrone.Core.Extras
 
         public List<string> ImportExtraFiles(Movie movie, List<string> possibleExtraFiles, string fileNameBeforeRename)
         {
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                return ImportExtraFilesCore(movie, possibleExtraFiles, fileNameBeforeRename);
+            }
+        }
+
+        private List<string> ImportExtraFilesCore(Movie movie, List<string> possibleExtraFiles, string fileNameBeforeRename)
+        {
             _logger.Debug("Looking for existing extra files in {0}", movie.Path);
 
             var importedFiles = new List<string>();
