@@ -70,6 +70,20 @@ the earlier one is unavailable. Primary selection is independent of download ord
   eligible HDR. Draft configuration accepts maximumConcurrentDownloads of 1 (default) or 2.
   The scheduler respects active queue items, same-version occupancy and grabs within the
   batch; it detects duplicate URLs/GUIDs/torrent hashes while they are active.
+- Durable DownloadReservations now serialize slot acquisition using the owning movie's
+  database row/write lock. Active-version and bound-client-ID uniqueness also have database
+  indexes. Both automatic and interactive dispatch go through the central download service:
+  persist intent, persist dispatch marker, call client, persist returned ID, then publish grab.
+  Imported release ownership remains effective while its file belongs to that version.
+- Preparation failures and definite rejections release slots. Ambiguous dispatch failures
+  and accepted jobs without IDs remain active for explicit reconciliation; there is no
+  automatic expiration that could cause duplicate submission. Tracking can recover from a
+  submitted reservation even if history writes failed, and scopes reused IDs to the current
+  reservation attempt. Blocked cached items can recover when identity becomes available.
+- Explicit reservation inspection/reconciliation endpoints are implemented. Binding requires
+  a tracked job on the reserved client, a matching release fingerprint, no conflicting
+  version, and a verification note. Imported-file and failed-download event handlers update
+  ownership/capacity; import handlers require a verified version-to-file assignment first.
 
 ## Remaining sequence
 
@@ -77,12 +91,12 @@ the earlier one is unavailable. Primary selection is independent of download ord
 2. Draft configuration, legacy protections and backend atomic conversion are implemented.
    Add version-aware activation/conversion orchestration, events and assignment
    reconciliation, including files and downloads already in flight, before exposing it.
-3. Search/RSS expansion, scoped comparisons and queue/batch scheduling are implemented.
-   Add durable dispatch reservations to enforce limits across concurrent processing calls,
-   preserve intent before client dispatch, and prevent duplicate release ownership after
-   completion. Apply reservation/scheduling checks centrally to interactive grabs too.
-   Queue snapshots alone do not close those races. Missing identity after a dispatch/history
-   write crash must block rather than guess the import target. These remain activation gates.
+3. Search/RSS expansion, scoped comparisons, prefer-first ordering and durable dispatch
+   reservations are implemented. Finish integration with version-aware imports and manual
+   import context, and add end-to-end recovery checks before activation. Manual imports of
+   a reserved download must retain its bound client/download identity; never infer that
+   association from a sole pending job. Keep active and currently owned reservations during
+   housekeeping; reconcile/cascade them explicitly when version-aware deletion is added.
 4. Scope imports, upgrades, scans, renames, moves, housekeeping and extra files to versions.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
@@ -99,7 +113,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | MediaFiles/DiskScanService.cs | Preserve assignments and stop on ambiguous new files |
 | DecisionEngine/Specifications | Child contexts and scoped queue/history/delay checks implemented |
 | DecisionEngine/DownloadDecisionComparer.cs | Effective child profile size settings implemented |
-| Download/ProcessDownloadDecisions.cs | Version grouping and prefer-first queue/batch scheduling implemented; durable reservations remain |
+| Download/ProcessDownloadDecisions.cs | Version grouping and prefer-first scheduling implemented; reservation races become pending releases |
 | Download/Pending/PendingRelease.cs | Identity and scoped pending contexts implemented |
 | Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
 | History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
@@ -134,6 +148,13 @@ excluded. Coverage includes per-profile size decisions from one fetched release,
 target preservation, prefer-first fallback, missing-copy priority, concurrency limits,
 duplicate active-release detection, batch caching and interactive cache separation.
 
+The durable-dispatch stage adds real SQLite concurrency/slot tests, dispatch ordering,
+uncertain failure handling, release ownership, reconciliation validation and recovery
+without grab history. Its regression run passes 243 core tests (one existing ignored test)
+and 17 API tests; the documented logging-expectation test remains excluded. PostgreSQL uses
+the same transaction/row-lock SQL path but has not
+been exercised against a live PostgreSQL database in this checkout.
+
 ## Draft configuration API
 
 Use an unused ordinary profile as the parent (give it the desired composite name first).
@@ -153,3 +174,24 @@ continues to list the parent, but assignment currently returns HTTP 409. Legacy 
 deletes against protected targets also return HTTP 409 with an explanation; this applies
 to the built-in legacy interface as well as external clients. The future legacy add
 workflow will be enabled once version assignments, downloads and imports are ready.
+
+## Reservation state and reconciliation API
+
+GET `/api/v3/movie/{movieId}/downloadreservations` lists intent, version/client identity,
+state, timestamps and diagnostic/verification notes. Release URLs and fingerprint keys
+are not returned as resource fields.
+
+| State | Slot behavior |
+| --- | --- |
+| Prepared | Intent persisted; client dispatch has not begun; slot held |
+| Dispatching | Marker persisted before client call; slot held |
+| Submitted | Returned client ID persisted; slot held through verified import |
+| Uncertain | Submission outcome unresolved; slot held until verified reconciliation |
+| Imported | Slot released; release ownership retained while the assigned file exists |
+| Failed | Slot and release claim released after a known failure or explicit confirmation |
+
+POST `.../{reservationId}/confirm-not-submitted` accepts a verification `note` and can
+release an unresolved, unbound attempt. It cannot clear an already bound submission.
+POST `.../{reservationId}/bind-download` accepts a `downloadId` and verification `note`.
+The client job must already be tracked and match the reserved release. Both operations
+validate route ownership; no legacy DELETE endpoint can release reservations.

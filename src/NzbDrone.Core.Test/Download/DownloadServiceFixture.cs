@@ -11,6 +11,7 @@ using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.Clients;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.Qualities;
@@ -42,6 +43,7 @@ namespace NzbDrone.Core.Test.Download
                 .Build();
 
             _parseResult = Builder<RemoteMovie>.CreateNew()
+                   .With(c => c.MovieVersionId = null)
                    .With(c => c.Movie = Builder<Movie>.CreateNew().Build())
                    .With(c => c.Release = releaseInfo)
                    .Build();
@@ -79,6 +81,81 @@ namespace NzbDrone.Core.Test.Download
             mock.SetupGet(v => v.Protocol).Returns(DownloadProtocol.Torrent);
 
             return mock;
+        }
+
+        [Test]
+        public async Task version_dispatch_should_persist_intent_and_client_identity_in_order()
+        {
+            _parseResult.MovieVersionId = 201;
+            var order = new List<string>();
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>()))
+                .Callback(() => order.Add("intent"))
+                .Returns(new DownloadReservation { Id = 42 });
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.BeginDispatch(42)).Callback(() => order.Add("dispatch-marker"));
+            client.Setup(s => s.Download(_parseResult, It.IsAny<IIndexer>())).Callback(() => order.Add("client-request")).ReturnsAsync("job-1");
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Submitted(42, "job-1")).Callback(() => order.Add("bound-id"));
+            Mocker.GetMock<IEventAggregator>().Setup(s => s.PublishEvent(It.IsAny<MovieGrabbedEvent>())).Callback<MovieGrabbedEvent>(_ => order.Add("history-event"));
+
+            await Subject.DownloadReport(_parseResult, null);
+
+            Assert.That(order, Is.EqualTo(new[] { "intent", "dispatch-marker", "client-request", "bound-id", "history-event" }));
+            VerifyEventPublished<MovieGrabbedEvent>();
+        }
+
+        [Test]
+        public void conflicting_reservation_should_prevent_client_submission()
+        {
+            _parseResult.MovieVersionId = 201;
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>())).Throws(new DownloadReservationConflictException());
+
+            Assert.ThrowsAsync<DownloadReservationConflictException>(() => Subject.DownloadReport(_parseResult, null));
+
+            client.Verify(s => s.Download(It.IsAny<RemoteMovie>(), It.IsAny<IIndexer>()), Times.Never());
+        }
+
+        [Test]
+        public void ambiguous_client_failure_should_not_be_classified_as_definitive_rejection()
+        {
+            _parseResult.MovieVersionId = 201;
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>())).Returns(new DownloadReservation { Id = 42 });
+            client.Setup(s => s.Download(_parseResult, It.IsAny<IIndexer>())).ThrowsAsync(new TimeoutException("Response lost"));
+
+            Assert.ThrowsAsync<TimeoutException>(() => Subject.DownloadReport(_parseResult, null));
+
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.DispatchFailed(42, false, "Response lost"), Times.Once());
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.Submitted(It.IsAny<int>(), It.IsAny<string>()), Times.Never());
+            VerifyEventNotPublished<MovieGrabbedEvent>();
+        }
+
+        [Test]
+        public void definitive_release_rejection_should_be_recorded_for_slot_release()
+        {
+            _parseResult.MovieVersionId = 201;
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>())).Returns(new DownloadReservation { Id = 42 });
+            client.Setup(s => s.Download(_parseResult, It.IsAny<IIndexer>())).ThrowsAsync(new ReleaseUnavailableException(_parseResult.Release, "Gone"));
+
+            Assert.ThrowsAsync<ReleaseUnavailableException>(() => Subject.DownloadReport(_parseResult, null));
+
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.DispatchFailed(42, true, It.IsAny<string>()), Times.Once());
+        }
+
+        [Test]
+        public void preparation_failure_must_not_reach_dispatch_marker_or_client()
+        {
+            _parseResult.MovieVersionId = 201;
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>())).Returns(new DownloadReservation { Id = 42 });
+            Mocker.GetMock<ISeedConfigProvider>().Setup(s => s.GetSeedConfiguration(_parseResult)).Throws(new InvalidOperationException("Preparation failed"));
+
+            Assert.ThrowsAsync<InvalidOperationException>(() => Subject.DownloadReport(_parseResult, null));
+
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.BeginDispatch(It.IsAny<int>()), Times.Never());
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.DispatchFailed(42, false, "Preparation failed"), Times.Once());
+            client.Verify(s => s.Download(It.IsAny<RemoteMovie>(), It.IsAny<IIndexer>()), Times.Never());
         }
 
         [Test]

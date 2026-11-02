@@ -96,6 +96,12 @@ namespace NzbDrone.Core.Download
                             break;
                         }
 
+                    case ProcessedDecisionResult.VersionPending:
+                        {
+                            PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.VersionDownloadLimit);
+                            break;
+                        }
+
                     case ProcessedDecisionResult.Rejected:
                         {
                             rejected.Add(report);
@@ -159,6 +165,11 @@ namespace NzbDrone.Core.Download
             }
 
             var result = await ProcessDecisionInternal(decision, downloadClientId);
+            if (result == ProcessedDecisionResult.VersionPending)
+            {
+                _pendingReleaseService.Add(decision, PendingReleaseReason.VersionDownloadLimit);
+                return ProcessedDecisionResult.Pending;
+            }
 
             if (result == ProcessedDecisionResult.Failed)
             {
@@ -214,6 +225,10 @@ namespace NzbDrone.Core.Download
                 await _downloadService.DownloadReport(remoteMovie, downloadClientId);
 
                 return ProcessedDecisionResult.Grabbed;
+            }
+            catch (DownloadReservationConflictException)
+            {
+                return ProcessedDecisionResult.VersionPending;
             }
             catch (ReleaseUnavailableException)
             {

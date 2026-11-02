@@ -101,5 +101,18 @@ namespace NzbDrone.Core.Test.Download
 
             Assert.That(result.Grabbed.Select(d => d.RemoteMovie.MovieVersionId), Is.EqualTo(new int?[] { 201, 202 }));
         }
+
+        [Test]
+        public async Task race_lost_at_durable_reservation_should_leave_release_pending()
+        {
+            Mocker.GetMock<IDownloadService>().Setup(s => s.DownloadReport(It.IsAny<RemoteMovie>(), It.IsAny<int?>()))
+                .ThrowsAsync(new DownloadReservationConflictException());
+
+            var result = await Subject.ProcessDecisions(new List<DownloadDecision> { new DownloadDecision(Release(201, 0)) });
+
+            Assert.That(result.Grabbed, Is.Empty);
+            Assert.That(result.Pending.Count, Is.EqualTo(1));
+            Mocker.GetMock<IPendingReleaseService>().Verify(s => s.AddMany(It.Is<List<Tuple<DownloadDecision, PendingReleaseReason>>>(items => items.Single().Item2 == PendingReleaseReason.VersionDownloadLimit)), Times.Once());
+        }
     }
 }

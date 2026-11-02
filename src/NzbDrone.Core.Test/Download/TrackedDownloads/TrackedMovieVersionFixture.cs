@@ -91,5 +91,72 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
 
             Assert.That(Subject.TrackDownload(_client, _item).State, Is.EqualTo(TrackedDownloadState.ImportBlocked));
         }
+
+        [Test]
+        public void reservation_should_restore_version_when_both_histories_are_missing()
+        {
+            _history.Clear();
+            Mocker.GetMock<IDownloadReservationRepository>().Setup(s => s.FindForDownload(_client.Id, _item.DownloadId))
+                .Returns(new List<DownloadReservation>
+                {
+                    new DownloadReservation { Id = 42, MovieId = 1, MovieVersionId = 201, SourceTitle = _item.Title, DownloadId = _item.DownloadId, State = DownloadReservationState.Submitted }
+                });
+
+            var tracked = Subject.TrackDownload(_client, _item);
+
+            Assert.That(tracked.DownloadReservationId, Is.EqualTo(42));
+            Assert.That(tracked.MovieVersionId, Is.EqualTo(201));
+            Assert.That(tracked.RemoteMovie.MovieVersionId, Is.EqualTo(201));
+        }
+
+        [Test]
+        public void multiple_reservations_claiming_one_client_download_should_block_import()
+        {
+            _history.Clear();
+            Mocker.GetMock<IDownloadReservationRepository>().Setup(s => s.FindForDownload(_client.Id, _item.DownloadId))
+                .Returns(new List<DownloadReservation>
+                {
+                    new DownloadReservation { Id = 42, MovieId = 1, MovieVersionId = 201 },
+                    new DownloadReservation { Id = 43, MovieId = 2, MovieVersionId = 202 }
+                });
+
+            Assert.That(Subject.TrackDownload(_client, _item).State, Is.EqualTo(TrackedDownloadState.ImportBlocked));
+        }
+
+        [Test]
+        public void reused_client_id_should_use_current_reservation_instead_of_old_attempt_history()
+        {
+            _history[0].Date = DateTime.UtcNow.AddDays(-1);
+            var created = DateTime.UtcNow;
+            Mocker.GetMock<IDownloadHistoryService>().Setup(s => s.GetLatestDownloadHistoryItem(_item.DownloadId))
+                .Returns(new DownloadHistory { MovieId = 1, MovieVersionId = 201, Date = created.AddDays(-1), EventType = DownloadHistoryEventType.DownloadImported });
+            Mocker.GetMock<IDownloadReservationRepository>().Setup(s => s.FindForDownload(_client.Id, _item.DownloadId))
+                .Returns(new List<DownloadReservation>
+                {
+                    new DownloadReservation { Id = 43, MovieId = 1, MovieVersionId = 202, SourceTitle = _item.Title, DownloadId = _item.DownloadId, State = DownloadReservationState.Submitted, Created = created }
+                });
+            Mocker.GetMock<IMovieVersionService>().Setup(s => s.ForVersion(It.IsAny<Movie>(), 202)).Returns(new Movie { Id = 1, QualityProfileId = 10 });
+
+            var tracked = Subject.TrackDownload(_client, _item);
+
+            Assert.That(tracked.State, Is.EqualTo(TrackedDownloadState.Downloading));
+            Assert.That(tracked.MovieVersionId, Is.EqualTo(202));
+        }
+
+        [Test]
+        public void blocked_cache_should_recover_when_submission_identity_becomes_available()
+        {
+            _history.Clear();
+            var rows = new List<DownloadReservation>();
+            Mocker.GetMock<IDownloadReservationRepository>().Setup(s => s.FindForDownload(_client.Id, _item.DownloadId)).Returns(rows);
+            Mocker.GetMock<IMovieVersionService>().Setup(s => s.Resolve(It.IsAny<Movie>())).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { Id = 201 }, new ResolvedMovieVersion { Id = 202 }
+            });
+            Assert.That(Subject.TrackDownload(_client, _item).State, Is.EqualTo(TrackedDownloadState.ImportBlocked));
+            rows.Add(new DownloadReservation { Id = 42, MovieId = 1, MovieVersionId = 201, SourceTitle = _item.Title, DownloadId = _item.DownloadId, State = DownloadReservationState.Submitted });
+
+            Assert.That(Subject.TrackDownload(_client, _item).State, Is.EqualTo(TrackedDownloadState.Downloading));
+        }
     }
 }

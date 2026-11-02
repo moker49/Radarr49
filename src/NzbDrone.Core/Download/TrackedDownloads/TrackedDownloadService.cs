@@ -42,6 +42,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
         private readonly IMovieVersionService _movieVersions;
+        private readonly IDownloadReservationRepository _reservations;
 
         private readonly ICached<TrackedDownload> _cache;
 
@@ -53,7 +54,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                                       IEventAggregator eventAggregator,
                                       ICacheManager cacheManager,
                                       Logger logger,
-                                      IMovieVersionService movieVersions)
+                                      IMovieVersionService movieVersions,
+                                      IDownloadReservationRepository reservations)
         {
             _parsingService = parsingService;
             _historyService = historyService;
@@ -63,6 +65,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _eventAggregator = eventAggregator;
             _logger = logger;
             _movieVersions = movieVersions;
+            _reservations = reservations;
 
             _cache = cacheManager.GetCache<TrackedDownload>(GetType());
         }
@@ -97,9 +100,19 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         public TrackedDownload TrackDownload(DownloadClientDefinition downloadClient, DownloadClientItem downloadItem)
         {
+            var reservations = _reservations.FindForDownload(downloadClient.Id, downloadItem.DownloadId) ?? new List<DownloadReservation>();
             var existingItem = Find(downloadItem.DownloadId);
+            if (existingItem != null && existingItem.DownloadClient != downloadClient.Id)
+            {
+                existingItem = null;
+            }
 
-            if (existingItem != null && existingItem.State != TrackedDownloadState.Downloading)
+            if (existingItem != null && reservations.Any(r => r.IsActive && r.Id != existingItem.DownloadReservationId))
+            {
+                existingItem = null;
+            }
+
+            if (existingItem != null && existingItem.State is not (TrackedDownloadState.Downloading or TrackedDownloadState.ImportBlocked))
             {
                 LogItemChange(existingItem, existingItem.DownloadItem, downloadItem);
 
@@ -141,6 +154,43 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                 var historyItems = _historyService.FindByDownloadId(downloadItem.DownloadId)
                     .OrderByDescending(h => h.Date)
                     .ToList();
+
+                if (reservations.Count > 1)
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn("Multiple managed reservations claim this client download. Reconcile ownership before importing.");
+                }
+                else if (reservations.Count == 1)
+                {
+                    var reservation = reservations[0];
+                    trackedDownload.DownloadReservationId = reservation.Id;
+                    if (reservation.IsActive)
+                    {
+                        // Client IDs (torrent hashes in particular) can be reused. Old
+                        // attempt history must not override the new durable assignment.
+                        historyItems = historyItems.Where(h => h.Date >= reservation.Created).ToList();
+                        if (downloadHistory == null || downloadHistory.Date < reservation.Created)
+                        {
+                            downloadHistory = null;
+                            trackedDownload.State = TrackedDownloadState.Downloading;
+                        }
+                    }
+
+                    if (reservation.State == DownloadReservationState.Imported)
+                    {
+                        trackedDownload.State = TrackedDownloadState.Imported;
+                    }
+
+                    historyItems.Add(new MovieHistory
+                    {
+                        MovieId = reservation.MovieId,
+                        MovieVersionId = reservation.MovieVersionId,
+                        SourceTitle = reservation.SourceTitle,
+                        Date = reservation.Created,
+                        EventType = MovieHistoryEventType.Grabbed,
+                        DownloadId = reservation.DownloadId
+                    });
+                }
 
                 if (historyItems.Any())
                 {
@@ -364,6 +414,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
             if (trackedDownload is { State: TrackedDownloadState.Imported or
                                             TrackedDownloadState.Failed or
+                                            TrackedDownloadState.FailedPending or
+                                            TrackedDownloadState.ImportBlocked or
                                             TrackedDownloadState.Ignored })
             {
                 _cache.Remove(message.DownloadId);

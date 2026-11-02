@@ -32,6 +32,7 @@ namespace NzbDrone.Core.Download
         private readonly ISeedConfigProvider _seedConfigProvider;
         private readonly Logger _logger;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly IDownloadReservationService _reservations;
 
         public DownloadService(IProvideDownloadClient downloadClientProvider,
                                IDownloadClientStatusService downloadClientStatusService,
@@ -41,7 +42,8 @@ namespace NzbDrone.Core.Download
                                IEventAggregator eventAggregator,
                                ISeedConfigProvider seedConfigProvider,
                                Logger logger,
-                               ICompositeProfilePolicy compositeProfilePolicy)
+                               ICompositeProfilePolicy compositeProfilePolicy,
+                               IDownloadReservationService reservations)
         {
             _downloadClientProvider = downloadClientProvider;
             _downloadClientStatusService = downloadClientStatusService;
@@ -52,6 +54,7 @@ namespace NzbDrone.Core.Download
             _seedConfigProvider = seedConfigProvider;
             _logger = logger;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _reservations = reservations;
         }
 
         public async Task DownloadReport(RemoteMovie remoteMovie, int? downloadClientId)
@@ -69,10 +72,39 @@ namespace NzbDrone.Core.Download
                 ? _downloadClientProvider.Get(downloadClientId.Value)
                 : _downloadClientProvider.GetDownloadClient(remoteMovie.Release.DownloadProtocol, remoteMovie.Release.IndexerId, filterBlockedClients, tags);
 
-            await DownloadReport(remoteMovie, downloadClient);
+            if (!remoteMovie.MovieVersionId.HasValue)
+            {
+                await DownloadReport(remoteMovie, downloadClient);
+                return;
+            }
+
+            if (downloadClient == null)
+            {
+                throw new DownloadClientUnavailableException($"{remoteMovie.Release.DownloadProtocol} Download client isn't configured yet");
+            }
+
+            var reservation = _reservations.Reserve(remoteMovie, downloadClient.Definition.Id);
+            try
+            {
+                await DownloadReport(remoteMovie, downloadClient, reservation.Id);
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    var definitive = ex is ReleaseUnavailableException or ReleaseBlockedException or DownloadClientRejectedReleaseException or ReleaseDownloadException;
+                    _reservations.DispatchFailed(reservation.Id, definitive, ex.Message);
+                }
+                catch (Exception stateError)
+                {
+                    _logger.Warn(stateError, "Unable to update dispatch reservation {0}; it remains blocked for reconciliation.", reservation.Id);
+                }
+
+                throw;
+            }
         }
 
-        private async Task DownloadReport(RemoteMovie remoteMovie, IDownloadClient downloadClient)
+        private async Task DownloadReport(RemoteMovie remoteMovie, IDownloadClient downloadClient, int? reservationId = null)
         {
             Ensure.That(remoteMovie.Movie, () => remoteMovie.Movie).IsNotNull();
 
@@ -103,7 +135,17 @@ namespace NzbDrone.Core.Download
             string downloadClientId;
             try
             {
+                if (reservationId.HasValue)
+                {
+                    _reservations.BeginDispatch(reservationId.Value);
+                }
+
                 downloadClientId = await downloadClient.Download(remoteMovie, indexer);
+                if (reservationId.HasValue)
+                {
+                    _reservations.Submitted(reservationId.Value, downloadClientId);
+                }
+
                 _downloadClientStatusService.RecordSuccess(downloadClient.Definition.Id);
                 _indexerStatusService.RecordSuccess(remoteMovie.Release.IndexerId);
             }
