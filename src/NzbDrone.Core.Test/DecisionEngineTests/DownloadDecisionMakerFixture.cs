@@ -56,6 +56,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
 
             Mocker.GetMock<IParsingService>()
                   .Setup(c => c.Map(It.IsAny<ParsedMovieInfo>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<SearchCriteriaBase>())).Returns(_remoteMovie);
+            Mocker.GetMock<IMovieVersionService>().Setup(s => s.Resolve(It.IsAny<Movie>()))
+                .Returns(new List<ResolvedMovieVersion> { new ResolvedMovieVersion() });
         }
 
         private void GivenSpecifications(params Mock<IDownloadDecisionEngineSpecification>[] mocks)

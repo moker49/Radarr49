@@ -11,7 +11,8 @@ namespace NzbDrone.Core.Profiles.Qualities
     public interface ICompositeProfileService
     {
         List<CompositeProfileVersion> Get(int profileId);
-        List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions);
+        List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1);
+        int GetMaximumConcurrentDownloads(int profileId);
         void Delete(int profileId);
     }
 
@@ -39,17 +40,27 @@ namespace NzbDrone.Core.Profiles.Qualities
             return _definitions.ForProfile(profileId).OrderBy(v => v.Priority).ToList();
         }
 
-        public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions)
+        public int GetMaximumConcurrentDownloads(int profileId)
+        {
+            return _profiles.Get(profileId).MaximumConcurrentDownloads ?? 1;
+        }
+
+        public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1)
         {
             lock (CompositeProfileSynchronization.SyncRoot)
             {
-                return SaveDefinitions(profileId, definitions);
+                return SaveDefinitions(profileId, definitions, maximumConcurrentDownloads);
             }
         }
 
-        private List<CompositeProfileVersion> SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions)
+        private List<CompositeProfileVersion> SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads)
         {
             _profiles.Get(profileId);
+            if (maximumConcurrentDownloads is < 1 or > 2)
+            {
+                throw Invalid("Maximum concurrent downloads must be 1 or 2.");
+            }
+
             if (definitions == null)
             {
                 throw Invalid("Two version definitions are required.");
@@ -92,7 +103,7 @@ namespace NzbDrone.Core.Profiles.Qualities
                 IsPrimary = v.IsPrimary
             }).ToList();
 
-            _definitions.SaveDefinitions(profileId, models);
+            _definitions.SaveDefinitions(profileId, models, maximumConcurrentDownloads);
             return models.OrderBy(v => v.Priority).ToList();
         }
 

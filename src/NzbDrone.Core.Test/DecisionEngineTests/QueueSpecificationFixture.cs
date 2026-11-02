@@ -29,6 +29,16 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
 
         private ReleaseInfo _releaseInfo;
 
+        [Test]
+        public void queued_sdr_should_not_satisfy_hdr_cutoff()
+        {
+            _remoteMovie.MovieVersionId = 202;
+            var queuedSdr = new RemoteMovie { Movie = _movie, MovieVersionId = 201 };
+            GivenQueue(new[] { queuedSdr });
+
+            Assert.That(Subject.IsSatisfiedBy(_remoteMovie, new()).Accepted, Is.True);
+        }
+
         [SetUp]
         public void Setup()
         {

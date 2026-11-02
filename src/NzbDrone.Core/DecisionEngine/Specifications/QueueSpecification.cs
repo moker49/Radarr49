@@ -38,7 +38,8 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
         {
             var queue = _queueService.GetQueue();
             var matchingMovies = queue.Where(q => q.RemoteMovie?.Movie != null &&
-                                                   q.RemoteMovie.Movie.Id == subject.Movie.Id)
+                                                   q.RemoteMovie.Movie.Id == subject.Movie.Id &&
+                                                   q.RemoteMovie.MovieVersionId == subject.MovieVersionId)
                                        .ToList();
 
             foreach (var queueItem in matchingMovies)

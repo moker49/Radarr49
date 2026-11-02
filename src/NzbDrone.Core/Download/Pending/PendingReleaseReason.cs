@@ -4,6 +4,7 @@
     {
         Delay = 0,
         DownloadClientUnavailable = 1,
-        Fallback = 2
+        Fallback = 2,
+        VersionDownloadLimit = 3
     }
 }

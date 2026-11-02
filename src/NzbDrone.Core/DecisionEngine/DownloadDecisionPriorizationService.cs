@@ -29,7 +29,11 @@ namespace NzbDrone.Core.DecisionEngine
             return decisions.Where(c => c.RemoteMovie.Movie != null)
                             .GroupBy(c => c.RemoteMovie.Movie.Id, (movieId, downloadDecisions) =>
                             {
-                                return downloadDecisions.OrderByDescending(decision => decision, new DownloadDecisionComparer(_configService, _delayProfileService, _qualityDefinitionService));
+                                return downloadDecisions
+                                    .GroupBy(d => d.RemoteMovie.MovieVersionId)
+                                    .OrderBy(g => g.Any(d => !d.RemoteMovie.Movie.HasFile) ? 0 : 1)
+                                    .ThenBy(g => g.Min(d => d.RemoteMovie.MovieVersionPriority))
+                                    .SelectMany(g => g.OrderByDescending(decision => decision, new DownloadDecisionComparer(_configService, _delayProfileService, _qualityDefinitionService)));
                             })
                             .SelectMany(c => c)
                             .Union(decisions.Where(c => c.RemoteMovie.Movie == null))

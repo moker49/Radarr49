@@ -35,6 +35,8 @@ namespace Radarr.Api.V3.Indexers
         public List<string> MovieTitles { get; set; }
         public List<Language> Languages { get; set; }
         public int? MappedMovieId { get; set; }
+        public int? MovieVersionId { get; set; }
+        public int MovieVersionPriority { get; set; }
         public bool Approved { get; set; }
         public bool TemporarilyRejected { get; set; }
         public bool Rejected { get; set; }
@@ -102,6 +104,8 @@ namespace Radarr.Api.V3.Indexers
                 MovieTitles = parsedMovieInfo.MovieTitles,
                 Languages = remoteMovie.Languages,
                 MappedMovieId = remoteMovie.Movie?.Id,
+                MovieVersionId = remoteMovie.MovieVersionId,
+                MovieVersionPriority = remoteMovie.MovieVersionPriority,
                 Approved = model.Approved,
                 TemporarilyRejected = model.TemporarilyRejected,
                 Rejected = model.Rejected,

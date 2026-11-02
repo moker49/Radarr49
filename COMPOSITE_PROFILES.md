@@ -58,20 +58,31 @@ the earlier one is unavailable. Primary selection is independent of download ord
   pending version marker back into decision-making.
 - GET `/api/v3/movie/{movieId}/versions` exposes implicit or explicit version state.
   History resources also expose MovieVersionId.
+- Search/RSS release evaluation expands into independent child-profile/file contexts.
+  Parsed data, release language lists and format scores are isolated. Version definitions
+  and file contexts are cached per batch rather than queried for every release. Pending
+  reprocessing targets only its original movie/version; stale assignments are rejected.
+- Queue cutoff, recent-history and pending/delay comparisons are scoped to the target
+  version. Interactive release cache keys include version identity, and legacy overrides
+  cannot strip that identity. Release and queue resources expose MovieVersionId.
+- Prefer-first ordering prioritizes missing copies before further upgrades and honors the
+  configured version order within those groups. Unavailable or delayed SDR does not block
+  eligible HDR. Draft configuration accepts maximumConcurrentDownloads of 1 (default) or 2.
+  The scheduler respects active queue items, same-version occupancy and grabs within the
+  batch; it detects duplicate URLs/GUIDs/torrent hashes while they are active.
 
 ## Remaining sequence
 
-1. Profile-owned size settings are implemented; extend their use to child profile context
-   when version-aware download evaluation is wired in.
+1. Profile-owned size settings and their use in independent child decision contexts are implemented.
 2. Draft configuration, legacy protections and backend atomic conversion are implemented.
    Add version-aware activation/conversion orchestration, events and assignment
    reconciliation, including files and downloads already in flight, before exposing it.
-3. Extend search/RSS evaluation to all child contexts and scope queue/history/delay
-   comparisons to each version. Identity persistence/recovery is implemented, but pending
-   re-evaluation still needs child context attachment, and normal downloads still have a
-   movie-wide grouping. Implement prefer-first scheduling, concurrency controls and durable
-   dispatch reservations. Missing identity after a dispatch/history-write crash must block
-   rather than guess the import target.
+3. Search/RSS expansion, scoped comparisons and queue/batch scheduling are implemented.
+   Add durable dispatch reservations to enforce limits across concurrent processing calls,
+   preserve intent before client dispatch, and prevent duplicate release ownership after
+   completion. Apply reservation/scheduling checks centrally to interactive grabs too.
+   Queue snapshots alone do not close those races. Missing identity after a dispatch/history
+   write crash must block rather than guess the import target. These remain activation gates.
 4. Scope imports, upgrades, scans, renames, moves, housekeeping and extra files to versions.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
@@ -86,10 +97,10 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | MediaFiles/UpgradeMediaFileService.cs | Replace only the targeted version's file |
 | MediaFiles/MovieImport/ImportApprovedMovie.cs | Group imports by movie and version |
 | MediaFiles/DiskScanService.cs | Preserve assignments and stop on ambiguous new files |
-| DecisionEngine/Specifications | Evaluate child profile and its existing file |
-| DecisionEngine/DownloadDecisionComparer.cs | Profile size resolution implemented; supply child context in version-aware evaluation |
-| Download/ProcessDownloadDecisions.cs | Deduplicate and prioritize by version |
-| Download/Pending/PendingRelease.cs | Identity persisted; scope remaining decision/delay evaluation to child context |
+| DecisionEngine/Specifications | Child contexts and scoped queue/history/delay checks implemented |
+| DecisionEngine/DownloadDecisionComparer.cs | Effective child profile size settings implemented |
+| Download/ProcessDownloadDecisions.cs | Version grouping and prefer-first queue/batch scheduling implemented; durable reservations remain |
+| Download/Pending/PendingRelease.cs | Identity and scoped pending contexts implemented |
 | Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
 | History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
 | Radarr.Api.V3 movie/file/profile controllers | Shared guards implemented; audit command/manual-import routes before activation |
@@ -117,6 +128,12 @@ decision-maker change removed; its assertion has not been weakened or changed.
 It is excluded from the passing regression run and recorded separately in
 `_temp/decision-maker-baseline.log`.
 
+The search/scheduling stage passes 185 relevant core tests (one existing ignored test)
+and 13 API tests. The same independently reproduced logging-expectation test remains
+excluded. Coverage includes per-profile size decisions from one fetched release, pending
+target preservation, prefer-first fallback, missing-copy priority, concurrency limits,
+duplicate active-release detection, batch caching and interactive cache separation.
+
 ## Draft configuration API
 
 Use an unused ordinary profile as the parent (give it the desired composite name first).
@@ -127,6 +144,8 @@ The separate endpoint is `/api/v3/qualityprofile/{profileId}/composite`:
   `qualityProfileId`, `label`, `priority` (0 or 1), and `isPrimary`.
   The route supplies the parent profile ID. Subsequent saves must retain both definition
   IDs returned by the API. Definition order in the JSON does not determine priority.
+  The body also accepts `maximumConcurrentDownloads`: 1 for sequential downloads (the
+  default), or 2 to allow both versions concurrently once acquisition is enabled.
 - DELETE removes an unused draft's definitions, leaving the ordinary parent profile intact.
 
 No activation endpoint or composite editor is exposed yet. The ordinary profile endpoint

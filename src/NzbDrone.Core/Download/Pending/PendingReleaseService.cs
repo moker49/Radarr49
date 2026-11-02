@@ -6,6 +6,7 @@ using NzbDrone.Common.Crypto;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.Indexers;
@@ -31,6 +32,7 @@ namespace NzbDrone.Core.Download.Pending
         Queue.Queue FindPendingQueueItem(int queueId);
         void RemovePendingQueueItems(int queueId);
         RemoteMovie OldestPendingRelease(int movieId);
+        RemoteMovie OldestPendingRelease(int movieId, int movieVersionId);
     }
 
     public class PendingReleaseService : IPendingReleaseService,
@@ -51,6 +53,7 @@ namespace NzbDrone.Core.Download.Pending
         private readonly IIndexerFactory _indexerFactory;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _movieVersions;
 
         public PendingReleaseService(IIndexerStatusService indexerStatusService,
                                      IPendingReleaseRepository repository,
@@ -64,7 +67,8 @@ namespace NzbDrone.Core.Download.Pending
                                      IDownloadClientFactory downloadClientFactory,
                                      IIndexerFactory indexerFactory,
                                      IEventAggregator eventAggregator,
-                                     Logger logger)
+                                     Logger logger,
+                                     IMovieVersionService movieVersions)
         {
             _indexerStatusService = indexerStatusService;
             _repository = repository;
@@ -79,6 +83,7 @@ namespace NzbDrone.Core.Download.Pending
             _indexerFactory = indexerFactory;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _movieVersions = movieVersions;
         }
 
         public void Add(DownloadDecision decision, PendingReleaseReason reason)
@@ -153,6 +158,7 @@ namespace NzbDrone.Core.Download.Pending
 
                 release.PendingReleaseReason = p.Reason;
                 release.PendingMovieVersionId = p.MovieVersionId;
+                release.PendingMovieId = p.MovieId;
 
                 return release;
             }).ToList();
@@ -237,6 +243,12 @@ namespace NzbDrone.Core.Download.Pending
                                  .MaxBy(p => p.Release.AgeHours);
         }
 
+        public RemoteMovie OldestPendingRelease(int movieId, int movieVersionId)
+        {
+            return GetPendingReleases(movieId).Where(r => r.MovieVersionId == movieVersionId)
+                .Select(r => r.RemoteMovie).MaxBy(r => r.Release.AgeHours);
+        }
+
         private List<PendingRelease> GetPendingReleases()
         {
             return IncludeRemoteMovies(_repository.All().ToList());
@@ -292,6 +304,21 @@ namespace NzbDrone.Core.Download.Pending
                     Release = release.Release
                 };
 
+                if (release.MovieVersionId.HasValue)
+                {
+                    try
+                    {
+                        var version = _movieVersions.Get(movie, release.MovieVersionId.Value) ?? throw new InvalidOperationException("The pending version could not be restored.");
+                        release.RemoteMovie.Movie = _movieVersions.ForVersion(movie, release.MovieVersionId.Value) ?? throw new InvalidOperationException("The pending movie could not be restored.");
+                        release.RemoteMovie.MovieVersionPriority = version.Priority;
+                    }
+                    catch (Exception e) when (e is InvalidOperationException || e is ModelNotFoundException)
+                    {
+                        release.RemoteMovie.Movie = movie;
+                        release.RemoteMovie.VersionError = e.Message;
+                    }
+                }
+
                 _aggregationService.Augment(release.RemoteMovie);
                 release.RemoteMovie.CustomFormats = _formatCalculator.ParseCustomFormat(release.RemoteMovie, release.Release.Size);
 
@@ -334,6 +361,7 @@ namespace NzbDrone.Core.Download.Pending
             var queue = new Queue.Queue
             {
                 Id = GetQueueId(pendingRelease, movie),
+                ErrorMessage = pendingRelease.RemoteMovie.VersionError,
                 Movie = movie,
                 Quality = pendingRelease.RemoteMovie.ParsedMovieInfo?.Quality ?? new QualityModel(),
                 Languages = pendingRelease.RemoteMovie.Languages,

@@ -23,16 +23,19 @@ namespace NzbDrone.Core.Download
         private readonly IPrioritizeDownloadDecision _prioritizeDownloadDecision;
         private readonly IPendingReleaseService _pendingReleaseService;
         private readonly Logger _logger;
+        private readonly ICompositeDownloadScheduler _compositeScheduler;
 
         public ProcessDownloadDecisions(IDownloadService downloadService,
                                         IPrioritizeDownloadDecision prioritizeDownloadDecision,
                                         IPendingReleaseService pendingReleaseService,
-                                        Logger logger)
+                                        Logger logger,
+                                        ICompositeDownloadScheduler compositeScheduler)
         {
             _downloadService = downloadService;
             _prioritizeDownloadDecision = prioritizeDownloadDecision;
             _pendingReleaseService = pendingReleaseService;
             _logger = logger;
+            _compositeScheduler = compositeScheduler;
         }
 
         public async Task<ProcessedDecisions> ProcessDecisions(List<DownloadDecision> decisions)
@@ -61,6 +64,12 @@ namespace NzbDrone.Core.Download
                 if (report.TemporarilyRejected)
                 {
                     PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.Delay);
+                    continue;
+                }
+
+                if (report.RemoteMovie.MovieVersionId.HasValue && !_compositeScheduler.CanGrab(report.RemoteMovie, grabbed))
+                {
+                    PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.VersionDownloadLimit);
                     continue;
                 }
 
@@ -143,6 +152,12 @@ namespace NzbDrone.Core.Download
                 return ProcessedDecisionResult.Pending;
             }
 
+            if (decision.RemoteMovie.MovieVersionId.HasValue && !_compositeScheduler.CanGrab(decision.RemoteMovie, new List<DownloadDecision>()))
+            {
+                _pendingReleaseService.Add(decision, PendingReleaseReason.VersionDownloadLimit);
+                return ProcessedDecisionResult.Pending;
+            }
+
             var result = await ProcessDecisionInternal(decision, downloadClientId);
 
             if (result == ProcessedDecisionResult.Failed)
@@ -168,10 +183,7 @@ namespace NzbDrone.Core.Download
         {
             var movieId = report.RemoteMovie.Movie.Id;
 
-            return decisions.Select(r => r.RemoteMovie.Movie)
-                            .Select(e => e.Id)
-                            .ToList()
-                            .Contains(movieId);
+            return decisions.Any(d => d.RemoteMovie.Movie.Id == movieId && d.RemoteMovie.MovieVersionId == report.RemoteMovie.MovieVersionId);
         }
 
         private void PreparePending(List<Tuple<DownloadDecision, PendingReleaseReason>> queue, List<DownloadDecision> grabbed, List<DownloadDecision> pending, DownloadDecision report, PendingReleaseReason reason)

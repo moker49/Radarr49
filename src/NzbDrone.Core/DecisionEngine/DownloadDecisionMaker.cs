@@ -6,9 +6,11 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.IndexerSearch.Definitions;
+using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
 
@@ -27,18 +29,21 @@ namespace NzbDrone.Core.DecisionEngine
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IRemoteMovieAggregationService _aggregationService;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _movieVersions;
 
         public DownloadDecisionMaker(IEnumerable<IDownloadDecisionEngineSpecification> specifications,
                                      IParsingService parsingService,
                                      ICustomFormatCalculationService formatCalculator,
                                      IRemoteMovieAggregationService aggregationService,
-                                     Logger logger)
+                                     Logger logger,
+                                     IMovieVersionService movieVersions)
         {
             _specifications = specifications;
             _parsingService = parsingService;
             _formatCalculator = formatCalculator;
             _aggregationService = aggregationService;
             _logger = logger;
+            _movieVersions = movieVersions;
         }
 
         public List<DownloadDecision> GetRssDecision(List<ReleaseInfo> reports, bool pushedRelease = false)
@@ -63,10 +68,12 @@ namespace NzbDrone.Core.DecisionEngine
             }
 
             var reportNumber = 1;
+            var versionCache = new Dictionary<int, List<ResolvedMovieVersion>>();
+            var contextCache = new Dictionary<(int MovieId, int VersionId), Movie>();
 
             foreach (var report in reports)
             {
-                DownloadDecision decision = null;
+                var reportDecisions = new List<DownloadDecision>();
                 _logger.ProgressTrace("Processing release {0}/{1}", reportNumber, reports.Count);
                 _logger.Debug("Processing release '{0}' from '{1}'", report.Title, report.Indexer);
 
@@ -76,26 +83,20 @@ namespace NzbDrone.Core.DecisionEngine
 
                     if (parsedMovieInfo != null && !parsedMovieInfo.PrimaryMovieTitle.IsNullOrWhiteSpace())
                     {
-                        var remoteMovie = _parsingService.Map(parsedMovieInfo, report.ImdbId.ToString(), report.TmdbId, searchCriteria);
+                        var remoteMovie = report.PendingMovieVersionId.HasValue && report.PendingMovieId.HasValue
+                            ? _parsingService.Map(parsedMovieInfo, report.PendingMovieId.Value)
+                            : _parsingService.Map(parsedMovieInfo, report.ImdbId.ToString(), report.TmdbId, searchCriteria);
                         remoteMovie.Release = report;
                         remoteMovie.MovieVersionId = report.PendingMovieVersionId;
                         remoteMovie.ReleaseSource = GetReleaseSource(pushedRelease, searchCriteria);
 
                         if (remoteMovie.Movie == null)
                         {
-                            decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnknownMovie, pushedRelease ? "Unknown Movie. Unable to match to existing movie in Library using release title." : "Unknown Movie. Unable to match to correct movie using release title."));
+                            reportDecisions.Add(new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnknownMovie, pushedRelease ? "Unknown Movie. Unable to match to existing movie in Library using release title." : "Unknown Movie. Unable to match to correct movie using release title.")));
                         }
                         else
                         {
-                            _aggregationService.Augment(remoteMovie);
-
-                            remoteMovie.CustomFormats = _formatCalculator.ParseCustomFormat(remoteMovie, remoteMovie.Release.Size);
-                            remoteMovie.CustomFormatScore = remoteMovie?.Movie?.QualityProfile?.CalculateCustomFormatScore(remoteMovie.CustomFormats) ?? 0;
-
-                            _logger.Trace("Custom Format Score of '{0}' [{1}] calculated for '{2}'", remoteMovie.CustomFormatScore, remoteMovie.CustomFormats?.ConcatToString(), report.Title);
-
-                            remoteMovie.DownloadAllowed = remoteMovie.Movie != null;
-                            decision = GetDecisionForReport(remoteMovie, new ReleaseDecisionInformation(pushedRelease, searchCriteria));
+                            reportDecisions.AddRange(DecideVersions(remoteMovie, new ReleaseDecisionInformation(pushedRelease, searchCriteria), versionCache, contextCache));
                         }
                     }
 
@@ -120,7 +121,7 @@ namespace NzbDrone.Core.DecisionEngine
                                 Languages = parsedMovieInfo.Languages,
                             };
 
-                            decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnableToParse, "Unable to parse release"));
+                            reportDecisions.Add(new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnableToParse, "Unable to parse release")));
                         }
                     }
                 }
@@ -129,12 +130,13 @@ namespace NzbDrone.Core.DecisionEngine
                     _logger.Error(e, "Couldn't process release.");
 
                     var remoteMovie = new RemoteMovie { Release = report, ReleaseSource = GetReleaseSource(pushedRelease, searchCriteria) };
-                    decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.Error, "Unexpected error processing release"));
+                    reportDecisions.Clear();
+                    reportDecisions.Add(new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.Error, "Unexpected error processing release")));
                 }
 
                 reportNumber++;
 
-                if (decision != null)
+                foreach (var decision in reportDecisions)
                 {
                     if (decision.Rejections.Any())
                     {
@@ -148,6 +150,74 @@ namespace NzbDrone.Core.DecisionEngine
                     yield return decision;
                 }
             }
+        }
+
+        private List<DownloadDecision> DecideVersions(RemoteMovie source,
+                                                     ReleaseDecisionInformation information,
+                                                     Dictionary<int, List<ResolvedMovieVersion>> versionCache,
+                                                     Dictionary<(int MovieId, int VersionId), Movie> contextCache)
+        {
+            List<RemoteMovie> contexts;
+            try
+            {
+                if (!versionCache.TryGetValue(source.Movie.Id, out var versions))
+                {
+                    versions = _movieVersions.Resolve(source.Movie);
+                    if (versions == null || versions.Count == 0)
+                    {
+                        throw new InvalidOperationException("No movie versions could be resolved.");
+                    }
+
+                    versionCache[source.Movie.Id] = versions;
+                }
+
+                if (source.MovieVersionId.HasValue)
+                {
+                    versions = versions.Where(v => v.Id == source.MovieVersionId).ToList();
+                    if (versions.Count != 1)
+                    {
+                        throw new InvalidOperationException("The pending release's version no longer belongs to this movie and profile.");
+                    }
+                }
+
+                contexts = new List<RemoteMovie>();
+                foreach (var version in versions)
+                {
+                    if (!version.Id.HasValue)
+                    {
+                        contexts.Add(source);
+                        continue;
+                    }
+
+                    var key = (source.Movie.Id, version.Id.Value);
+                    if (!contextCache.TryGetValue(key, out var movie))
+                    {
+                        movie = _movieVersions.ForVersion(source.Movie, version.Id.Value) ?? throw new InvalidOperationException("The version context could not be restored.");
+                        contextCache[key] = movie;
+                    }
+
+                    contexts.Add(source.WithVersion(movie, version.Id.Value, version.Priority));
+                }
+            }
+            catch (Exception e) when (e is InvalidOperationException || e is ModelNotFoundException)
+            {
+                return new List<DownloadDecision>
+                {
+                    new DownloadDecision(source, new DownloadRejection(DownloadRejectionReason.InvalidMovieVersion, e.Message))
+                };
+            }
+
+            var decisions = new List<DownloadDecision>();
+            foreach (var context in contexts)
+            {
+                _aggregationService.Augment(context);
+                context.CustomFormats = _formatCalculator.ParseCustomFormat(context, context.Release.Size);
+                context.CustomFormatScore = context.Movie.QualityProfile?.CalculateCustomFormatScore(context.CustomFormats) ?? 0;
+                context.DownloadAllowed = true;
+                decisions.Add(GetDecisionForReport(context, information));
+            }
+
+            return decisions;
         }
 
         private DownloadDecision GetDecisionForReport(RemoteMovie remoteMovie, ReleaseDecisionInformation information)

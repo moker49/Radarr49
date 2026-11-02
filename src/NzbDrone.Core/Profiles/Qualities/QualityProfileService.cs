@@ -66,7 +66,9 @@ namespace NzbDrone.Core.Profiles.Qualities
         {
             // Legacy clients do not know this field. Omission must preserve attached settings.
             // An explicit empty list resets all qualities to the global defaults.
-            profile.SizeDefinitions ??= _profileRepository.Get(profile.Id)?.SizeDefinitions;
+            var stored = _profileRepository.Get(profile.Id);
+            profile.SizeDefinitions ??= stored?.SizeDefinitions;
+            profile.MaximumConcurrentDownloads ??= stored?.MaximumConcurrentDownloads;
             ValidateSizeDefinitions(profile);
             _profileRepository.Update(profile);
         }

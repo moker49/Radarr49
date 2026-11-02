@@ -50,7 +50,7 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
             var result = Subject.Save(10, definitions);
 
             Assert.That(result.Select(v => v.CompositeProfileId), Is.EqualTo(new[] { 10, 10 }));
-            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>()), Times.Once());
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 1), Times.Once());
         }
 
         [Test]
@@ -75,7 +75,7 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
             _stored.Add(new CompositeProfileVersion { Id = 101, CompositeProfileId = 10 });
 
             Assert.Throws<ValidationException>(() => Subject.Save(10, Definitions()));
-            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(It.IsAny<int>(), It.IsAny<List<CompositeProfileVersion>>()), Times.Never());
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(It.IsAny<int>(), It.IsAny<List<CompositeProfileVersion>>(), It.IsAny<int>()), Times.Never());
         }
 
         [Test]
@@ -166,6 +166,21 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
 
             Assert.Throws<NzbDroneClientException>(() => Subject.Delete(10));
             Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.DeleteDefinitions(It.IsAny<int>()), Times.Never());
+        }
+
+        [Test]
+        public void should_store_configured_concurrency_with_definitions()
+        {
+            Subject.Save(10, Definitions(), 2);
+
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 2), Times.Once());
+        }
+
+        [TestCase(0)]
+        [TestCase(3)]
+        public void should_reject_invalid_concurrency(int limit)
+        {
+            Assert.Throws<ValidationException>(() => Subject.Save(10, Definitions(), limit));
         }
     }
 }

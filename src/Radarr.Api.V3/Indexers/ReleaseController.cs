@@ -82,6 +82,11 @@ namespace Radarr.Api.V3.Indexers
             {
                 if (release.ShouldOverride == true)
                 {
+                    if (remoteMovie.MovieVersionId.HasValue)
+                    {
+                        throw new NzbDroneClientException(HttpStatusCode.Conflict, "Managed versions require an explicit version-aware override.");
+                    }
+
                     Ensure.That(release.MovieId, () => release.MovieId).IsNotNull();
                     Ensure.That(release.Quality, () => release.Quality).IsNotNull();
                     Ensure.That(release.Languages, () => release.Languages).IsNotNull();
@@ -182,7 +187,8 @@ namespace Radarr.Api.V3.Indexers
 
         private string GetCacheKey(ReleaseResource resource)
         {
-            return string.Concat(resource.IndexerId, "_", resource.Guid);
+            var key = string.Concat(resource.IndexerId, "_", resource.Guid);
+            return resource.MovieVersionId.HasValue ? string.Concat(key, "_version_", resource.MovieVersionId.Value) : key;
         }
 
         private List<ReleaseResource> MapDecisions(IEnumerable<DownloadDecision> decisions, List<MovieHistory> history)
@@ -193,7 +199,7 @@ namespace Radarr.Api.V3.Indexers
             {
                 var release = MapDecision(downloadDecision, result.Count);
 
-                release.History = AddHistory(downloadDecision.RemoteMovie.Release, history);
+                release.History = AddHistory(downloadDecision.RemoteMovie.Release, history.Where(h => h.MovieVersionId == downloadDecision.RemoteMovie.MovieVersionId).ToList());
 
                 result.Add(release);
             }

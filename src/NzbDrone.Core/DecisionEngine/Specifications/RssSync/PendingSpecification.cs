@@ -38,7 +38,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications.RssSync
             var pending = _pendingReleaseService.GetPendingQueue();
 
             var matchingMovie = pending.Where(q => q.RemoteMovie?.Movie != null &&
-                                                   q.RemoteMovie.Movie.Id == subject.Movie.Id)
+                                                   q.RemoteMovie.Movie.Id == subject.Movie.Id && q.RemoteMovie.MovieVersionId == subject.MovieVersionId)
                 .ToList();
 
             if (matchingMovie.Any())

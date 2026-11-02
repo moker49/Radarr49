@@ -18,13 +18,14 @@ namespace Radarr.Api.V3.Profiles.Quality
         [HttpGet]
         public CompositeProfileResource Get(int profileId)
         {
-            return new CompositeProfileResource { ProfileId = profileId, Versions = _composites.Get(profileId) };
+            return new CompositeProfileResource { ProfileId = profileId, Versions = _composites.Get(profileId), MaximumConcurrentDownloads = _composites.GetMaximumConcurrentDownloads(profileId) };
         }
 
         [HttpPut]
         public CompositeProfileResource Save(int profileId, [FromBody] CompositeProfileResource resource)
         {
-            return new CompositeProfileResource { ProfileId = profileId, Versions = _composites.Save(profileId, resource?.Versions) };
+            var limit = resource?.MaximumConcurrentDownloads ?? 1;
+            return new CompositeProfileResource { ProfileId = profileId, Versions = _composites.Save(profileId, resource?.Versions, limit), MaximumConcurrentDownloads = limit };
         }
 
         [HttpDelete]
@@ -40,5 +41,6 @@ namespace Radarr.Api.V3.Profiles.Quality
         public int ProfileId { get; set; }
         public bool IsDraft => true;
         public List<CompositeProfileVersion> Versions { get; set; }
+        public int MaximumConcurrentDownloads { get; set; } = 1;
     }
 }

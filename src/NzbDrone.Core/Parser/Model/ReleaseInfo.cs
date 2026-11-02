@@ -48,6 +48,16 @@ namespace NzbDrone.Core.Parser.Model
         [JsonIgnore]
         public int? PendingMovieVersionId { get; set; }
 
+        [JsonIgnore]
+        public int? PendingMovieId { get; set; }
+
+        internal ReleaseInfo CopyForVersion()
+        {
+            var context = (ReleaseInfo)MemberwiseClone();
+            context.Languages = new List<Language>(Languages ?? new List<Language>());
+            return context;
+        }
+
         public int Age
         {
             get { return DateTime.UtcNow.Subtract(PublishDate).Days; }

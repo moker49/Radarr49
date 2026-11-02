@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         public Language Language { get; set; }
         public bool UpgradeAllowed { get; set; }
         public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
+        public int? MaximumConcurrentDownloads { get; set; }
 
         public Quality FirststAllowedQuality()
         {

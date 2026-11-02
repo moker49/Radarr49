@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dapper;
 using NUnit.Framework;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
 
@@ -17,6 +19,20 @@ namespace NzbDrone.Core.Test.Profiles
                 new CompositeProfileVersion { CompositeProfileId = 10, QualityProfileId = 1, Label = "SDR", Priority = 0, IsPrimary = true },
                 new CompositeProfileVersion { CompositeProfileId = 10, QualityProfileId = 2, Label = "HDR", Priority = 1 }
             };
+        }
+
+        [Test]
+        public void should_save_concurrency_with_definition_configuration()
+        {
+            var profile = new QualityProfile { Name = "Composite", Items = new List<QualityProfileQualityItem>() };
+            Db.Insert(profile);
+            var definitions = Definitions();
+            definitions.ForEach(v => v.CompositeProfileId = profile.Id);
+
+            Subject.SaveDefinitions(profile.Id, definitions, 2);
+
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            Assert.That(connection.ExecuteScalar<int>("SELECT \"MaximumConcurrentDownloads\" FROM \"QualityProfiles\" WHERE \"Id\" = @Id", profile), Is.EqualTo(2));
         }
 
         [Test]

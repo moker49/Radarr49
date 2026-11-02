@@ -13,6 +13,7 @@ namespace NzbDrone.Core.History
     {
         List<QualityModel> GetBestQualityInHistory(int movieId);
         MovieHistory MostRecentForMovie(int movieId);
+        MovieHistory MostRecentForMovieVersion(int movieId, int movieVersionId);
         List<MovieHistory> FindByMovieId(int movieId);
         MovieHistory MostRecentForDownloadId(string downloadId);
         List<MovieHistory> FindByDownloadId(string downloadId);
@@ -40,6 +41,11 @@ namespace NzbDrone.Core.History
         public MovieHistory MostRecentForMovie(int movieId)
         {
             return Query(x => x.MovieId == movieId).MaxBy(h => h.Date);
+        }
+
+        public MovieHistory MostRecentForMovieVersion(int movieId, int movieVersionId)
+        {
+            return Query(x => x.MovieId == movieId && x.MovieVersionId == movieVersionId).MaxBy(h => h.Date);
         }
 
         public List<MovieHistory> FindByMovieId(int movieId)

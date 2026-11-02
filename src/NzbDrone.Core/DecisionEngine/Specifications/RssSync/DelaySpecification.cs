@@ -103,7 +103,9 @@ namespace NzbDrone.Core.DecisionEngine.Specifications.RssSync
                 }
             }
 
-            var oldest = _pendingReleaseService.OldestPendingRelease(subject.Movie.Id);
+            var oldest = subject.MovieVersionId.HasValue
+                ? _pendingReleaseService.OldestPendingRelease(subject.Movie.Id, subject.MovieVersionId.Value)
+                : _pendingReleaseService.OldestPendingRelease(subject.Movie.Id);
 
             if (oldest != null && oldest.Release.AgeMinutes > delay)
             {

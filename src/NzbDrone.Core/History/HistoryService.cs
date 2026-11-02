@@ -21,6 +21,7 @@ namespace NzbDrone.Core.History
         QualityModel GetBestQualityInHistory(QualityProfile profile, int movieId);
         PagingSpec<MovieHistory> Paged(PagingSpec<MovieHistory> pagingSpec, int[] languages, int[] qualities);
         MovieHistory MostRecentForMovie(int movieId);
+        MovieHistory MostRecentForMovieVersion(int movieId, int movieVersionId);
         List<MovieHistory> FindByMovieId(int movieId);
         MovieHistory MostRecentForDownloadId(string downloadId);
         MovieHistory Get(int historyId);
@@ -58,6 +59,11 @@ namespace NzbDrone.Core.History
         public MovieHistory MostRecentForMovie(int movieId)
         {
             return _historyRepository.MostRecentForMovie(movieId);
+        }
+
+        public MovieHistory MostRecentForMovieVersion(int movieId, int movieVersionId)
+        {
+            return _historyRepository.MostRecentForMovieVersion(movieId, movieVersionId);
         }
 
         public List<MovieHistory> FindByMovieId(int movieId)

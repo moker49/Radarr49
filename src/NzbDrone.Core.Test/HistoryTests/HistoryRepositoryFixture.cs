@@ -29,6 +29,20 @@ namespace NzbDrone.Core.Test.HistoryTests
         }
 
         [Test]
+        public void most_recent_version_history_should_exclude_other_versions()
+        {
+            var sdr = Builder<MovieHistory>.CreateNew().With(h => h.Id = 0).With(h => h.MovieId = 1).With(h => h.MovieVersionId = 201)
+                .With(h => h.Quality = new QualityModel()).With(h => h.Languages = new List<Language>()).Build();
+            var hdr = Builder<MovieHistory>.CreateNew().With(h => h.Id = 0).With(h => h.MovieId = 1).With(h => h.MovieVersionId = 202)
+                .With(h => h.Quality = new QualityModel()).With(h => h.Languages = new List<Language>()).Build();
+            Subject.Insert(sdr);
+            Subject.Insert(hdr);
+
+            Assert.That(Subject.MostRecentForMovieVersion(1, 201).Id, Is.EqualTo(sdr.Id));
+            Assert.That(Subject.MostRecentForMovieVersion(1, 202).Id, Is.EqualTo(hdr.Id));
+        }
+
+        [Test]
         public void should_persist_managed_version_identity()
         {
             var history = Builder<MovieHistory>.CreateNew().With(h => h.Id = 0).With(h => h.MovieVersionId = 201).With(h => h.Quality = new QualityModel()).With(h => h.Languages = new List<Language>()).Build();

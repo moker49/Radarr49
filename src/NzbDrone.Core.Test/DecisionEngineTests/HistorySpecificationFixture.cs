@@ -33,6 +33,17 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         private QualityModel _notupgradableQuality;
         private Movie _fakeMovie;
 
+        [Test]
+        public void should_use_only_target_versions_history()
+        {
+            _parseResultSingle.MovieVersionId = 202;
+
+            Assert.That(Subject.IsSatisfiedBy(_parseResultSingle, new()).Accepted, Is.True);
+
+            Mocker.GetMock<IHistoryService>().Verify(s => s.MostRecentForMovieVersion(_fakeMovie.Id, 202), Times.Once());
+            Mocker.GetMock<IHistoryService>().Verify(s => s.MostRecentForMovie(It.IsAny<int>()), Times.Never());
+        }
+
         [SetUp]
         public void Setup()
         {

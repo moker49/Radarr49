@@ -10,7 +10,7 @@ namespace NzbDrone.Core.Profiles.Qualities
     public interface ICompositeProfileVersionRepository : IBasicRepository<CompositeProfileVersion>
     {
         List<CompositeProfileVersion> ForProfile(int profileId);
-        void SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions);
+        void SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1);
         void DeleteDefinitions(int profileId);
     }
 
@@ -26,7 +26,7 @@ namespace NzbDrone.Core.Profiles.Qualities
             return Query(v => v.CompositeProfileId == profileId);
         }
 
-        public void SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions)
+        public void SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1)
         {
             if (definitions.Any(v => v.CompositeProfileId != profileId))
             {
@@ -61,6 +61,7 @@ namespace NzbDrone.Core.Profiles.Qualities
                 definition.Id = connection.ExecuteScalar<int>(sql, definition, transaction);
             }
 
+            connection.Execute("UPDATE \"QualityProfiles\" SET \"MaximumConcurrentDownloads\" = @maximumConcurrentDownloads WHERE \"Id\" = @profileId", new { maximumConcurrentDownloads, profileId }, transaction);
             transaction.Commit();
         }
 

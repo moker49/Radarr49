@@ -15,6 +15,7 @@ namespace Radarr.Api.V3.Queue
     public class QueueResource : RestResource
     {
         public int? MovieId { get; set; }
+        public int? MovieVersionId { get; set; }
         public MovieResource Movie { get; set; }
         public List<Language> Languages { get; set; }
         public QualityModel Quality { get; set; }
@@ -64,6 +65,7 @@ namespace Radarr.Api.V3.Queue
             {
                 Id = model.Id,
                 MovieId = model.Movie?.Id,
+                MovieVersionId = model.RemoteMovie?.MovieVersionId,
                 Movie = includeMovie && model.Movie != null ? model.Movie.ToResource(0) : null,
                 Languages = model.Languages,
                 Quality = model.Quality,
