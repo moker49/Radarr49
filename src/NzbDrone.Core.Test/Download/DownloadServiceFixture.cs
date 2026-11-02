@@ -13,6 +13,7 @@ using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.Download
@@ -56,6 +57,16 @@ namespace NzbDrone.Core.Test.Download
             mock.SetupGet(v => v.Protocol).Returns(DownloadProtocol.Usenet);
 
             return mock;
+        }
+
+        [Test]
+        public void draft_composite_should_be_rejected_before_selecting_download_client()
+        {
+            Mocker.GetMock<ICompositeProfilePolicy>().Setup(s => s.EnsureAssignable(_parseResult.Movie.QualityProfileId))
+                .Throws(new NzbDroneClientException(HttpStatusCode.Conflict, "Draft composite"));
+
+            Assert.ThrowsAsync<NzbDroneClientException>(() => Subject.DownloadReport(_parseResult, null));
+            Mocker.GetMock<IProvideDownloadClient>().Verify(s => s.GetDownloadClient(It.IsAny<DownloadProtocol>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<HashSet<int>>()), Times.Never());
         }
 
         private Mock<IDownloadClient> WithTorrentClient()

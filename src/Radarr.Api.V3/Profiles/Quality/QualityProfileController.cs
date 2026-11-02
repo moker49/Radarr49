@@ -15,10 +15,12 @@ namespace Radarr.Api.V3.Profiles.Quality
     public class QualityProfileController : RestController<QualityProfileResource>
     {
         private readonly IQualityProfileService _qualityProfileService;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
-        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService)
+        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService, ICompositeProfilePolicy compositeProfilePolicy)
         {
             _qualityProfileService = qualityProfileService;
+            _compositeProfilePolicy = compositeProfilePolicy;
 
             SharedValidator.RuleFor(c => c.Name).NotEmpty();
 
@@ -68,6 +70,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         [Consumes("application/json")]
         public ActionResult<QualityProfileResource> Update([FromBody] QualityProfileResource resource)
         {
+            _compositeProfilePolicy.EnsureLegacyProfileEditAllowed(resource.Id);
             var model = resource.ToModel();
 
             _qualityProfileService.Update(model);

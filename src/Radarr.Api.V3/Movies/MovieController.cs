@@ -17,6 +17,7 @@ using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Events;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.MovieStats;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Validation;
 using NzbDrone.Core.Validation.Paths;
@@ -45,6 +46,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IRootFolderService _rootFolderService;
         private readonly IUpgradableSpecification _qualityUpgradableSpecification;
         private readonly IConfigService _configService;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public MovieController(IBroadcastSignalRMessage signalRBroadcaster,
                            IMovieService moviesService,
@@ -65,7 +67,8 @@ namespace Radarr.Api.V3.Movies
                            SystemFolderValidator systemFolderValidator,
                            QualityProfileExistsValidator qualityProfileExistsValidator,
                            RootFolderExistsValidator rootFolderExistsValidator,
-                           MovieFolderAsRootFolderValidator movieFolderAsRootFolderValidator)
+                           MovieFolderAsRootFolderValidator movieFolderAsRootFolderValidator,
+                           ICompositeProfilePolicy compositeProfilePolicy)
             : base(signalRBroadcaster)
         {
             _moviesService = moviesService;
@@ -77,6 +80,7 @@ namespace Radarr.Api.V3.Movies
             _coverMapper = coverMapper;
             _commandQueueManager = commandQueueManager;
             _rootFolderService = rootFolderService;
+            _compositeProfilePolicy = compositeProfilePolicy;
 
             SharedValidator.RuleFor(s => s.Path).Cascade(CascadeMode.Stop)
                 .IsValidPath()
@@ -249,6 +253,11 @@ namespace Radarr.Api.V3.Movies
         public ActionResult<MovieResource> UpdateMovie([FromBody] MovieResource moviesResource, [FromQuery] bool moveFiles = false)
         {
             var movie = _moviesService.GetMovie(moviesResource.Id);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+            if (moviesResource.QualityProfileId != movie.QualityProfileId)
+            {
+                _compositeProfilePolicy.EnsureAssignable(moviesResource.QualityProfileId);
+            }
 
             if (moveFiles)
             {
@@ -276,6 +285,7 @@ namespace Radarr.Api.V3.Movies
         [RestDeleteById]
         public void DeleteMovie(int id, bool deleteFiles = false, bool addImportExclusion = false)
         {
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { _moviesService.GetMovie(id) });
             _moviesService.DeleteMovie(id, deleteFiles, addImportExclusion);
         }
 

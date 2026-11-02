@@ -11,6 +11,7 @@ using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Translations;
+using NzbDrone.Core.Profiles.Qualities;
 using Radarr.Http;
 
 namespace Radarr.Api.V3.Movies
@@ -25,6 +26,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly MovieEditorValidator _movieEditorValidator;
         private readonly IUpgradableSpecification _upgradableSpecification;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public MovieEditorController(IMovieService movieService,
             IMovieTranslationService movieTranslationService,
@@ -32,7 +34,8 @@ namespace Radarr.Api.V3.Movies
             IConfigService configService,
             IManageCommandQueue commandQueueManager,
             MovieEditorValidator movieEditorValidator,
-            IUpgradableSpecification upgradableSpecification)
+            IUpgradableSpecification upgradableSpecification,
+            ICompositeProfilePolicy compositeProfilePolicy)
         {
             _movieService = movieService;
             _movieTranslationService = movieTranslationService;
@@ -41,12 +44,19 @@ namespace Radarr.Api.V3.Movies
             _commandQueueManager = commandQueueManager;
             _movieEditorValidator = movieEditorValidator;
             _upgradableSpecification = upgradableSpecification;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         [HttpPut]
         public IActionResult SaveAll([FromBody] MovieEditorResource resource)
         {
             var moviesToUpdate = _movieService.GetMovies(resource.MovieIds);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(moviesToUpdate);
+            if (resource.QualityProfileId.HasValue)
+            {
+                _compositeProfilePolicy.EnsureAssignable(resource.QualityProfileId.Value);
+            }
+
             var moviesToMove = new List<BulkMoveMovie>();
 
             foreach (var movie in moviesToUpdate)
@@ -138,6 +148,7 @@ namespace Radarr.Api.V3.Movies
         [HttpDelete]
         public object DeleteMovies([FromBody] MovieEditorResource resource)
         {
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(_movieService.GetMovies(resource.MovieIds));
             _movieService.DeleteMovies(resource.MovieIds, resource.DeleteFiles, resource.AddImportExclusion);
 
             return new { };

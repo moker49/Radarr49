@@ -12,6 +12,7 @@ using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.Download
 {
@@ -30,6 +31,7 @@ namespace NzbDrone.Core.Download
         private readonly IEventAggregator _eventAggregator;
         private readonly ISeedConfigProvider _seedConfigProvider;
         private readonly Logger _logger;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public DownloadService(IProvideDownloadClient downloadClientProvider,
                                IDownloadClientStatusService downloadClientStatusService,
@@ -38,7 +40,8 @@ namespace NzbDrone.Core.Download
                                IRateLimitService rateLimitService,
                                IEventAggregator eventAggregator,
                                ISeedConfigProvider seedConfigProvider,
-                               Logger logger)
+                               Logger logger,
+                               ICompositeProfilePolicy compositeProfilePolicy)
         {
             _downloadClientProvider = downloadClientProvider;
             _downloadClientStatusService = downloadClientStatusService;
@@ -48,10 +51,16 @@ namespace NzbDrone.Core.Download
             _eventAggregator = eventAggregator;
             _seedConfigProvider = seedConfigProvider;
             _logger = logger;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         public async Task DownloadReport(RemoteMovie remoteMovie, int? downloadClientId)
         {
+            if (remoteMovie.Movie != null)
+            {
+                _compositeProfilePolicy.EnsureAssignable(remoteMovie.Movie.QualityProfileId);
+            }
+
             var filterBlockedClients = remoteMovie.Release.PendingReleaseReason == PendingReleaseReason.DownloadClientUnavailable;
 
             var tags = remoteMovie.Movie?.Tags;

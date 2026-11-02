@@ -12,6 +12,7 @@ using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies.Events;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.RomanNumerals;
+using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.Movies
 {
@@ -60,13 +61,15 @@ namespace NzbDrone.Core.Movies
         private readonly IBuildMoviePaths _moviePathBuilder;
         private readonly IAutoTaggingService _autoTaggingService;
         private readonly Logger _logger;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public MovieService(IMovieRepository movieRepository,
                             IEventAggregator eventAggregator,
                             IConfigService configService,
                             IBuildMoviePaths moviePathBuilder,
                             IAutoTaggingService autoTaggingService,
-                            Logger logger)
+                            Logger logger,
+                            ICompositeProfilePolicy compositeProfilePolicy)
         {
             _movieRepository = movieRepository;
             _eventAggregator = eventAggregator;
@@ -74,6 +77,7 @@ namespace NzbDrone.Core.Movies
             _moviePathBuilder = moviePathBuilder;
             _autoTaggingService = autoTaggingService;
             _logger = logger;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         public Movie GetMovie(int movieId)
@@ -93,6 +97,7 @@ namespace NzbDrone.Core.Movies
 
         public Movie AddMovie(Movie newMovie)
         {
+            _compositeProfilePolicy.EnsureAssignable(newMovie.QualityProfileId);
             var movie = _movieRepository.Insert(newMovie);
 
             _eventAggregator.PublishEvent(new MovieAddedEvent(GetMovie(movie.Id)));
@@ -102,6 +107,11 @@ namespace NzbDrone.Core.Movies
 
         public List<Movie> AddMovies(List<Movie> newMovies)
         {
+            foreach (var profileId in newMovies.Select(m => m.QualityProfileId).Distinct())
+            {
+                _compositeProfilePolicy.EnsureAssignable(profileId);
+            }
+
             _movieRepository.InsertMany(newMovies);
 
             _eventAggregator.PublishEvent(new MoviesImportedEvent(newMovies));
@@ -247,6 +257,8 @@ namespace NzbDrone.Core.Movies
         {
             var storedMovie = GetMovie(movie.Id);
 
+            _compositeProfilePolicy.EnsureAssignable(movie.QualityProfileId);
+
             UpdateTags(movie);
 
             var updatedMovie = _movieRepository.Update(movie);
@@ -257,6 +269,11 @@ namespace NzbDrone.Core.Movies
 
         public List<Movie> UpdateMovie(List<Movie> movies, bool useExistingRelativeFolder)
         {
+            foreach (var profileId in movies.Select(m => m.QualityProfileId).Distinct())
+            {
+                _compositeProfilePolicy.EnsureAssignable(profileId);
+            }
+
             _logger.Debug("Updating {0} movies", movies.Count);
 
             foreach (var m in movies)

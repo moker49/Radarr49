@@ -37,13 +37,15 @@ namespace NzbDrone.Core.Profiles.Qualities
         private readonly IImportListFactory _importListFactory;
         private readonly IMovieCollectionService _collectionService;
         private readonly Logger _logger;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public QualityProfileService(IQualityProfileRepository profileRepository,
                               ICustomFormatService formatService,
                               IMovieService movieService,
                               IImportListFactory importListFactory,
                               IMovieCollectionService collectionService,
-                              Logger logger)
+                              Logger logger,
+                              ICompositeProfilePolicy compositeProfilePolicy)
         {
             _profileRepository = profileRepository;
             _formatService = formatService;
@@ -51,6 +53,7 @@ namespace NzbDrone.Core.Profiles.Qualities
             _importListFactory = importListFactory;
             _collectionService = collectionService;
             _logger = logger;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         public QualityProfile Add(QualityProfile profile)
@@ -78,6 +81,7 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public void Delete(int id)
         {
+            _compositeProfilePolicy.EnsureProfileDeletionAllowed(id);
             if (_movieService.GetAllMovies().Any(c => c.QualityProfileId == id) || _importListFactory.All().Any(c => c.QualityProfileId == id) || _collectionService.GetAllCollections().Any(c => c.QualityProfileId == id))
             {
                 throw new QualityProfileInUseException(id);

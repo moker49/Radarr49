@@ -14,6 +14,7 @@ using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.SignalR;
 using Radarr.Http;
 using Radarr.Http.REST;
@@ -32,13 +33,15 @@ namespace Radarr.Api.V3.MovieFiles
         private readonly IMovieService _movieService;
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IUpgradableSpecification _upgradableSpecification;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public MovieFileController(IBroadcastSignalRMessage signalRBroadcaster,
                                IMediaFileService mediaFileService,
                                IDeleteMediaFiles mediaFileDeletionService,
                                IMovieService movieService,
                                ICustomFormatCalculationService formatCalculator,
-                               IUpgradableSpecification upgradableSpecification)
+                               IUpgradableSpecification upgradableSpecification,
+                               ICompositeProfilePolicy compositeProfilePolicy)
             : base(signalRBroadcaster)
         {
             _mediaFileService = mediaFileService;
@@ -46,6 +49,7 @@ namespace Radarr.Api.V3.MovieFiles
             _movieService = movieService;
             _formatCalculator = formatCalculator;
             _upgradableSpecification = upgradableSpecification;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         protected override MovieFileResource GetResourceById(int id)
@@ -87,6 +91,7 @@ namespace Radarr.Api.V3.MovieFiles
         public ActionResult<MovieFileResource> SetMovieFile([FromBody] MovieFileResource movieFileResource)
         {
             var movieFile = _mediaFileService.GetMovie(movieFileResource.Id);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { _movieService.GetMovie(movieFile.MovieId) });
             movieFile.IndexerFlags = (IndexerFlags)movieFileResource.IndexerFlags;
             movieFile.Quality = movieFileResource.Quality;
             movieFile.Languages = movieFileResource.Languages;
@@ -111,6 +116,8 @@ namespace Radarr.Api.V3.MovieFiles
         public object SetMovieFile([FromBody] MovieFileListResource resource)
         {
             var movieFiles = _mediaFileService.GetMovies(resource.MovieFileIds);
+
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(_movieService.GetMovies(movieFiles.Select(f => f.MovieId).Distinct()));
 
             foreach (var movieFile in movieFiles)
             {
@@ -165,6 +172,8 @@ namespace Radarr.Api.V3.MovieFiles
 
             var movie = _movieService.GetMovie(movieFile.MovieId);
 
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+
             _mediaFileDeletionService.DeleteMovieFile(movie, movieFile);
         }
 
@@ -178,11 +187,12 @@ namespace Radarr.Api.V3.MovieFiles
             }
 
             var movieFiles = _mediaFileService.GetMovies(resource.MovieFileIds);
-            var movie = _movieService.GetMovie(movieFiles.First().MovieId);
+            var movies = _movieService.GetMovies(movieFiles.Select(f => f.MovieId).Distinct()).ToDictionary(m => m.Id);
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(movies.Values);
 
             foreach (var movieFile in movieFiles)
             {
-                _mediaFileDeletionService.DeleteMovieFile(movie, movieFile);
+                _mediaFileDeletionService.DeleteMovieFile(movies[movieFile.MovieId], movieFile);
             }
 
             return new { };
@@ -193,6 +203,7 @@ namespace Radarr.Api.V3.MovieFiles
         public object SetPropertiesBulk([FromBody] List<MovieFileResource> resources)
         {
             var movieFiles = _mediaFileService.GetMovies(resources.Select(r => r.Id));
+            _compositeProfilePolicy.EnsureLegacyMutationAllowed(_movieService.GetMovies(movieFiles.Select(f => f.MovieId).Distinct()));
 
             foreach (var movieFile in movieFiles)
             {
