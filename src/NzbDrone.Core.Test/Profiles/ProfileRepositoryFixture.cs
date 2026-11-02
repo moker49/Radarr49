@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using NUnit.Framework;
 using NzbDrone.Core.Profiles.Qualities;
@@ -20,17 +21,23 @@ namespace NzbDrone.Core.Test.Profiles
         {
             var profile = new QualityProfile
             {
-                Items = Qualities.QualityFixture.GetDefaultQualities(Quality.Bluray1080p, Quality.DVD, Quality.HDTV720p),
+                Items = NzbDrone.Core.Test.Qualities.QualityFixture.GetDefaultQualities(Quality.Bluray1080p, Quality.DVD, Quality.HDTV720p),
                 MinFormatScore = 0,
                 FormatItems = CustomFormatsTestHelpers.GetDefaultFormatItems(),
                 Cutoff = Quality.Bluray1080p.Id,
                 Name = "TestProfile"
             };
 
+            profile.SizeDefinitions = new List<ProfileSizeDefinition>
+            {
+                new ProfileSizeDefinition { QualityId = Quality.Bluray1080p.Id, MinSize = 5, PreferredSize = 10, MaxSize = null }
+            };
+
             Subject.Insert(profile);
 
             StoredModel.Name.Should().Be(profile.Name);
             StoredModel.Cutoff.Should().Be(profile.Cutoff);
+            StoredModel.SizeDefinitions.Should().BeEquivalentTo(profile.SizeDefinitions);
 
             StoredModel.Items.Should().Equal(profile.Items, (a, b) => a.Quality == b.Quality && a.Allowed == b.Allowed);
         }

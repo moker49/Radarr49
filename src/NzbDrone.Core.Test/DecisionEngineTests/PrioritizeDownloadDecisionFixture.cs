@@ -51,6 +51,24 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                   .Returns(new QualityDefinition { PreferredSize = size });
         }
 
+        [Test]
+        public void should_rank_using_profile_preferred_size_instead_of_global_target()
+        {
+            GivenPreferredSize(20);
+            var small = GivenRemoteMovie(new QualityModel(Quality.WEBDL1080p), size: 500.Megabytes(), runtime: 100);
+            var large = GivenRemoteMovie(new QualityModel(Quality.WEBDL1080p), size: 2000.Megabytes(), runtime: 100);
+            var profile = small.Movie.QualityProfile;
+            profile.SizeDefinitions = new List<ProfileSizeDefinition>
+            {
+                new ProfileSizeDefinition { QualityId = Quality.WEBDL1080p.Id, PreferredSize = 5 }
+            };
+            large.Movie = small.Movie;
+
+            var decisions = new List<DownloadDecision> { new DownloadDecision(large), new DownloadDecision(small) };
+
+            Subject.PrioritizeDecisionsForMovies(decisions).First().RemoteMovie.Should().BeSameAs(small);
+        }
+
         private RemoteMovie GivenRemoteMovie(QualityModel quality, int age = 0, long size = 0, DownloadProtocol downloadProtocol = DownloadProtocol.Usenet, int runtime = 150, int indexerPriority = 25)
         {
             var remoteMovie = new RemoteMovie();

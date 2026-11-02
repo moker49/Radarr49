@@ -9,6 +9,13 @@ export interface QualityProfileQualityItem {
   name?: string;
 }
 
+export interface ProfileSizeDefinition {
+  qualityId: number;
+  minSize: number | null;
+  preferredSize: number | null;
+  maxSize: number | null;
+}
+
 interface QualityProfile {
   name: string;
   upgradeAllowed: boolean;
@@ -19,6 +26,7 @@ interface QualityProfile {
   minUpgradeFormatScore: number;
   formatItems: QualityProfileFormatItem[];
   id: number;
+  sizeDefinitions?: ProfileSizeDefinition[] | null;
 }
 
 export default QualityProfile;

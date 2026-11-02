@@ -27,6 +27,9 @@ namespace Radarr.Api.V3.Profiles.Quality
             SharedValidator.RuleFor(c => c.MinUpgradeFormatScore).GreaterThanOrEqualTo(1);
             SharedValidator.RuleFor(c => c.Cutoff).ValidCutoff();
             SharedValidator.RuleFor(c => c.Items).ValidItems();
+            SharedValidator.RuleFor(c => c.SizeDefinitions)
+                .SetValidator(new ProfileSizeDefinitionsValidator())
+                .When(c => c.SizeDefinitions != null);
 
             SharedValidator.RuleFor(c => c.FormatItems).Must(items =>
             {

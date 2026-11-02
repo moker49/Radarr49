@@ -19,6 +19,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         public int MinUpgradeFormatScore { get; set; }
         public List<ProfileFormatItemResource> FormatItems { get; set; }
         public Language Language { get; set; }
+        public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
     }
 
     public class QualityProfileQualityItemResource : RestResource
@@ -61,7 +62,8 @@ namespace Radarr.Api.V3.Profiles.Quality
                 CutoffFormatScore = model.CutoffFormatScore,
                 MinUpgradeFormatScore = model.MinUpgradeFormatScore,
                 FormatItems = model.FormatItems.ConvertAll(ToResource),
-                Language = model.Language
+                Language = model.Language,
+                SizeDefinitions = model.SizeDefinitions
             };
         }
 
@@ -110,7 +112,8 @@ namespace Radarr.Api.V3.Profiles.Quality
                 CutoffFormatScore = resource.CutoffFormatScore,
                 MinUpgradeFormatScore = resource.MinUpgradeFormatScore,
                 FormatItems = resource.FormatItems.ConvertAll(ToModel),
-                Language = resource.Language
+                Language = resource.Language,
+                SizeDefinitions = resource.SizeDefinitions
             };
         }
 

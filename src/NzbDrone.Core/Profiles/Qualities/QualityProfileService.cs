@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using FluentValidation;
 using NLog;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.CustomFormats.Events;
@@ -54,12 +55,25 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public QualityProfile Add(QualityProfile profile)
         {
+            ValidateSizeDefinitions(profile);
             return _profileRepository.Insert(profile);
         }
 
         public void Update(QualityProfile profile)
         {
+            // Legacy clients do not know this field. Omission must preserve attached settings.
+            // An explicit empty list resets all qualities to the global defaults.
+            profile.SizeDefinitions ??= _profileRepository.Get(profile.Id)?.SizeDefinitions;
+            ValidateSizeDefinitions(profile);
             _profileRepository.Update(profile);
+        }
+
+        private static void ValidateSizeDefinitions(QualityProfile profile)
+        {
+            if (profile.SizeDefinitions != null)
+            {
+                new ProfileSizeDefinitionsValidator().ValidateAndThrow(profile.SizeDefinitions);
+            }
         }
 
         public void Delete(int id)

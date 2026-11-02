@@ -1,6 +1,7 @@
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 
 namespace NzbDrone.Core.DecisionEngine.Specifications
@@ -31,7 +32,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 return DownloadSpecDecision.Accept();
             }
 
-            var qualityDefinition = _qualityDefinitionService.Get(quality);
+            var qualityDefinition = subject.Movie.QualityProfile.GetSizeDefinition(quality, _qualityDefinitionService.Get(quality));
 
             if (subject.Movie.MovieMetadata.Value.Runtime == 0)
             {

@@ -18,6 +18,7 @@ import dimensions from 'Styles/Variables/dimensions';
 import translate from 'Utilities/String/translate';
 import QualityProfileFormatItems from './QualityProfileFormatItems';
 import QualityProfileItems from './QualityProfileItems';
+import QualityProfileSizeDefinitions from './QualityProfileSizeDefinitions';
 import styles from './EditQualityProfileModalContent.css';
 
 const MODAL_BODY_PADDING = parseInt(dimensions.modalBodyPadding);
@@ -129,7 +130,8 @@ class EditQualityProfileModalContent extends Component {
       cutoffFormatScore,
       language,
       items,
-      formatItems
+      formatItems,
+      sizeDefinitions
     } = item;
 
     const languageId = language ? language.value.id : 0;
@@ -297,6 +299,14 @@ class EditQualityProfileModalContent extends Component {
                           warnings={items.warnings}
                           {...otherProps}
                         />
+                        <details>
+                          <summary>{translate('ProfileSizeSettings')}</summary>
+                          <QualityProfileSizeDefinitions
+                            qualityProfileItems={items.value}
+                            definitions={sizeDefinitions}
+                            onChange={onInputChange}
+                          />
+                        </details>
                       </div>
 
                       <div className={styles.formatItemSmall}>

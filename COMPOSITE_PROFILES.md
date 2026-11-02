@@ -29,11 +29,15 @@ the earlier one is unavailable. Primary selection is independent of download ord
   incomplete assignments and duplicate file ownership.
 - No composite creation API or download activation yet. Existing consumers still use
   their original single-file paths; the new resolver is not wired into those paths yet.
+- Ordinary profiles now support per-quality SizeDefinitions in storage, API and profile
+  editor. Release size rejection and preferred-size ranking use these settings through
+  one shared resolver. Unconfigured qualities retain global defaults. Legacy updates
+  omitting the field preserve settings; an explicit empty list resets to global defaults.
 
 ## Remaining sequence
 
-1. Profile-owned size settings and a single effective-settings resolver used by release
-   acceptance and ranking; retain global defaults for profiles without attached settings.
+1. Profile-owned size settings are implemented; extend their use to child profile context
+   when version-aware download evaluation is wired in.
 2. Composite configuration/validation and atomic movie conversion. Preserve files;
    require explicit assignment when ambiguous. Protect legacy edits and deletes before
    allowing creation or activation through any API.
@@ -54,7 +58,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | MediaFiles/MovieImport/ImportApprovedMovie.cs | Group imports by movie and version |
 | MediaFiles/DiskScanService.cs | Preserve assignments and stop on ambiguous new files |
 | DecisionEngine/Specifications | Evaluate child profile and its existing file |
-| DecisionEngine/DownloadDecisionComparer.cs | Read effective child profile size settings |
+| DecisionEngine/DownloadDecisionComparer.cs | Profile size resolution implemented; supply child context in version-aware evaluation |
 | Download/ProcessDownloadDecisions.cs | Deduplicate and prioritize by version |
 | Download/Pending/PendingRelease.cs | Persist version identity |
 | Download/TrackedDownloads/TrackedDownload.cs | Recover intended version after restart |
@@ -66,3 +70,11 @@ The critical lifecycle test is add, acquire SDR and HDR, upgrade SDR, restart, r
 and verify HDR is untouched and both assignments survive. Also test unavailable SDR,
 failures/retries, concurrent imports, ambiguous files, profile changes in flight,
 path collisions, duplicate releases and protected legacy operations.
+
+## Latest validation
+
+On the .NET 8 master checkout, 84 relevant core tests and two profile-resource API tests
+pass. These cover the version foundation, size-bound validation, independent profile
+resolution, release acceptance/ranking, database roundtrips and legacy-update preservation.
+Changed frontend files pass ESLint and an isolated webpack build. Existing ImageSharp
+audit warnings are nonfatal only in test commands; repository warning policy is unchanged.

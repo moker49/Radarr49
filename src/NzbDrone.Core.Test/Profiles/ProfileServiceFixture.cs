@@ -21,6 +21,31 @@ namespace NzbDrone.Core.Test.Profiles
     public class ProfileServiceFixture : CoreTest<QualityProfileService>
     {
         [Test]
+        public void legacy_update_should_preserve_profile_size_settings()
+        {
+            var definitions = new List<ProfileSizeDefinition>
+            {
+                new ProfileSizeDefinition { QualityId = 1, MinSize = 1, PreferredSize = 5, MaxSize = 10 }
+            };
+            Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(10))
+                .Returns(new QualityProfile { Id = 10, SizeDefinitions = definitions });
+
+            Subject.Update(new QualityProfile { Id = 10 });
+
+            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.SizeDefinitions == definitions)));
+        }
+
+        [Test]
+        public void explicit_empty_size_settings_should_reset_to_global_defaults()
+        {
+            var definitions = new List<ProfileSizeDefinition>();
+
+            Subject.Update(new QualityProfile { Id = 10, SizeDefinitions = definitions });
+
+            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.SizeDefinitions == definitions)));
+        }
+
+        [Test]
         public void init_should_add_default_profiles()
         {
             Mocker.GetMock<ICustomFormatService>()

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
@@ -7,6 +8,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
@@ -71,6 +73,23 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             _qualityType.MaxSize = 20;
 
             Subject.IsSatisfiedBy(_remoteMovie, new()).Accepted.Should().BeTrue();
+        }
+
+        [TestCase(1, 3, false)]
+        [TestCase(4, 8, true)]
+        public void should_use_profile_bounds_instead_of_global_bounds(double min, double max, bool accepted)
+        {
+            _movie.MovieMetadata.Value.Runtime = 100;
+            _remoteMovie.Release.Size = 500.Megabytes();
+            _movie.QualityProfile = new QualityProfile
+            {
+                SizeDefinitions = new List<ProfileSizeDefinition>
+                {
+                    new ProfileSizeDefinition { QualityId = Quality.SDTV.Id, MinSize = min, MaxSize = max }
+                }
+            };
+
+            Subject.IsSatisfiedBy(_remoteMovie, new()).Accepted.Should().Be(accepted);
         }
 
         [Test]
