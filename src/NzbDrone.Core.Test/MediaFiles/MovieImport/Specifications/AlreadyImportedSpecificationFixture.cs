@@ -41,6 +41,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Specifications
 
         private void GivenHistory(List<MovieHistory> history)
         {
+            history.ForEach(h => h.MovieVersionId = null);
             Mocker.GetMock<IHistoryService>()
                 .Setup(s => s.GetByMovieId(It.IsAny<int>(), null))
                 .Returns(history);

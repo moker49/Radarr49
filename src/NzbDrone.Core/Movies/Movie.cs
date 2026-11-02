@@ -36,6 +36,7 @@ namespace NzbDrone.Core.Movies
         public int MovieFileId { get; set; }
 
         public bool HasFile => MovieFileId > 0;
+        public ResolvedMovieVersion ManagedVersion { get; set; }
 
         internal Movie WithVersion(ResolvedMovieVersion version, MovieFile file)
         {
@@ -46,6 +47,7 @@ namespace NzbDrone.Core.Movies
             context.MovieFileId = version.MovieFileId ?? 0;
             context.MovieFile = file;
             context.Monitored = version.Monitored;
+            context.ManagedVersion = version;
             return context;
         }
 

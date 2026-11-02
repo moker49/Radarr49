@@ -508,6 +508,12 @@ namespace NzbDrone.Core.Movies
         public void Handle(MovieFileAddedEvent message)
         {
             var movie = message.MovieFile.Movie;
+            if (message.MovieFile.MovieVersionId.HasValue)
+            {
+                // Version/file ownership and the primary summary were committed together.
+                return;
+            }
+
             movie.MovieFileId = message.MovieFile.Id;
             _movieRepository.Update(movie);
 

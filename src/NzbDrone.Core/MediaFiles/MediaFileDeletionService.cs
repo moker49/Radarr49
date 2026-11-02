@@ -11,6 +11,7 @@ using NzbDrone.Core.Messaging;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Events;
+using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.MediaFiles
 {
@@ -30,6 +31,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IConfigService _configService;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly ICompositeProfilePolicy _compositeProfilePolicy;
 
         public MediaFileDeletionService(IDiskProvider diskProvider,
                                         IRecycleBinProvider recycleBinProvider,
@@ -37,6 +39,7 @@ namespace NzbDrone.Core.MediaFiles
                                         IMovieService movieService,
                                         IConfigService configService,
                                         IEventAggregator eventAggregator,
+                                        ICompositeProfilePolicy compositeProfilePolicy,
                                         Logger logger)
         {
             _diskProvider = diskProvider;
@@ -46,9 +49,20 @@ namespace NzbDrone.Core.MediaFiles
             _configService = configService;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _compositeProfilePolicy = compositeProfilePolicy;
         }
 
         public void DeleteMovieFile(Movie movie, MovieFile movieFile)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                movie = _movieService.GetMovie(movie.Id) ?? movie;
+                _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+                DeleteMovieFileCore(movie, movieFile);
+            }
+        }
+
+        private void DeleteMovieFileCore(Movie movie, MovieFile movieFile)
         {
             var fullPath = Path.Combine(movie.Path, movieFile.RelativePath);
             var rootFolder = _diskProvider.GetParentFolder(movie.Path);

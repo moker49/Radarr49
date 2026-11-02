@@ -78,6 +78,43 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
             _movieFile.Quality.Revision.Version = 2;
         }
 
+        [TestCase("SDR")]
+        [TestCase("HDR")]
+        public void managed_version_should_use_exact_folder_and_label_even_when_renaming_is_disabled(string label)
+        {
+            _movie.Path = @"C:\Movies\300 (2006)".AsOsAgnostic();
+            _movie.ManagedVersion = new ResolvedMovieVersion { Id = 7, Label = label };
+            _namingConfig.RenameMovies = false;
+
+            Subject.BuildFileName(_movie, _movieFile).Should().Be("300 (2006) - " + label);
+        }
+
+        [Test]
+        public void existing_managed_file_should_resolve_its_own_version()
+        {
+            _movie.Path = @"C:\Movies\300 (2006)".AsOsAgnostic();
+            _movieFile.Id = 12;
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { Id = 7, Label = "SDR", MovieFileId = 11 },
+                new ResolvedMovieVersion { Id = 8, Label = "HDR", MovieFileId = 12 }
+            });
+
+            Subject.BuildFileName(_movie, _movieFile).Should().Be("300 (2006) - HDR");
+            _movieFile.MovieVersionId.Should().Be(8);
+        }
+
+        [Test]
+        public void unassigned_managed_file_should_not_guess_a_version()
+        {
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { Id = 7, Label = "SDR", MovieFileId = 11 }
+            });
+
+            Assert.Throws<NamingFormatException>(() => Subject.BuildFileName(_movie, _movieFile));
+        }
+
         private void GivenReal()
         {
             _movieFile.Quality.Revision.Real = 1;

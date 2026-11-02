@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using FizzWare.NBuilder;
 using Moq;
 using NUnit.Framework;
@@ -6,6 +8,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
 
@@ -44,6 +47,19 @@ namespace NzbDrone.Core.Test.MediaFiles.MediaFileDeletionService
             Mocker.GetMock<IDiskProvider>()
                   .Setup(s => s.FolderExists(RootFolder))
                   .Returns(true);
+        }
+
+        [Test]
+        public void policy_rejection_should_prevent_physical_and_database_deletion()
+        {
+            Mocker.GetMock<ICompositeProfilePolicy>()
+                .Setup(v => v.EnsureLegacyMutationAllowed(It.IsAny<IEnumerable<Movie>>()))
+                .Throws(new NzbDroneClientException(HttpStatusCode.Conflict, "Composite-managed movie"));
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.DeleteMovieFile(_movie, _movieFile));
+
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
         }
 
         private void GivenRootFolderHasFolders()

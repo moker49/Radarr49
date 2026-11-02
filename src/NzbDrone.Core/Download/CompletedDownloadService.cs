@@ -35,6 +35,7 @@ namespace NzbDrone.Core.Download
         private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
         private readonly IRejectedImportService _rejectedImportService;
         private readonly Logger _logger;
+        private readonly IDownloadReservationRepository _reservations;
 
         public CompletedDownloadService(IEventAggregator eventAggregator,
                                         IHistoryService historyService,
@@ -44,7 +45,8 @@ namespace NzbDrone.Core.Download
                                         IMovieService movieService,
                                         ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
                                         IRejectedImportService rejectedImportService,
-                                        Logger logger)
+                                        Logger logger,
+                                        IDownloadReservationRepository reservations)
         {
             _eventAggregator = eventAggregator;
             _historyService = historyService;
@@ -55,6 +57,7 @@ namespace NzbDrone.Core.Download
             _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
             _rejectedImportService = rejectedImportService;
             _logger = logger;
+            _reservations = reservations;
         }
 
         public void Check(TrackedDownload trackedDownload)
@@ -75,7 +78,7 @@ namespace NzbDrone.Core.Download
             var grabbedHistories = _historyService.FindByDownloadId(trackedDownload.DownloadItem.DownloadId).Where(h => h.EventType == MovieHistoryEventType.Grabbed).ToList();
             var historyItem = grabbedHistories.MaxBy(h => h.Date);
 
-            if (historyItem == null && trackedDownload.DownloadItem.Category.IsNullOrWhiteSpace())
+            if (historyItem == null && !trackedDownload.DownloadReservationId.HasValue && trackedDownload.DownloadItem.Category.IsNullOrWhiteSpace())
             {
                 trackedDownload.Warn("Download wasn't grabbed by Radarr and not in a category, Skipping.");
                 return;
@@ -83,6 +86,19 @@ namespace NzbDrone.Core.Download
 
             if (!ValidatePath(trackedDownload))
             {
+                return;
+            }
+
+            if (trackedDownload.MovieVersionId.HasValue)
+            {
+                if (trackedDownload.RemoteMovie?.Movie?.ManagedVersion?.Id != trackedDownload.MovieVersionId)
+                {
+                    trackedDownload.Warn("The managed version could not be verified. Reconcile its download assignment before importing.");
+                    SetStateToImportBlocked(trackedDownload);
+                    return;
+                }
+
+                trackedDownload.State = TrackedDownloadState.ImportPending;
                 return;
             }
 
@@ -193,7 +209,23 @@ namespace NzbDrone.Core.Download
 
         public bool VerifyImport(TrackedDownload trackedDownload, List<ImportResult> importResults)
         {
+            if (trackedDownload.DownloadReservationId.HasValue)
+            {
+                var completed = _reservations.FindForDownload(trackedDownload.DownloadClient, trackedDownload.DownloadItem.DownloadId)
+                    ?.Any(r => r.Id == trackedDownload.DownloadReservationId.Value && r.MovieId == trackedDownload.RemoteMovie.Movie.Id &&
+                        r.MovieVersionId == trackedDownload.MovieVersionId && r.State == DownloadReservationState.Imported) == true;
+                if (completed)
+                {
+                    trackedDownload.State = TrackedDownloadState.Imported;
+                    _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, trackedDownload.RemoteMovie.Movie.Id));
+                }
+
+                return completed;
+            }
+
             var allMoviesImported = importResults.Where(c => c.Result == ImportResultType.Imported)
+                                       .Where(c => c.ImportDecision.LocalMovie.Movie?.Id == trackedDownload.RemoteMovie.Movie.Id &&
+                                           c.ImportDecision.LocalMovie.MovieVersionId == trackedDownload.MovieVersionId)
                                        .Select(c => c.ImportDecision.LocalMovie.Movie)
                                        .Any();
 

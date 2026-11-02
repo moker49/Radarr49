@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NzbDrone.Common;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Events;
+using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.MediaFiles
 {
@@ -29,22 +31,62 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMediaFileRepository _mediaFileRepository;
         private readonly IMovieRepository _movieRepository;
         private readonly IEventAggregator _eventAggregator;
+        private readonly IMovieVersionRepository _versions;
+        private readonly ICompositeProfileVersionRepository _definitions;
+        private readonly IConfigService _config;
 
         public MediaFileService(IMediaFileRepository mediaFileRepository,
                                 IMovieRepository movieRepository,
-                                IEventAggregator eventAggregator)
+                                IEventAggregator eventAggregator,
+                                IMovieVersionRepository versions,
+                                ICompositeProfileVersionRepository definitions,
+                                IConfigService config)
         {
             _mediaFileRepository = mediaFileRepository;
             _movieRepository = movieRepository;
             _eventAggregator = eventAggregator;
+            _versions = versions;
+            _definitions = definitions;
+            _config = config;
         }
 
         public MovieFile Add(MovieFile movieFile)
         {
-            var addedFile = _mediaFileRepository.Insert(movieFile);
+            lock (MovieVersionImportSynchronization.ForMovie(movieFile.MovieId))
+            {
+                return AddCore(movieFile);
+            }
+        }
+
+        private MovieFile AddCore(MovieFile movieFile)
+        {
+            var versionId = movieFile.Movie?.ManagedVersion?.Id;
+            MovieFile addedFile;
+            if (versionId.HasValue)
+            {
+                addedFile = _mediaFileRepository.InsertForVersion(movieFile, versionId.Value);
+            }
+            else
+            {
+                var movie = movieFile.Movie ?? _movieRepository.Get(movieFile.MovieId);
+                if ((movie != null && _definitions.ForProfile(movie.QualityProfileId)?.Any() == true) || _versions.ForMovie(movieFile.MovieId)?.Any() == true)
+                {
+                    throw new System.InvalidOperationException("A managed movie requires an explicit version before adding a file.");
+                }
+
+                addedFile = _mediaFileRepository.Insert(movieFile);
+            }
+
             if (addedFile.Movie == null)
             {
                 addedFile.Movie = _movieRepository.Get(movieFile.MovieId);
+            }
+
+            if (versionId.HasValue)
+            {
+                addedFile.MovieVersionId = versionId;
+                addedFile.Movie.MovieFileId = addedFile.Id;
+                addedFile.Movie.MovieFile = addedFile;
             }
 
             _eventAggregator.PublishEvent(new MovieFileAddedEvent(addedFile));
@@ -64,6 +106,14 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Delete(MovieFile movieFile, DeleteMediaFileReason reason)
         {
+            lock (MovieVersionImportSynchronization.ForMovie(movieFile.MovieId))
+            {
+                DeleteCore(movieFile, reason);
+            }
+        }
+
+        private void DeleteCore(MovieFile movieFile, DeleteMediaFileReason reason)
+        {
             // Little hack so we have the movie attached for the event consumers
             if (movieFile.Movie == null)
             {
@@ -72,7 +122,13 @@ namespace NzbDrone.Core.MediaFiles
 
             movieFile.Path = Path.Combine(movieFile.Movie.Path, movieFile.RelativePath);
 
-            _mediaFileRepository.Delete(movieFile);
+            var versionId = _mediaFileRepository.DeleteForVersion(movieFile, (reason == DeleteMediaFileReason.Manual || reason == DeleteMediaFileReason.MissingFromDisk) && _config.AutoUnmonitorPreviouslyDownloadedMovies);
+            movieFile.MovieVersionId = versionId;
+            if (!versionId.HasValue)
+            {
+                _mediaFileRepository.Delete(movieFile);
+            }
+
             _eventAggregator.PublishEvent(new MovieFileDeletedEvent(movieFile, reason));
         }
 

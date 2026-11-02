@@ -31,6 +31,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IBuildFileNames _filenameBuilder;
         private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _versions;
 
         public RenameMovieFileService(IMovieService movieService,
                                       IMediaFileService mediaFileService,
@@ -38,6 +39,7 @@ namespace NzbDrone.Core.MediaFiles
                                       IEventAggregator eventAggregator,
                                       IBuildFileNames filenameBuilder,
                                       IDiskProvider diskProvider,
+                                      IMovieVersionService versions,
                                       Logger logger)
         {
             _movieService = movieService;
@@ -47,6 +49,7 @@ namespace NzbDrone.Core.MediaFiles
             _filenameBuilder = filenameBuilder;
             _diskProvider = diskProvider;
             _logger = logger;
+            _versions = versions;
         }
 
         public List<RenameMovieFilePreview> GetRenamePreviews(List<int> movieIds)
@@ -88,7 +91,17 @@ namespace NzbDrone.Core.MediaFiles
 
         private List<RenamedMovieFile> RenameFiles(List<MovieFile> movieFiles, Movie movie)
         {
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                movie = _movieService.GetMovie(movie.Id) ?? movie;
+                return RenameFilesCore(movieFiles, movie);
+            }
+        }
+
+        private List<RenamedMovieFile> RenameFilesCore(List<MovieFile> movieFiles, Movie movie)
+        {
             var renamed = new List<RenamedMovieFile>();
+            var managed = _versions.Resolve(movie)?.Any(v => v.Id.HasValue) == true;
 
             foreach (var movieFile in movieFiles)
             {
@@ -101,7 +114,11 @@ namespace NzbDrone.Core.MediaFiles
                     _movieFileMover.MoveMovieFile(movieFile, movie);
 
                     _mediaFileService.Update(movieFile);
-                    _movieService.UpdateMovie(movie);
+                    if (!managed)
+                    {
+                        _movieService.UpdateMovie(movie);
+                    }
+
                     renamed.Add(new RenamedMovieFile
                                 {
                                     MovieFile = movieFile,

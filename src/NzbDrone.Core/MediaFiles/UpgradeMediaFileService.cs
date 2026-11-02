@@ -19,23 +19,27 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMoveMovieFiles _movieFileMover;
         private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
+        private readonly IMovieVersionImportService _versionImports;
 
         public UpgradeMediaFileService(IRecycleBinProvider recycleBinProvider,
                                        IMediaFileService mediaFileService,
                                        IMoveMovieFiles movieFileMover,
                                        IDiskProvider diskProvider,
-                                       Logger logger)
+                                       Logger logger,
+                                       IMovieVersionImportService versionImports)
         {
             _recycleBinProvider = recycleBinProvider;
             _mediaFileService = mediaFileService;
             _movieFileMover = movieFileMover;
             _diskProvider = diskProvider;
             _logger = logger;
+            _versionImports = versionImports;
         }
 
         public MovieFileMoveResult UpgradeMovieFile(MovieFile movieFile, LocalMovie localMovie, bool copyOnly = false)
         {
             _logger.Trace("Upgrading movie file.");
+            _versionImports.ValidateForWrite(localMovie, localMovie.DownloadItem, true);
 
             var moveFileResult = new MovieFileMoveResult();
 

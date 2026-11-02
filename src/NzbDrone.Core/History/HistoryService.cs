@@ -236,6 +236,7 @@ namespace NzbDrone.Core.History
             var history = new MovieHistory
             {
                 EventType = MovieHistoryEventType.MovieFileDeleted,
+                MovieVersionId = message.MovieFile.MovieVersionId,
                 Date = DateTime.UtcNow,
                 Quality = message.MovieFile.Quality,
                 Languages = message.MovieFile.Languages,
@@ -261,6 +262,7 @@ namespace NzbDrone.Core.History
             var history = new MovieHistory
             {
                 EventType = MovieHistoryEventType.MovieFileRenamed,
+                MovieVersionId = message.MovieFile.MovieVersionId,
                 Date = DateTime.UtcNow,
                 Quality = message.MovieFile.Quality,
                 Languages = message.MovieFile.Languages,

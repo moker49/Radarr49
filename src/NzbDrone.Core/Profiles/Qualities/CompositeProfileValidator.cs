@@ -24,7 +24,7 @@ namespace NzbDrone.Core.Profiles.Qualities
                 .WithMessage("Select two different ordinary profiles.");
         }
 
-        private static bool ValidLabel(string label)
+        internal static bool ValidLabel(string label)
         {
             return !string.IsNullOrWhiteSpace(label) && label.Length <= 64 && label == label.Trim() &&
                 !label.EndsWith(".", StringComparison.Ordinal) && !label.Any(char.IsControl) &&

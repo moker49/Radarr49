@@ -66,6 +66,23 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void managed_rename_should_not_submit_a_legacy_movie_update()
+        {
+            GivenMovieFiles();
+            GivenMovedFiles();
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { Id = 1 },
+                new ResolvedMovieVersion { Id = 2 }
+            });
+
+            Subject.Execute(new RenameFilesCommand(_movie.Id, new List<int> { 1, 2 }));
+
+            Mocker.GetMock<IMovieService>().Verify(v => v.UpdateMovie(It.IsAny<Movie>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Update(It.IsAny<MovieFile>()), Times.Exactly(2));
+        }
+
+        [Test]
         public void should_not_publish_event_if_no_files_are_renamed()
         {
             GivenMovieFiles();

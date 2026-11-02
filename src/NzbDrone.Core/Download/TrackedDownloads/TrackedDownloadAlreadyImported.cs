@@ -32,7 +32,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
             var movie = trackedDownload.RemoteMovie.Movie;
 
-            var lastHistoryItem = historyItems.FirstOrDefault(h => h.MovieId == movie.Id);
+            var lastHistoryItem = historyItems.FirstOrDefault(h => h.MovieId == movie.Id && h.MovieVersionId == trackedDownload.MovieVersionId);
 
             if (lastHistoryItem == null)
             {

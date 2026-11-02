@@ -39,9 +39,12 @@ namespace NzbDrone.Core.Movies
 
         public List<MovieVersion> Assign(int movieId, int compositeProfileId, Dictionary<int, int?> fileAssignments = null)
         {
-            lock (CompositeProfileSynchronization.SyncRoot)
+            lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
-                return AssignVersions(movieId, compositeProfileId, fileAssignments);
+                lock (CompositeProfileSynchronization.SyncRoot)
+                {
+                    return AssignVersions(movieId, compositeProfileId, fileAssignments);
+                }
             }
         }
 

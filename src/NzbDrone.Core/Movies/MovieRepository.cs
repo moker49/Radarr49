@@ -58,7 +58,7 @@ namespace NzbDrone.Core.Movies
         protected override SqlBuilder Builder() => new SqlBuilder(_database.DatabaseType)
             .Join<Movie, QualityProfile>((m, p) => m.QualityProfileId == p.Id)
             .Join<Movie, MovieMetadata>((m, p) => m.MovieMetadataId == p.Id)
-            .LeftJoin<Movie, MovieFile>((m, f) => m.Id == f.MovieId)
+            .LeftJoin<Movie, MovieFile>((m, f) => m.MovieFileId == f.Id)
             .LeftJoin<MovieMetadata, AlternativeTitle>((mm, t) => mm.Id == t.MovieMetadataId);
 
         private Movie Map(Dictionary<int, Movie> dict, Movie movie, MovieMetadata metadata, QualityProfile qualityProfile, MovieFile movieFile, AlternativeTitle altTitle = null, MovieTranslation translation = null)
@@ -153,7 +153,7 @@ namespace NzbDrone.Core.Movies
             var builder = new SqlBuilder(_database.DatabaseType)
                 .Join<Movie, QualityProfile>((m, p) => m.QualityProfileId == p.Id)
                 .Join<Movie, MovieMetadata>((m, p) => m.MovieMetadataId == p.Id)
-                .LeftJoin<Movie, MovieFile>((m, f) => m.Id == f.MovieId)
+                .LeftJoin<Movie, MovieFile>((m, f) => m.MovieFileId == f.Id)
                 .Where<MovieMetadata>(x => titles.Contains(x.CleanTitle) || titles.Contains(x.CleanOriginalTitle));
 
             _ = _database.QueryJoined<Movie, MovieMetadata, QualityProfile, MovieFile>(
@@ -171,7 +171,7 @@ namespace NzbDrone.Core.Movies
                 .Join<AlternativeTitle, MovieMetadata>((t, mm) => t.MovieMetadataId == mm.Id)
                 .Join<MovieMetadata, Movie>((mm, m) => mm.Id == m.MovieMetadataId)
                 .Join<Movie, QualityProfile>((m, p) => m.QualityProfileId == p.Id)
-                .LeftJoin<Movie, MovieFile>((m, f) => m.Id == f.MovieId)
+                .LeftJoin<Movie, MovieFile>((m, f) => m.MovieFileId == f.Id)
                 .Where<AlternativeTitle>(x => titles.Contains(x.CleanTitle));
 
             _ = _database.QueryJoined<AlternativeTitle, QualityProfile, Movie, MovieMetadata, MovieFile>(
@@ -193,7 +193,7 @@ namespace NzbDrone.Core.Movies
                 .Join<MovieTranslation, MovieMetadata>((t, mm) => t.MovieMetadataId == mm.Id)
                 .Join<MovieMetadata, Movie>((mm, m) => mm.Id == m.MovieMetadataId)
                 .Join<Movie, QualityProfile>((m, p) => m.QualityProfileId == p.Id)
-                .LeftJoin<Movie, MovieFile>((m, f) => m.Id == f.MovieId)
+                .LeftJoin<Movie, MovieFile>((m, f) => m.MovieFileId == f.Id)
                 .Where<MovieTranslation>(x => titles.Contains(x.CleanTitle));
 
             _ = _database.QueryJoined<MovieTranslation, QualityProfile, Movie, MovieMetadata, MovieFile>(

@@ -28,9 +28,8 @@ the earlier one is unavailable. Primary selection is independent of download ord
 - Validation for primary selection, unique labels/priorities, nested composites,
   incomplete assignments and duplicate file ownership.
 - Composite draft configuration is available through a separate API. Draft assignment
-  and downloads are blocked until version-aware acquisition/import is implemented.
-  Existing consumers still use their original single-file paths; the new resolver is
-  not wired into those paths yet.
+  and downloads remain blocked until the remaining lifecycle work and activation flow
+  are complete. Search, tracking, import and naming now use explicit version contexts.
 - Ordinary profiles now support per-quality SizeDefinitions in storage, API and profile
   editor. Release size rejection and preferred-size ranking use these settings through
   one shared resolver. Unconfigured qualities retain global defaults. Legacy updates
@@ -84,6 +83,24 @@ the earlier one is unavailable. Primary selection is independent of download ord
   a tracked job on the reserved client, a matching release fingerprint, no conflicting
   version, and a verification note. Imported-file and failed-download event handlers update
   ownership/capacity; import handlers require a verified version-to-file assignment first.
+- Imports preserve/reload the explicit version after aggregation and immediately before
+  writing. Client imports require the exact bound reservation; unassigned existing files
+  require explicit selection. Child quality, language, Custom Format threshold and size
+  settings are checked again against the actual file before replacement.
+- Import grouping and duplicate suppression distinguish movie/version pairs. Replacement
+  selects only the target version's file. Empty sources, unrelated destination files,
+  conflicting file registrations and sources already at the destination fail before recycle.
+- File insertion/deletion and version ownership/primary summary updates commit together.
+  File events/history carry version identity; managed file events no longer overwrite the
+  root's primary summary. Automatic unmonitor affects the deleted version on manual or
+  missing-file deletion, and preserves monitoring during upgrades/metadata refresh.
+- Naming uses the exact movie folder plus version label, including existing assigned files
+  and when ordinary renaming is disabled. Rename batches serialize with imports/conversion
+  and avoid legacy movie updates. Legacy file deletion rechecks protection while holding
+  the same per-movie lock before removing a physical file.
+- Singular movie repository joins now consistently select MovieFileId, so queries cannot
+  load an arbitrary secondary file. Completed downloads require their own verified imported
+  reservation; history and import-result checks cannot complete a different version.
 
 ## Remaining sequence
 
@@ -97,7 +114,12 @@ the earlier one is unavailable. Primary selection is independent of download ord
    a reserved download must retain its bound client/download identity; never infer that
    association from a sole pending job. Keep active and currently owned reservations during
    housekeeping; reconcile/cascade them explicitly when version-aware deletion is added.
-4. Scope imports, upgrades, scans, renames, moves, housekeeping and extra files to versions.
+4. Import/replacement, transactional file ownership and basic naming/rename paths are
+   implemented. Finish scans, folder moves, housekeeping, extras/metadata and explicit
+   manual-import routes. Managed download script imports are rejected pending dedicated
+   support. Existing standard recycle-before-transfer behavior remains: a transfer failure
+   can leave the target's previous file in the recycle bin; there is no physical rollback.
+   Audit crash recovery between file transfer, registration, extras and import events.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
 
@@ -106,10 +128,10 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Location | Required change |
 | --- | --- |
 | Movies/Movie.cs | Retain legacy fields as summaries; resolve actual version state explicitly |
-| Movies/MovieRepository.cs | Version-aware missing/cutoff queries and file joins |
-| Movies/MovieService.cs | Import/delete events update the targeted version |
-| MediaFiles/UpgradeMediaFileService.cs | Replace only the targeted version's file |
-| MediaFiles/MovieImport/ImportApprovedMovie.cs | Group imports by movie and version |
+| Movies/MovieRepository.cs | Primary file joins implemented; version-aware missing/cutoff queries remain |
+| Movies/MovieService.cs | Managed file-event ownership/summary updates implemented |
+| MediaFiles/UpgradeMediaFileService.cs | Targeted replacement and pre-recycle checks implemented |
+| MediaFiles/MovieImport/ImportApprovedMovie.cs | Movie/version grouping and validation implemented |
 | MediaFiles/DiskScanService.cs | Preserve assignments and stop on ambiguous new files |
 | DecisionEngine/Specifications | Child contexts and scoped queue/history/delay checks implemented |
 | DecisionEngine/DownloadDecisionComparer.cs | Effective child profile size settings implemented |
@@ -154,6 +176,14 @@ without grab history. Its regression run passes 243 core tests (one existing ign
 and 17 API tests; the documented logging-expectation test remains excluded. PostgreSQL uses
 the same transaction/row-lock SQL path but has not
 been exercised against a live PostgreSQL database in this checkout.
+
+The import/ownership stage passes 867 core tests with five existing platform/ignored
+skips and 17 API tests. The previously documented logging-expectation test remains
+excluded. Coverage includes real SQLite file ownership/summary transactions, primary-only
+query joins, cross-version replacement isolation, pre-write collisions, reservation-bound
+imports/completion, child profile enforcement, exact naming and protected legacy deletion.
+Legacy test builders now explicitly leave version IDs null where they represent old rows.
+Logs: `_temp/composite-import-regression.log` and `_temp/composite-import-api-tests.log`.
 
 ## Draft configuration API
 

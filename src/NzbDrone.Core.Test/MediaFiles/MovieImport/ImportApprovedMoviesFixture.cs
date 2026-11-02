@@ -129,6 +129,38 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
         }
 
         [Test]
+        public void should_import_two_different_versions_of_the_same_movie()
+        {
+            GivenExistingFileOnDisk();
+            Mocker.GetMock<IMediaFileService>().Setup(v => v.Add(It.IsAny<MovieFile>())).Returns<MovieFile>(f => f);
+            var first = _approvedDecisions.First().LocalMovie;
+            first.MovieVersionId = 7;
+            var second = new LocalMovie { Movie = first.Movie, MovieVersionId = 8, Path = first.Path + ".hdr.mkv", Quality = first.Quality };
+
+            var results = Subject.Import(new List<ImportDecision> { new ImportDecision(first), new ImportDecision(second) }, false);
+
+            results.Count(r => r.Result == ImportResultType.Imported).Should().Be(2);
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Add(It.Is<MovieFile>(f => f.MovieVersionId == 7)), Times.Once());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Add(It.Is<MovieFile>(f => f.MovieVersionId == 8)), Times.Once());
+        }
+
+        [Test]
+        public void rejected_version_should_not_suppress_other_version_import()
+        {
+            GivenExistingFileOnDisk();
+            Mocker.GetMock<IMediaFileService>().Setup(v => v.Add(It.IsAny<MovieFile>())).Returns<MovieFile>(f => f);
+            var first = _approvedDecisions.First().LocalMovie;
+            first.MovieVersionId = 7;
+            var second = new LocalMovie { Movie = first.Movie, MovieVersionId = 8, Path = first.Path + ".hdr.mkv", Quality = first.Quality };
+            Mocker.GetMock<IMovieVersionImportService>().Setup(v => v.ValidateForWrite(first, null, false)).Throws(new MovieVersionImportException("Rejected SDR"));
+
+            var results = Subject.Import(new List<ImportDecision> { new ImportDecision(first), new ImportDecision(second) }, false);
+
+            results.Count(r => r.Result == ImportResultType.Imported).Should().Be(1);
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Add(It.Is<MovieFile>(f => f.MovieVersionId == 8)), Times.Once());
+        }
+
+        [Test]
         public void should_move_new_downloads()
         {
             Subject.Import(new List<ImportDecision> { _approvedDecisions.First() }, true);

@@ -66,6 +66,42 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void failed_version_validation_should_not_recycle_or_remove_any_file()
+        {
+            GivenSingleMovieWithSingleMovieFile();
+            Mocker.GetMock<IMovieVersionImportService>()
+                .Setup(v => v.ValidateForWrite(_localMovie, null, true))
+                .Throws(new MovieVersionImportException("Destination belongs to another version."));
+
+            Assert.Throws<MovieVersionImportException>(() => Subject.UpgradeMovieFile(_movieFile, _localMovie));
+
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
+            Mocker.GetMock<IMoveMovieFiles>().Verify(v => v.MoveMovieFile(It.IsAny<MovieFile>(), It.IsAny<LocalMovie>()), Times.Never());
+        }
+
+        [Test]
+        public void should_replace_only_the_file_selected_by_version_validation()
+        {
+            GivenSingleMovieWithSingleMovieFile();
+            var primary = _localMovie.Movie.MovieFile;
+            var hdr = new MovieFile { Id = 2, RelativePath = "HDR.mkv" };
+            Mocker.GetMock<IMovieVersionImportService>()
+                .Setup(v => v.ValidateForWrite(_localMovie, null, true))
+                .Callback(() =>
+                {
+                    _localMovie.Movie.MovieFileId = hdr.Id;
+                    _localMovie.Movie.MovieFile = hdr;
+                });
+
+            Subject.UpgradeMovieFile(_movieFile, _localMovie);
+
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(hdr, DeleteMediaFileReason.Upgrade), Times.Once());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(primary, It.IsAny<DeleteMediaFileReason>()), Times.Never());
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(Path.Combine(_localMovie.Movie.Path, "HDR.mkv"), It.IsAny<string>()), Times.Once());
+        }
+
+        [Test]
         public void should_delete_movie_file_from_database()
         {
             GivenSingleMovieWithSingleMovieFile();
@@ -87,6 +123,7 @@ namespace NzbDrone.Core.Test.MediaFiles
             Subject.UpgradeMovieFile(_movieFile, _localMovie);
 
             Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(_localMovie.Movie.MovieFile, DeleteMediaFileReason.Upgrade), Times.Once());
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]
@@ -101,6 +138,7 @@ namespace NzbDrone.Core.Test.MediaFiles
             Subject.UpgradeMovieFile(_movieFile, _localMovie);
 
             Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]

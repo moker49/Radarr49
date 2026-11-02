@@ -12,6 +12,7 @@ using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
 
@@ -33,6 +34,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         private readonly IEventAggregator _eventAggregator;
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly Logger _logger;
+        private readonly IMovieVersionImportService _versionImports;
 
         public ImportApprovedMovie(IUpgradeMediaFiles movieFileUpgrader,
                                    IMediaFileService mediaFileService,
@@ -42,7 +44,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                                    IHistoryService historyService,
                                    IEventAggregator eventAggregator,
                                    IManageCommandQueue commandQueueManager,
-                                   Logger logger)
+                                   Logger logger,
+                                   IMovieVersionImportService versionImports)
         {
             _movieFileUpgrader = movieFileUpgrader;
             _mediaFileService = mediaFileService;
@@ -53,6 +56,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _eventAggregator = eventAggregator;
             _commandQueueManager = commandQueueManager;
             _logger = logger;
+            _versionImports = versionImports;
         }
 
         public List<ImportResult> Import(List<ImportDecision> decisions, bool newDownload, DownloadClientItem downloadClientItem = null, ImportMode importMode = ImportMode.Auto)
@@ -62,7 +66,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             // I added a null op for the rare case that the quality is null. TODO: find out why that would even happen in the first place.
             var qualifiedImports = decisions
                 .Where(decision => decision.Approved)
-                .GroupBy(decision => decision.LocalMovie.Movie.Id)
+                .GroupBy(decision => (decision.LocalMovie.Movie.Id, decision.LocalMovie.MovieVersionId))
                 .SelectMany(group => group
                     .OrderByDescending(decision => decision.LocalMovie.Quality ?? new QualityModel { Quality = Quality.Unknown }, new QualityModelComparer(group.First().LocalMovie.Movie.QualityProfile))
                     .ThenByDescending(decision => decision.LocalMovie.Size))
@@ -75,129 +79,140 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                 var localMovie = importDecision.LocalMovie;
                 var oldFiles = new List<DeletedMovieFile>();
 
-                try
+                lock (MovieVersionImportSynchronization.ForMovie(localMovie.Movie.Id))
                 {
-                    // check if already imported
-                    if (importResults.Select(r => r.ImportDecision.LocalMovie.Movie)
-                                         .Select(m => m.Id).Contains(localMovie.Movie.Id))
+                    try
                     {
-                        importResults.Add(new ImportResult(importDecision, "Movie has already been imported"));
-                        continue;
-                    }
+                        localMovie.DownloadItem = downloadClientItem ?? localMovie.DownloadItem;
+                        _versionImports.ValidateForWrite(localMovie, localMovie.DownloadItem, newDownload);
 
-                    var movieFile = new MovieFile();
-                    movieFile.DateAdded = DateTime.UtcNow;
-                    movieFile.MovieId = localMovie.Movie.Id;
-                    movieFile.Path = localMovie.Path.CleanFilePath();
-                    movieFile.Size = _diskProvider.GetFileSize(localMovie.Path);
-                    movieFile.Quality = localMovie.Quality;
-                    movieFile.Languages = localMovie.Languages;
-                    movieFile.MediaInfo = localMovie.MediaInfo;
-                    movieFile.Movie = localMovie.Movie;
-                    movieFile.ReleaseGroup = localMovie.ReleaseGroup;
-                    movieFile.Edition = localMovie.Edition;
-
-                    if (downloadClientItem?.DownloadId.IsNotNullOrWhiteSpace() == true)
-                    {
-                        var grabHistory = _historyService.FindByDownloadId(downloadClientItem.DownloadId)
-                            .OrderByDescending(h => h.Date)
-                            .FirstOrDefault(h => h.EventType == MovieHistoryEventType.Grabbed);
-
-                        if (Enum.TryParse(grabHistory?.Data.GetValueOrDefault("indexerFlags"), true, out IndexerFlags flags))
+                        // check if already imported
+                        if (importResults.Any(r => r.Result == ImportResultType.Imported && r.ImportDecision.LocalMovie.Movie.Id == localMovie.Movie.Id &&
+                            r.ImportDecision.LocalMovie.MovieVersionId == localMovie.MovieVersionId))
                         {
-                            movieFile.IndexerFlags = flags;
+                            importResults.Add(new ImportResult(importDecision, "Movie has already been imported"));
+                            continue;
                         }
-                    }
-                    else
-                    {
-                        movieFile.IndexerFlags = localMovie.IndexerFlags;
-                    }
 
-                    bool copyOnly;
-                    switch (importMode)
-                    {
-                        default:
-                        case ImportMode.Auto:
-                            copyOnly = downloadClientItem is { CanMoveFiles: false };
-                            break;
-                        case ImportMode.Move:
-                            copyOnly = false;
-                            break;
-                        case ImportMode.Copy:
-                            copyOnly = true;
-                            break;
-                    }
+                        var movieFile = new MovieFile();
+                        movieFile.MovieVersionId = localMovie.MovieVersionId;
+                        movieFile.DateAdded = DateTime.UtcNow;
+                        movieFile.MovieId = localMovie.Movie.Id;
+                        movieFile.Path = localMovie.Path.CleanFilePath();
+                        movieFile.Size = _diskProvider.GetFileSize(localMovie.Path);
+                        movieFile.Quality = localMovie.Quality;
+                        movieFile.Languages = localMovie.Languages;
+                        movieFile.MediaInfo = localMovie.MediaInfo;
+                        movieFile.Movie = localMovie.Movie;
+                        movieFile.ReleaseGroup = localMovie.ReleaseGroup;
+                        movieFile.Edition = localMovie.Edition;
 
-                    if (newDownload)
-                    {
-                        movieFile.SceneName = localMovie.SceneName;
-                        movieFile.OriginalFilePath = GetOriginalFilePath(downloadClientItem, localMovie);
-
-                        oldFiles = _movieFileUpgrader.UpgradeMovieFile(movieFile, localMovie, copyOnly).OldFiles;
-                    }
-                    else
-                    {
-                        movieFile.RelativePath = localMovie.Movie.Path.GetRelativePath(movieFile.Path);
-
-                        // Delete existing files from the DB mapped to this path
-                        var previousFiles = _mediaFileService.GetFilesWithRelativePath(localMovie.Movie.Id, movieFile.RelativePath);
-
-                        foreach (var previousFile in previousFiles)
+                        if (downloadClientItem?.DownloadId.IsNotNullOrWhiteSpace() == true)
                         {
-                            _mediaFileService.Delete(previousFile, DeleteMediaFileReason.ManualOverride);
-                        }
-                    }
+                            var grabHistory = _historyService.FindByDownloadId(downloadClientItem.DownloadId)
+                                .OrderByDescending(h => h.Date)
+                                .FirstOrDefault(h => h.EventType == MovieHistoryEventType.Grabbed && h.MovieVersionId == localMovie.MovieVersionId);
 
-                    movieFile = _mediaFileService.Add(movieFile);
-                    importResults.Add(new ImportResult(importDecision));
-
-                    localMovie.Movie.MovieFile = movieFile;
-
-                    if (newDownload)
-                    {
-                        if (localMovie.ScriptImported)
-                        {
-                            _existingExtraFiles.ImportExtraFiles(localMovie.Movie, localMovie.PossibleExtraFiles, localMovie.FileNameBeforeRename);
-
-                            if (localMovie.FileNameBeforeRename != movieFile.RelativePath)
+                            if (Enum.TryParse(grabHistory?.Data.GetValueOrDefault("indexerFlags"), true, out IndexerFlags flags))
                             {
-                                _extraService.MoveFilesAfterRename(localMovie.Movie, movieFile);
+                                movieFile.IndexerFlags = flags;
+                            }
+                        }
+                        else
+                        {
+                            movieFile.IndexerFlags = localMovie.IndexerFlags;
+                        }
+
+                        bool copyOnly;
+                        switch (importMode)
+                        {
+                            default:
+                            case ImportMode.Auto:
+                                copyOnly = downloadClientItem is { CanMoveFiles: false };
+                                break;
+                            case ImportMode.Move:
+                                copyOnly = false;
+                                break;
+                            case ImportMode.Copy:
+                                copyOnly = true;
+                                break;
+                        }
+
+                        if (newDownload)
+                        {
+                            movieFile.SceneName = localMovie.SceneName;
+                            movieFile.OriginalFilePath = GetOriginalFilePath(downloadClientItem, localMovie);
+
+                            oldFiles = _movieFileUpgrader.UpgradeMovieFile(movieFile, localMovie, copyOnly).OldFiles;
+                        }
+                        else
+                        {
+                            movieFile.RelativePath = localMovie.Movie.Path.GetRelativePath(movieFile.Path);
+
+                            // Delete existing files from the DB mapped to this path
+                            var previousFiles = _mediaFileService.GetFilesWithRelativePath(localMovie.Movie.Id, movieFile.RelativePath);
+
+                            foreach (var previousFile in previousFiles)
+                            {
+                                _mediaFileService.Delete(previousFile, DeleteMediaFileReason.ManualOverride);
                             }
                         }
 
-                        if (!localMovie.ScriptImported || localMovie.ShouldImportExtras)
+                        movieFile = _mediaFileService.Add(movieFile);
+                        importResults.Add(new ImportResult(importDecision));
+
+                        localMovie.Movie.MovieFile = movieFile;
+
+                        if (newDownload)
                         {
-                            _extraService.ImportMovie(localMovie, movieFile, copyOnly);
+                            if (localMovie.ScriptImported)
+                            {
+                                _existingExtraFiles.ImportExtraFiles(localMovie.Movie, localMovie.PossibleExtraFiles, localMovie.FileNameBeforeRename);
+
+                                if (localMovie.FileNameBeforeRename != movieFile.RelativePath)
+                                {
+                                    _extraService.MoveFilesAfterRename(localMovie.Movie, movieFile);
+                                }
+                            }
+
+                            if (!localMovie.ScriptImported || localMovie.ShouldImportExtras)
+                            {
+                                _extraService.ImportMovie(localMovie, movieFile, copyOnly);
+                            }
                         }
+
+                        _eventAggregator.PublishEvent(new MovieFileImportedEvent(localMovie, movieFile, oldFiles, newDownload, downloadClientItem));
                     }
+                    catch (MovieVersionImportException ex)
+                    {
+                        importResults.Add(new ImportResult(importDecision, ex.Message));
+                    }
+                    catch (RootFolderNotFoundException e)
+                    {
+                        _logger.Warn(e, "Couldn't import movie " + localMovie);
+                        _eventAggregator.PublishEvent(new MovieImportFailedEvent(e, localMovie, newDownload, downloadClientItem));
 
-                    _eventAggregator.PublishEvent(new MovieFileImportedEvent(localMovie, movieFile, oldFiles, newDownload, downloadClientItem));
-                }
-                catch (RootFolderNotFoundException e)
-                {
-                    _logger.Warn(e, "Couldn't import movie " + localMovie);
-                    _eventAggregator.PublishEvent(new MovieImportFailedEvent(e, localMovie, newDownload, downloadClientItem));
+                        importResults.Add(new ImportResult(importDecision, "Failed to import movie, Root folder missing."));
+                    }
+                    catch (DestinationAlreadyExistsException e)
+                    {
+                        _logger.Warn(e, "Couldn't import movie " + localMovie);
+                        importResults.Add(new ImportResult(importDecision, "Failed to import movie, Destination already exists."));
 
-                    importResults.Add(new ImportResult(importDecision, "Failed to import movie, Root folder missing."));
-                }
-                catch (DestinationAlreadyExistsException e)
-                {
-                    _logger.Warn(e, "Couldn't import movie " + localMovie);
-                    importResults.Add(new ImportResult(importDecision, "Failed to import movie, Destination already exists."));
+                        _commandQueueManager.Push(new RescanMovieCommand(localMovie.Movie.Id));
+                    }
+                    catch (RecycleBinException e)
+                    {
+                        _logger.Warn(e, "Couldn't import movie " + localMovie);
+                        _eventAggregator.PublishEvent(new MovieImportFailedEvent(e, localMovie, newDownload, downloadClientItem));
 
-                    _commandQueueManager.Push(new RescanMovieCommand(localMovie.Movie.Id));
-                }
-                catch (RecycleBinException e)
-                {
-                    _logger.Warn(e, "Couldn't import movie " + localMovie);
-                    _eventAggregator.PublishEvent(new MovieImportFailedEvent(e, localMovie, newDownload, downloadClientItem));
-
-                    importResults.Add(new ImportResult(importDecision, "Failed to import movie, unable to move existing file to the Recycle Bin."));
-                }
-                catch (Exception e)
-                {
-                    _logger.Warn(e, "Couldn't import movie " + localMovie);
-                    importResults.Add(new ImportResult(importDecision, "Failed to import movie"));
+                        importResults.Add(new ImportResult(importDecision, "Failed to import movie, unable to move existing file to the Recycle Bin."));
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Warn(e, "Couldn't import movie " + localMovie);
+                        importResults.Add(new ImportResult(importDecision, "Failed to import movie"));
+                    }
                 }
             }
 

@@ -35,6 +35,8 @@ namespace NzbDrone.Core.Test.Download
             var remoteMovie = BuildRemoteMovie();
 
             _trackedDownload = Builder<TrackedDownload>.CreateNew()
+                    .With(c => c.MovieVersionId = null)
+                    .With(c => c.DownloadReservationId = null)
                     .With(c => c.State = TrackedDownloadState.Downloading)
                     .With(c => c.DownloadItem = completed)
                     .With(c => c.RemoteMovie = remoteMovie)
@@ -215,6 +217,24 @@ namespace NzbDrone.Core.Test.Download
                   .Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Never());
 
             _trackedDownload.State.Should().Be(TrackedDownloadState.ImportBlocked);
+        }
+
+        [TestCase(DownloadReservationState.Submitted, 7, false)]
+        [TestCase(DownloadReservationState.Imported, 8, false)]
+        [TestCase(DownloadReservationState.Imported, 7, true)]
+        public void reserved_download_should_only_complete_after_its_own_verified_import(DownloadReservationState state, int version, bool expected)
+        {
+            _trackedDownload.MovieVersionId = 7;
+            _trackedDownload.DownloadReservationId = 3;
+            Mocker.GetMock<IDownloadReservationRepository>()
+                .Setup(v => v.FindForDownload(_trackedDownload.DownloadClient, _trackedDownload.DownloadItem.DownloadId))
+                .Returns(new List<DownloadReservation>
+                {
+                    new DownloadReservation { Id = 3, MovieId = _trackedDownload.RemoteMovie.Movie.Id, MovieVersionId = version, State = state }
+                });
+
+            Subject.VerifyImport(_trackedDownload, new List<ImportResult>()).Should().Be(expected);
+            Mocker.GetMock<IEventAggregator>().Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), expected ? Times.Once() : Times.Never());
         }
 
         private void AssertImported()

@@ -31,6 +31,8 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
                                                          .Build();
 
             _trackedDownload = Builder<TrackedDownload>.CreateNew()
+                                                       .With(t => t.MovieVersionId = null)
+                                                       .With(t => t.DownloadReservationId = null)
                                                        .With(t => t.RemoteMovie = remoteMovie)
                                                        .With(t => t.DownloadItem = downloadItem)
                                                        .Build();
@@ -44,6 +46,7 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
             {
                 _historyItems.Add(
                     Builder<MovieHistory>.CreateNew()
+                                            .With(h => h.MovieVersionId = null)
                                             .With(h => h.MovieId = movie.Id)
                                             .With(h => h.EventType = eventType)
                                             .Build());
@@ -56,6 +59,15 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
             Subject.IsImported(_trackedDownload, _historyItems)
                    .Should()
                    .BeFalse();
+        }
+
+        [Test]
+        public void another_versions_import_should_not_complete_this_version()
+        {
+            _trackedDownload.MovieVersionId = 7;
+            _historyItems.Add(new MovieHistory { MovieId = _movie.Id, MovieVersionId = 8, EventType = MovieHistoryEventType.DownloadFolderImported });
+
+            Subject.IsImported(_trackedDownload, _historyItems).Should().BeFalse();
         }
 
         [Test]

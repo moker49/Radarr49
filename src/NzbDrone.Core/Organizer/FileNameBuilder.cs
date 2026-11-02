@@ -12,6 +12,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MediaInfo;
+using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.Parser;
@@ -37,6 +38,7 @@ namespace NzbDrone.Core.Organizer
         private readonly IMovieTranslationService _movieTranslationService;
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly Logger _logger;
+        private readonly IMovieVersionService _movieVersions;
 
         private static readonly Regex TitleRegex = new Regex(@"(?<tag>\{(?<prefix>[-{ ._\[(]*)(?:imdb(?:id)?-|edition-))?\{(?<prefix>[-{ ._\[(]*)(?<token>(?:[a-z0-9]+)(?:(?<separator>[- ._]+)(?:[a-z0-9]+))?)(?::(?<customFormat>[ ,a-z0-9|+-]+(?<![- ])))?(?<suffix>[-} ._)\]]*)\}",
                                                              RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -92,7 +94,8 @@ namespace NzbDrone.Core.Organizer
                                IUpdateMediaInfo mediaInfoUpdater,
                                IMovieTranslationService movieTranslationService,
                                ICustomFormatCalculationService formatCalculator,
-                               Logger logger)
+                               Logger logger,
+                               IMovieVersionService movieVersions)
         {
             _namingConfigService = namingConfigService;
             _qualityDefinitionService = qualityDefinitionService;
@@ -100,10 +103,29 @@ namespace NzbDrone.Core.Organizer
             _movieTranslationService = movieTranslationService;
             _formatCalculator = formatCalculator;
             _logger = logger;
+            _movieVersions = movieVersions;
         }
 
         public string BuildFileName(Movie movie, MovieFile movieFile, NamingConfig namingConfig = null, List<CustomFormat> customFormats = null)
         {
+            if (movie.ManagedVersion?.Id.HasValue == true)
+            {
+                return MovieVersionImportService.VersionFileName(movie);
+            }
+
+            var versions = _movieVersions.Resolve(movie);
+            if (versions?.Any(v => v.Id.HasValue) == true)
+            {
+                var version = versions.SingleOrDefault(v => v.Id.HasValue && v.MovieFileId == movieFile.Id);
+                if (version == null)
+                {
+                    throw new NamingFormatException("An explicit managed version is required to name this file.");
+                }
+
+                movieFile.MovieVersionId = version.Id;
+                return MovieVersionImportService.VersionFileName(movie.WithVersion(version, movieFile));
+            }
+
             if (namingConfig == null)
             {
                 namingConfig = _namingConfigService.GetConfig();
