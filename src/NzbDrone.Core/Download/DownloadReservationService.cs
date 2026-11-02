@@ -49,6 +49,14 @@ namespace NzbDrone.Core.Download
                 throw new InvalidOperationException("A managed version is required for a download reservation.");
             }
 
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Movie.Id))
+            {
+                return ReserveCore(movie, downloadClientId);
+            }
+        }
+
+        private DownloadReservation ReserveCore(RemoteMovie movie, int downloadClientId)
+        {
             var owner = _movies.Get(movie.Movie.Id);
             movie.Movie = _versions.ForVersion(owner, movie.MovieVersionId.Value);
             var active = _trackedDownloads.GetTrackedDownloads()

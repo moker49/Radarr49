@@ -171,5 +171,26 @@ namespace NzbDrone.Core.Test.MediaFiles
         {
             Assert.Throws<MovieVersionImportException>(() => Subject.ValidateForWrite(_local, null, false));
         }
+
+        [Test]
+        public void reservation_created_after_manual_preview_should_block_unrelated_write()
+        {
+            Mocker.GetMock<IDownloadReservationRepository>().Setup(v => v.ForMovie(_movie.Id)).Returns(new List<DownloadReservation>
+            {
+                new DownloadReservation { MovieVersionId = _local.MovieVersionId.Value, State = DownloadReservationState.Submitted }
+            });
+
+            Assert.Throws<MovieVersionImportException>(() => Subject.ValidateForWrite(_local, null, true));
+        }
+
+        [Test]
+        public void bound_client_download_should_not_be_redirected_to_an_ordinary_movie()
+        {
+            _local.MovieVersionId = null;
+            _movie.ManagedVersion = null;
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.Resolve(_movie)).Returns(new List<ResolvedMovieVersion> { new ResolvedMovieVersion() });
+
+            Assert.Throws<MovieVersionImportException>(() => Subject.ValidateForWrite(_local, _download, true));
+        }
     }
 }

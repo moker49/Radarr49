@@ -5,9 +5,11 @@ using FizzWare.NBuilder;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Disk;
+using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Organizer;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
 
@@ -61,6 +63,28 @@ namespace NzbDrone.Core.Test.MovieTests
             Mocker.GetMock<IDiskTransferService>()
                   .Setup(s => s.TransferFolder(It.IsAny<string>(), It.IsAny<string>(), TransferMode.Move))
                   .Throws<IOException>();
+        }
+
+        [Test]
+        public void protected_movie_should_not_move_through_a_legacy_command()
+        {
+            Mocker.GetMock<ICompositeProfilePolicy>().Setup(v => v.EnsureLegacyMutationAllowed(It.IsAny<IEnumerable<Movie>>()))
+                .Throws(new NzbDroneClientException(System.Net.HttpStatusCode.Conflict, "Version-aware move required"));
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.Execute(_command));
+
+            Mocker.GetMock<IDiskTransferService>().Verify(v => v.TransferFolder(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TransferMode>()), Times.Never());
+        }
+
+        [Test]
+        public void protected_bulk_selection_should_fail_before_any_folder_moves()
+        {
+            Mocker.GetMock<ICompositeProfilePolicy>().Setup(v => v.EnsureLegacyMutationAllowed(It.IsAny<IEnumerable<Movie>>()))
+                .Throws(new NzbDroneClientException(System.Net.HttpStatusCode.Conflict, "Version-aware move required"));
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.Execute(_bulkCommand));
+
+            Mocker.GetMock<IDiskTransferService>().Verify(v => v.TransferFolder(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TransferMode>()), Times.Never());
         }
 
         [Test]

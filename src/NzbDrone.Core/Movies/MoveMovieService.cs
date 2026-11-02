@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
@@ -8,6 +9,7 @@ using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Events;
 using NzbDrone.Core.Organizer;
+using NzbDrone.Core.Profiles.Qualities;
 
 namespace NzbDrone.Core.Movies
 {
@@ -19,12 +21,14 @@ namespace NzbDrone.Core.Movies
         private readonly IDiskTransferService _diskTransferService;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly ICompositeProfilePolicy _compositePolicy;
 
         public MoveMovieService(IMovieService movieService,
                                  IBuildFileNames filenameBuilder,
                                  IDiskProvider diskProvider,
                                  IDiskTransferService diskTransferService,
                                  IEventAggregator eventAggregator,
+                                 ICompositeProfilePolicy compositePolicy,
                                  Logger logger)
         {
             _movieService = movieService;
@@ -33,9 +37,20 @@ namespace NzbDrone.Core.Movies
             _diskTransferService = diskTransferService;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _compositePolicy = compositePolicy;
         }
 
         private void MoveSingleMovie(Movie movie, string sourcePath, string destinationPath, int? index = null, int? total = null)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+            {
+                movie = _movieService.GetMovie(movie.Id);
+                _compositePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+                MoveSingleMovieCore(movie, sourcePath, destinationPath, index, total);
+            }
+        }
+
+        private void MoveSingleMovieCore(Movie movie, string sourcePath, string destinationPath, int? index, int? total)
         {
             if (!sourcePath.IsPathValid(PathValidationType.CurrentOs))
             {
@@ -98,6 +113,7 @@ namespace NzbDrone.Core.Movies
         public void Execute(BulkMoveMovieCommand message)
         {
             var moviesToMove = message.Movies;
+            _compositePolicy.EnsureLegacyMutationAllowed(moviesToMove.Select(m => _movieService.GetMovie(m.MovieId)).ToList());
             var destinationRootFolder = message.DestinationRootFolder;
 
             _logger.ProgressInfo("Moving {0} movies to '{1}'", moviesToMove.Count, destinationRootFolder);

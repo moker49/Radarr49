@@ -6,7 +6,7 @@ using NzbDrone.Core.Qualities;
 
 namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 {
-    public class ManualImportFile : IEquatable<ManualImportFile>
+    public class ManualImportFile : ManualImportVersionSelection, IEquatable<ManualImportFile>
     {
         public string Path { get; set; }
         public string FolderName { get; set; }

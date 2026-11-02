@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NzbDrone.Common.Disk;
@@ -70,6 +71,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             if (!versions.Any(v => v.Id.HasValue))
             {
                 Require(!versionId.HasValue && !local.DownloadReservationId.HasValue, "The selected version no longer belongs to this movie.");
+                if (download?.DownloadClientInfo?.Id > 0)
+                {
+                    Require((_reservations.FindForDownload(download.DownloadClientInfo.Id, download.DownloadId)?.Count ?? 0) == 0,
+                        "This client download belongs to a managed version and cannot be redirected to an ordinary movie.");
+                }
+
                 local.Movie = movie;
                 return;
             }
@@ -104,6 +111,11 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             if (local.DownloadReservationId.HasValue)
             {
                 Require(_reservations.Get(local.DownloadReservationId.Value).State == DownloadReservationState.Submitted, "This reserved download has already been imported or its state changed.");
+            }
+            else
+            {
+                Require(!(_reservations.ForMovie(local.Movie.Id) ?? new List<DownloadReservation>()).Any(r => r.MovieVersionId == local.MovieVersionId && r.IsActive),
+                    "This version has an active reserved download. Import using that download's bound identity or reconcile it first.");
             }
 
             local.Size = _disk.GetFileSize(local.Path);

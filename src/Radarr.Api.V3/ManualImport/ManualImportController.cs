@@ -24,14 +24,16 @@ namespace Radarr.Api.V3.ManualImport
 
         [HttpGet]
         [Produces("application/json")]
-        public List<ManualImportResource> GetMediaFiles(string folder, string downloadId, int? movieId, bool filterExistingFiles = true)
+        public List<ManualImportResource> GetMediaFiles(string folder, string downloadId, int? movieId, bool filterExistingFiles = true, int? movieVersionId = null, int? downloadClientId = null, int? downloadReservationId = null)
         {
-            if (movieId.HasValue && downloadId.IsNullOrWhiteSpace())
+            if (movieId.HasValue && downloadId.IsNullOrWhiteSpace() && (folder.IsNullOrWhiteSpace() || !movieVersionId.HasValue))
             {
-                return _manualImportService.GetMediaFiles(movieId.Value).ToResource().Select(AddQualityWeight).ToList();
+                return _manualImportService.GetMediaFiles(movieId.Value)
+                    .Where(i => !movieVersionId.HasValue || i.MovieVersionId == movieVersionId).ToResource().Select(AddQualityWeight).ToList();
             }
 
-            return _manualImportService.GetMediaFiles(folder, downloadId, movieId, filterExistingFiles).ToResource().Select(AddQualityWeight).ToList();
+            var selection = new ManualImportVersionSelection { MovieVersionId = movieVersionId, DownloadClientId = downloadClientId, DownloadReservationId = downloadReservationId };
+            return _manualImportService.GetMediaFiles(folder, downloadId, movieId, filterExistingFiles, selection).ToResource().Select(AddQualityWeight).ToList();
         }
 
         [HttpPost]
@@ -45,13 +47,17 @@ namespace Radarr.Api.V3.ManualImport
 
             foreach (var item in items)
             {
-                var processedItem = _manualImportService.ReprocessItem(item.Path, item.DownloadId, item.MovieId, item.ReleaseGroup, item.Quality, item.Languages, item.IndexerFlags);
+                var selection = new ManualImportVersionSelection { MovieVersionId = item.MovieVersionId, DownloadClientId = item.DownloadClientId, DownloadReservationId = item.DownloadReservationId };
+                var processedItem = _manualImportService.ReprocessItem(item.Path, item.DownloadId, item.MovieId, item.ReleaseGroup, item.Quality, item.Languages, item.IndexerFlags, selection);
 
                 item.Movie = processedItem.Movie.ToResource(0);
                 item.IndexerFlags = processedItem.IndexerFlags;
                 item.Rejections = processedItem.Rejections.Select(r => r.ToResource());
                 item.CustomFormats = processedItem.CustomFormats.ToResource(false);
                 item.CustomFormatScore = processedItem.CustomFormatScore;
+                item.MovieVersionId = processedItem.MovieVersionId;
+                item.DownloadClientId = processedItem.DownloadClientId;
+                item.DownloadReservationId = processedItem.DownloadReservationId;
 
                 // Only set the language/quality if they're unknown and languages were returned.
                 if (item.Languages?.Count <= 1 && (item.Languages?.SingleOrDefault() ?? Language.Unknown) == Language.Unknown && processedItem.Languages.Any())

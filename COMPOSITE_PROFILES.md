@@ -123,6 +123,24 @@ the earlier one is unavailable. Primary selection is independent of download ord
 - Housekeeping preserves files owned by MovieVersions even when they are not the primary.
   Metadata deduplication now distinguishes movie, file owner, consumer and path, retaining
   both versions' NFOs and shared metadata while removing all true duplicate records.
+- Manual import preview, reprocessing and command payloads carry MovieVersionId,
+  DownloadClientId and DownloadReservationId. Existing library files expose the version
+  associated with their stored file ID. Reprocessing preserves the child profile context.
+  Execution preflights every selected source before any import and rejects duplicate
+  source selections. Managed imports require explicit version selection.
+- Manual client imports require the exact tracked client/download/reservation/version
+  identity and a source inside that download's import path. They cannot redirect a managed
+  job into an ordinary movie or drop the download ID to claim its source as an offline
+  import. Offline selection cannot replace a version with an active reserved job.
+  The shared write validator rechecks active reservations before replacement; dispatch
+  reservation acquisition uses the same per-movie lock as file imports within the process.
+- Manual download completion now uses the shared verified-import check. Folder cleanup
+  only follows verified completion, and results are grouped by client, download ID and
+  reservation attempt. A successful import result alone cannot complete another version.
+- Legacy single/bulk folder-move commands enforce the composite mutation policy before
+  physical changes, including direct command requests. Bulk preflight protects mixed
+  selections, and individual moves recheck under the per-movie lock. The explicit managed
+  folder move/recovery workflow is not implemented or exposed yet.
 
 ## Remaining sequence
 
@@ -138,8 +156,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
    housekeeping; reconcile/cascade them explicitly when version-aware deletion is added.
 4. Import/replacement, transactional file ownership and basic naming/rename paths are
    implemented. Scans, sidecar association, shared metadata and relevant file/metadata
-   housekeeping are also implemented. Finish folder moves, version-aware deletion and
-   explicit manual-import routes; audit notifications and remaining command paths.
+   housekeeping are also implemented. Explicit manual-import backend/API selection is
+   implemented. Finish managed folder moves and version-aware deletion; audit notifications
+   and remaining command paths. Legacy folder moves are protected, not enabled for composites.
    Managed download script imports are rejected pending dedicated
    support. Existing standard recycle-before-transfer behavior remains: a transfer failure
    can leave the target's previous file in the recycle bin; there is no physical rollback.
@@ -163,7 +182,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Download/Pending/PendingRelease.cs | Identity and scoped pending contexts implemented |
 | Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
 | History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
-| Radarr.Api.V3 movie/file/profile controllers | Shared guards implemented; audit command/manual-import routes before activation |
+| Radarr.Api.V3 movie/file/profile controllers | Shared guards and explicit manual-import identity implemented; activation and remaining command audits pending |
 | Extras and housekeeping | Per-file sidecars, shared metadata and secondary-file preservation implemented |
 | Organizer folder moves and notifications | Audit file selection and scope to version |
 
@@ -219,6 +238,13 @@ baseline logging-expectation test remains excluded. Logs:
 `_temp/composite-scan-extras-regression.log`, `_temp/composite-scan-persistence.log` and
 `_temp/composite-scan-extras-api.log`.
 
+The manual-import stage passes 1,062 core tests and 23 API tests, with five existing core skips. The previously
+documented logging-expectation test remains excluded. Coverage includes explicit selection,
+client/reservation conflicts, canonical source containment, dropped-identity protection,
+command preflight, child-context preservation, completion verification and legacy move
+protection. Logs: `_temp/composite-manual-regression.log` and
+`_temp/composite-manual-api-tests.log`.
+
 ## Draft configuration API
 
 Use an unused ordinary profile as the parent (give it the desired composite name first).
@@ -238,6 +264,25 @@ continues to list the parent, but assignment currently returns HTTP 409. Legacy 
 deletes against protected targets also return HTTP 409 with an explanation; this applies
 to the built-in legacy interface as well as external clients. The future legacy add
 workflow will be enabled once version assignments, downloads and imports are ready.
+
+## Manual import API
+
+GET `/api/v3/manualimport` accepts optional `movieVersionId`, `downloadClientId` and
+`downloadReservationId`, and returns these fields on each item. A library listing using
+`movieId` without a download ID exposes existing file-to-version assignments; use no
+`folder` to request that listing when a version filter is supplied. An explicit version
+plus `folder` previews that folder for the selected movie/version instead.
+
+POST reprocessing items and `ManualImport` command `files` accept the same three nullable
+fields. Ordinary imports keep them absent. For a composite, supply the destination
+`movieVersionId`. When `downloadId` identifies a client job, also supply its exact client
+and reservation IDs; the source must be within that job's import path. Without a download
+ID, omit client/reservation IDs and select a version with no active reserved job. The
+server rejects missing/conflicting identities with HTTP 409, or fails a queued command
+before its first import during preflight.
+
+These backend/API changes do not add a version selector to the UI or enable composite
+activation. A separate version-aware folder relocation and recovery flow is still needed.
 
 ## Reservation state and reconciliation API
 
