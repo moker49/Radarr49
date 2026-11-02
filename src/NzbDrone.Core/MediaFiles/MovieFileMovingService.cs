@@ -34,6 +34,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IEventAggregator _eventAggregator;
         private readonly IConfigService _configService;
         private readonly Logger _logger;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public MovieFileMovingService(IUpdateMovieFileService updateMovieFileService,
                                 IBuildFileNames buildFileNames,
@@ -44,6 +45,7 @@ namespace NzbDrone.Core.MediaFiles
                                 IRootFolderService rootFolderService,
                                 IEventAggregator eventAggregator,
                                 IConfigService configService,
+                                IVersionFileDeletionRepository deletions,
                                 Logger logger)
         {
             _updateMovieFileService = updateMovieFileService;
@@ -56,6 +58,7 @@ namespace NzbDrone.Core.MediaFiles
             _eventAggregator = eventAggregator;
             _configService = configService;
             _logger = logger;
+            _deletions = deletions;
         }
 
         public MovieFile MoveMovieFile(MovieFile movieFile, Movie movie)
@@ -103,6 +106,7 @@ namespace NzbDrone.Core.MediaFiles
         {
             Ensure.That(movieFile, () => movieFile).IsNotNull();
             Ensure.That(movie, () => movie).IsNotNull();
+            _deletions.CheckReady(movie.Id, localMovie?.MovieVersionId ?? movie.ManagedVersion?.Id ?? movieFile.MovieVersionId);
             Ensure.That(destinationFilePath, () => destinationFilePath).IsValidPath(PathValidationType.CurrentOs);
 
             var movieFilePath = movieFile.Path ?? Path.Combine(movie.Path, movieFile.RelativePath);

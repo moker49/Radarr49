@@ -86,6 +86,19 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
+        public void unfinished_deletion_should_block_only_its_versions_reservation()
+        {
+            Db.Insert(new VersionFileDeletion
+            {
+                MovieId = _movie.Id, MovieVersionId = _sdr.Id, MovieFileId = 99, MoviePath = _movie.Path,
+                State = VersionFileDeletionState.Detached, Snapshot = new VersionFileDeletionSnapshot { File = new MovieFile { Id = 99 } }
+            });
+
+            Assert.That(Reserve(_sdr), Is.Null);
+            Assert.That(Reserve(_hdr), Is.Not.Null);
+        }
+
+        [Test]
         public void default_limit_should_block_other_version()
         {
             Reserve(_sdr);

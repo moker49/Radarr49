@@ -41,6 +41,17 @@ namespace NzbDrone.Core.Test.MediaFiles
                   .Returns(new List<MovieFile>());
         }
 
+        [Test]
+        public void unfinished_deletion_should_prevent_physical_rename()
+        {
+            GivenMovieFiles();
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.CheckReady(_movie.Id, null)).Throws(new VersionFileDeletionPendingException());
+
+            Assert.Throws<VersionFileDeletionPendingException>(() => Subject.Execute(new RenameFilesCommand(_movie.Id, new List<int> { 1, 2 })));
+
+            Mocker.GetMock<IMoveMovieFiles>().Verify(v => v.MoveMovieFile(It.IsAny<MovieFile>(), It.IsAny<Movie>()), Times.Never());
+        }
+
         private void GivenMovieFiles()
         {
             Mocker.GetMock<IMediaFileService>()

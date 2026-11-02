@@ -105,6 +105,12 @@ namespace NzbDrone.Core.Extras.Files
 
         public void HandleAsync(MovieFileDeletedEvent message)
         {
+            if (message.DeletionOperationId.HasValue)
+            {
+                // The durable deletion runner owns extras cleanup and its checkpoints.
+                return;
+            }
+
             lock (MovieVersionImportSynchronization.ForMovie(message.MovieFile.MovieId))
             {
                 DeleteForMovieFile(message);

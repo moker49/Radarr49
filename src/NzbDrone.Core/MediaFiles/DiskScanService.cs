@@ -44,6 +44,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
         private readonly IMovieVersionService _versions;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public DiskScanService(IDiskProvider diskProvider,
                                IMakeImportDecision importDecisionMaker,
@@ -56,6 +57,7 @@ namespace NzbDrone.Core.MediaFiles
                                IUpdateMediaInfo updateMediaInfoService,
                                IEventAggregator eventAggregator,
                                IMovieVersionService versions,
+                               IVersionFileDeletionRepository deletions,
                                Logger logger)
         {
             _diskProvider = diskProvider;
@@ -70,6 +72,7 @@ namespace NzbDrone.Core.MediaFiles
             _eventAggregator = eventAggregator;
             _logger = logger;
             _versions = versions;
+            _deletions = deletions;
         }
 
         private static readonly Regex ExcludedExtrasSubFolderRegex = new Regex(@"(?:\\|\/|^)(?:extras|extrafanart|behind the scenes|deleted scenes|featurettes|interviews|other|scenes|sample[s]?|shorts|trailers)(?:\\|\/)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -83,6 +86,7 @@ namespace NzbDrone.Core.MediaFiles
             lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
             {
                 movie = _movieService.GetMovie(movie.Id) ?? movie;
+                _deletions.CheckReady(movie.Id, null);
                 _versions.Resolve(movie);
                 ScanCore(movie);
             }

@@ -44,5 +44,15 @@ namespace NzbDrone.Core.Test.MediaFiles
 
             Mocker.GetMock<IEventAggregator>().Verify(v => v.PublishEvent(It.IsAny<MovieFileDeletedEvent>()), Times.Never());
         }
+
+        [Test]
+        public void unfinished_deletion_should_block_metadata_update_before_repository_mutation()
+        {
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.CheckReady(1, null)).Throws(new VersionFileDeletionPendingException());
+
+            Assert.Throws<VersionFileDeletionPendingException>(() => Subject.Update(_file));
+
+            Mocker.GetMock<IMediaFileRepository>().Verify(v => v.Update(It.IsAny<MovieFile>()), Times.Never());
+        }
     }
 }

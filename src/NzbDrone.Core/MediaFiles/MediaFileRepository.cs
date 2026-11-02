@@ -44,6 +44,7 @@ namespace NzbDrone.Core.MediaFiles
             using var connection = _database.OpenConnection();
             using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             LockMovie(connection, transaction, movieFile.MovieId);
+            CheckNoDeletion(connection, transaction, movieFile.MovieId, movieVersionId);
             var version = connection.QuerySingleOrDefault<MovieVersion>("SELECT v.* FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" WHERE v.\"Id\" = @movieVersionId AND v.\"MovieId\" = @MovieId AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", new { movieVersionId, movieFile.MovieId }, transaction);
             if (version == null || version.MovieFileId.HasValue)
             {
@@ -110,6 +111,7 @@ namespace NzbDrone.Core.MediaFiles
                 return null;
             }
 
+            CheckNoDeletion(connection, transaction, movieFile.MovieId, versionId.Value);
             if (expectedVersionId.HasValue)
             {
                 if (versionId != expectedVersionId || connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" WHERE v.\"Id\" = @versionId AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", new { versionId }, transaction) != 1)
@@ -140,6 +142,14 @@ namespace NzbDrone.Core.MediaFiles
             if (connection.Execute("UPDATE \"Movies\" SET \"MovieFileId\" = \"MovieFileId\" WHERE \"Id\" = @movieId", new { movieId }, transaction) != 1)
             {
                 throw new InvalidOperationException("Movie no longer exists.");
+            }
+        }
+
+        private static void CheckNoDeletion(IDbConnection connection, IDbTransaction transaction, int movieId, int versionId)
+        {
+            if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @movieId AND \"MovieVersionId\" = @versionId AND \"State\" IN (0, 1, 2, 3, 4)", new { movieId, versionId }, transaction) != 0)
+            {
+                throw new InvalidOperationException("This version has an unfinished deletion. Recover it before changing files.");
             }
         }
 

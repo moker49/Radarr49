@@ -156,6 +156,27 @@ the earlier one is unavailable. Primary selection is independent of download ord
   and other extras, not just the current provider's category. Shared metadata, including
   recognized shared files with older file-owned registrations, is preserved. Paths outside
   the movie folder or overlapping another movie are not recycled as sidecars.
+- Targeted deletion now persists a VersionFileDeletions journal before physical changes.
+  The snapshot retains the exact file and registered extras, source sizes and precise UTC
+  write-time ticks, monitoring choice and immutable movie path. Recycling markers precede
+  each physical action. Detachment/monitoring/primary summary changes and the Detached
+  checkpoint commit atomically; extras registration cleanup and cursor advancement also
+  commit together. The previous direct recycle/delete path delegates to this runner.
+- Startup resumes pending deletions when the recorded state and observed files permit it.
+  Ambiguous recycling with an existing file remains blocked until explicitly verified;
+  changed source attributes never authorize recycling, even with a retry flag. Missing
+  sources are accepted only with the root available and the exact assignment intact.
+  Unstarted requests can be cancelled with a note; changed extras can be explicitly
+  preserved. Completed exact-file requests replay without selecting a replacement.
+- Pending deletions block target registration, deletion, metadata writes, transfers and
+  reservation claims. Scans and batch renames pause for the affected movie. Other versions
+  retain acquisition eligibility; search returns a temporary rejection for only the held
+  version. Housekeeping preserves pending extras registrations until recovery processes
+  them. The durable runner owns extras cleanup rather than asynchronous delete subscribers.
+- Delete event dispatch has a replay checkpoint and operation ID; replayed history records
+  are deduplicated by that ID. The existing event aggregator still treats subscriber delivery
+  as best effort, so external notifications are not guaranteed exactly once. This journal
+  currently covers explicit version-file deletion, not upgrades/imports or folder moves.
 
 ## Remaining sequence
 
@@ -180,7 +201,8 @@ the earlier one is unavailable. Primary selection is independent of download ord
    Managed download script imports are rejected pending dedicated
    support. Existing standard recycle-before-transfer behavior remains: a transfer failure
    can leave the target's previous file in the recycle bin; there is no physical rollback.
-   Audit crash recovery between file transfer, registration, extras and import events.
+   Explicit version-file deletion now has durable recovery. Finish equivalent auditing and
+   recovery for acquisition/import/replacement and folder moves before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
 
@@ -273,15 +295,26 @@ cross-provider extras claims, stale requests and filesystem failures. Logs:
 `_temp/composite-version-delete-api-tests.log` and
 `_temp/composite-version-delete-path-tests.log`.
 
+The deletion-recovery stage passes 1,150 core tests (five existing skips) and 29 API tests.
+The documented logging-expectation test remains excluded. New real-SQLite cases cover
+concurrent intent creation, snapshot roundtrips with fractional timestamps, interruption
+before/after physical recycling, atomic detach, partial extras cleanup, changed-source
+protection, cancellation, completed replay, startup resumption and housekeeping retention.
+Gating, per-version search isolation and history replay are also checked. Logs:
+`_temp/deletion-recovery-regression.log` and `_temp/deletion-recovery-api-tests.log`.
+
 ## File operation recovery still required before activation
 
-Targeted deletion currently follows the existing recycle-before-database pattern. A failed
-recycle does not detach ownership. A crash after recycling but before the database commit
-can still leave the registered target in the recycle bin, and a crash after the commit
-can interrupt asynchronous extras cleanup. There is no durable filesystem-operation
-journal or automatic physical rollback yet. Exact file IDs prevent a retry from deleting
-a replacement, but callers must refresh on stale/missing assignments rather than assuming
-the previous request completed. Composite activation remains disabled.
+Explicit version-file deletion has a durable forward-recovery journal. It resumes the
+authorized deletion, rather than restoring recycled files automatically. Size and precise
+write-time checks detect changed entries; they are not cryptographic content identities.
+An explicit physical retry still requires operator verification of the original file.
+The supported runtime assumes one application instance owns the media filesystem; the
+database locks/indexes protect records but do not provide a distributed filesystem lease.
+
+Upgrades/imports and folder moves still lack equivalent operation recovery. Composite
+activation remains disabled until those lifecycle paths and the remaining UI/API work
+are ready. No running development app was restarted by these test/build steps.
 
 The folder-move audit found that DiskTransferService.TransferFolder can recursively merge
 into an existing destination, overwrite file paths, and move files incrementally across
@@ -324,6 +357,35 @@ cannot use this route. Legacy movie/file delete endpoints continue to reject com
 
 This route does not cancel client jobs, remove a version definition or delete the whole
 movie. If a reservation is active, reconcile it explicitly before attempting deletion.
+
+## Deletion recovery API
+
+GET `/api/v3/movie/{movieId}/versionfiledeletions` lists checkpoints, exact movie/version/file
+identity, monitoring choice, original paths/attributes, current extra, recycle path when
+known, timestamps and notes. Each delete request retains its original monitoring choice;
+retrying with a different choice returns HTTP 409.
+
+POST `.../{operationId}/resume` accepts `{}` for ordinary forward recovery. If recycling
+may have started and the original path still exists, use `retryOriginalSource: true` with
+a nonempty verification `note` only after inspecting that original file. Attribute changes
+still block recycling. For changed extras, `preserveChangedExtras: true` with a note retains
+the physical files and clears only their old registrations. Both options apply to the
+current persisted checkpoint; neither can override stale ownership or path checks.
+
+POST `.../{operationId}/cancel` requires a `note` and only cancels Prepared operations,
+before any recycling marker was written. Completed operations are idempotent; cancelled
+operations require a new exact-file delete request. No automatic timeout releases an
+unfinished operation. Inspection/resumption is scoped to the route's owning movie.
+
+| State | Meaning |
+| --- | --- |
+| Prepared | Intent/snapshot persisted; no recycling marker written |
+| Recycling | Main-file recycling may have begun; existing paths need verified retry |
+| Detached | File row/assignment/monitoring committed; extras cursor pending |
+| RecyclingExtra | Current extra recycling may have begun; cursor not committed |
+| EventsPending | Durable physical/registration cleanup done; event dispatch pending |
+| Completed | Journal no longer blocks writes; exact request can replay safely |
+| Cancelled | Unstarted intent cancelled; files and monitoring were not changed |
 
 ## Manual import API
 

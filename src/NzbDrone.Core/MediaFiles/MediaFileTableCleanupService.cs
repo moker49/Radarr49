@@ -17,18 +17,22 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMediaFileService _mediaFileService;
         private readonly IMovieService _movieService;
         private readonly Logger _logger;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public MediaFileTableCleanupService(IMediaFileService mediaFileService,
                                             IMovieService movieService,
+                                            IVersionFileDeletionRepository deletions,
                                             Logger logger)
         {
             _mediaFileService = mediaFileService;
             _movieService = movieService;
             _logger = logger;
+            _deletions = deletions;
         }
 
         public void Clean(Movie movie, List<string> filesOnDisk)
         {
+            _deletions.CheckReady(movie.Id, null);
             var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
 
             var filesOnDiskKeys = new HashSet<string>(filesOnDisk, PathEqualityComparer.Instance);

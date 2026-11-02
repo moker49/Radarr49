@@ -6,6 +6,7 @@ namespace NzbDrone.Core.MediaFiles.Events
     {
         public MovieFile MovieFile { get; private set; }
         public DeleteMediaFileReason Reason { get; private set; }
+        public int? DeletionOperationId { get; set; }
 
         public MovieFileDeletedEvent(MovieFile movieFile, DeleteMediaFileReason reason)
         {

@@ -52,9 +52,7 @@ namespace NzbDrone.Core.Test.MediaFiles
         {
             Subject.Delete(1, 7, 11, unmonitor);
 
-            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(Path.Combine(_movie.Path, _file.RelativePath), It.IsAny<string>()), Times.Once());
-            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Once());
-            Mocker.GetMock<IMediaFileService>().Verify(v => v.DeleteManagedVersionFile(_file, 7, unmonitor), Times.Once());
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Start(_movie, _file, unmonitor), Times.Once());
             Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
         }
 
@@ -84,7 +82,7 @@ namespace NzbDrone.Core.Test.MediaFiles
             _tracked.Add(new TrackedDownload { MovieVersionId = 8, IsTrackable = true, RemoteMovie = new RemoteMovie { Movie = _movie } });
 
             Assert.DoesNotThrow(() => Subject.Delete(1, 7, 11, true));
-            Mocker.GetMock<IMediaFileService>().Verify(v => v.DeleteManagedVersionFile(_file, 7, true), Times.Once());
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Start(_movie, _file, true), Times.Once());
         }
 
         [TestCase(null)]
@@ -135,7 +133,7 @@ namespace NzbDrone.Core.Test.MediaFiles
             Mocker.GetMock<IDiskProvider>().Setup(v => v.FileExists(It.IsAny<string>())).Returns(false);
             Subject.Delete(1, 7, 11, false);
             Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
-            Mocker.GetMock<IMediaFileService>().Verify(v => v.DeleteManagedVersionFile(_file, 7, false), Times.Once());
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Start(_movie, _file, false), Times.Once());
         }
 
         [Test]
@@ -152,15 +150,36 @@ namespace NzbDrone.Core.Test.MediaFiles
         [Test]
         public void recycle_failure_should_preserve_database_ownership()
         {
-            Mocker.GetMock<IRecycleBinProvider>().Setup(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>())).Throws(new IOException("Recycle failed"));
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Setup(v => v.Start(_movie, _file, true)).Throws(new IOException("Recycle failed"));
             Assert.Throws<IOException>(() => Subject.Delete(1, 7, 11, true));
             Mocker.GetMock<IMediaFileService>().Verify(v => v.DeleteManagedVersionFile(It.IsAny<MovieFile>(), It.IsAny<int>(), It.IsAny<bool>()), Times.Never());
         }
 
         private void AssertNoDeletion()
         {
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Start(It.IsAny<Movie>(), It.IsAny<MovieFile>(), It.IsAny<bool>()), Times.Never());
             Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
             Mocker.GetMock<IMediaFileService>().Verify(v => v.DeleteManagedVersionFile(It.IsAny<MovieFile>(), It.IsAny<int>(), It.IsAny<bool>()), Times.Never());
+        }
+
+        [Test]
+        public void repeated_exact_file_request_should_resume_existing_operation_without_selecting_a_replacement()
+        {
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.FindRequest(1, 7, 11)).Returns(new VersionFileDeletion { Id = 42, Unmonitor = true, State = VersionFileDeletionState.Completed });
+
+            Subject.Delete(1, 7, 11, true);
+
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Resume(1, 42, false, false, null), Times.Once());
+            Mocker.GetMock<IMovieVersionService>().Verify(v => v.ForVersion(It.IsAny<Movie>(), It.IsAny<int>()), Times.Never());
+        }
+
+        [Test]
+        public void retry_should_not_silently_change_persisted_monitoring_choice()
+        {
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.FindRequest(1, 7, 11)).Returns(new VersionFileDeletion { Id = 42, Unmonitor = false });
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.Delete(1, 7, 11, true));
+            Mocker.GetMock<IVersionFileDeletionRecoveryService>().Verify(v => v.Resume(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string>()), Times.Never());
         }
     }
 }

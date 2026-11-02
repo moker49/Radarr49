@@ -10,6 +10,7 @@ using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.IndexerSearch.Definitions;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -158,6 +159,7 @@ namespace NzbDrone.Core.DecisionEngine
                                                      Dictionary<(int MovieId, int VersionId), Movie> contextCache)
         {
             List<RemoteMovie> contexts;
+            var decisions = new List<DownloadDecision>();
             try
             {
                 if (!versionCache.TryGetValue(source.Movie.Id, out var versions))
@@ -192,7 +194,17 @@ namespace NzbDrone.Core.DecisionEngine
                     var key = (source.Movie.Id, version.Id.Value);
                     if (!contextCache.TryGetValue(key, out var movie))
                     {
-                        movie = _movieVersions.ForVersion(source.Movie, version.Id.Value) ?? throw new InvalidOperationException("The version context could not be restored.");
+                        try
+                        {
+                            movie = _movieVersions.ForVersion(source.Movie, version.Id.Value) ?? throw new InvalidOperationException("The version context could not be restored.");
+                        }
+                        catch (VersionFileDeletionPendingException ex)
+                        {
+                            decisions.Add(new DownloadDecision(source.WithVersion(source.Movie.WithVersion(version, null), version.Id.Value, version.Priority),
+                                new DownloadRejection(DownloadRejectionReason.InvalidMovieVersion, ex.Message, RejectionType.Temporary)));
+                            continue;
+                        }
+
                         contextCache[key] = movie;
                     }
 
@@ -207,7 +219,6 @@ namespace NzbDrone.Core.DecisionEngine
                 };
             }
 
-            var decisions = new List<DownloadDecision>();
             foreach (var context in contexts)
             {
                 _aggregationService.Augment(context);

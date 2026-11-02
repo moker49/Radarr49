@@ -56,6 +56,17 @@ namespace NzbDrone.Core.Test.MoviesTests
         }
 
         [Test]
+        public void unfinished_deletion_should_block_target_context_before_reading_its_file()
+        {
+            WithComposite();
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.CheckReady(_movie.Id, 201)).Throws(new VersionFileDeletionPendingException());
+
+            Assert.Throws<VersionFileDeletionPendingException>(() => Subject.ForVersion(_movie, 201));
+            Assert.That(Subject.ForVersion(_movie, 202).ManagedVersion.Id, Is.EqualTo(202));
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.GetMovie(50), Times.Never());
+        }
+
+        [Test]
         public void ordinary_movie_should_resolve_without_creating_assignments()
         {
             var version = Subject.Resolve(_movie).Single();

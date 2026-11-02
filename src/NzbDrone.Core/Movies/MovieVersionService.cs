@@ -19,16 +19,19 @@ namespace NzbDrone.Core.Movies
         private readonly IMovieVersionRepository _versions;
         private readonly IQualityProfileService _profiles;
         private readonly IMediaFileService _files;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public MovieVersionService(ICompositeProfileVersionRepository definitions,
                                    IMovieVersionRepository versions,
                                    IQualityProfileService profiles,
-                                   IMediaFileService files)
+                                   IMediaFileService files,
+                                   IVersionFileDeletionRepository deletions)
         {
             _definitions = definitions;
             _versions = versions;
             _profiles = profiles;
             _files = files;
+            _deletions = deletions;
         }
 
         public ResolvedMovieVersion Get(Movie movie, int movieVersionId)
@@ -44,6 +47,7 @@ namespace NzbDrone.Core.Movies
 
         public Movie ForVersion(Movie movie, int movieVersionId)
         {
+            _deletions.CheckReady(movie.Id, movieVersionId);
             var version = Get(movie, movieVersionId);
             var file = version.MovieFileId.HasValue ? _files.GetMovie(version.MovieFileId.Value) : null;
             if (version.MovieFileId.HasValue && (file == null || file.MovieId != movie.Id))

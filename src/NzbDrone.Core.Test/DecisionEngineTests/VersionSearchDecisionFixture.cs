@@ -9,6 +9,7 @@ using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -78,6 +79,17 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             Assert.That(decisions.Single(d => d.Approved).RemoteMovie.MovieVersionId, Is.EqualTo(acceptedVersion));
             Assert.That(decisions[0].RemoteMovie, Is.Not.SameAs(decisions[1].RemoteMovie));
             Assert.That(_source.Movie.QualityProfile.Id, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void unfinished_sdr_deletion_should_not_suppress_eligible_hdr_release()
+        {
+            Mocker.GetMock<IMovieVersionService>().Setup(s => s.ForVersion(It.IsAny<Movie>(), 201)).Throws(new VersionFileDeletionPendingException());
+
+            var decisions = Subject.GetRssDecision(new List<ReleaseInfo> { new ReleaseInfo { Title = "Alien.1979.1080p.WEB-DL", Size = 2000.Megabytes() } });
+
+            Assert.That(decisions.Single(d => d.Approved).RemoteMovie.MovieVersionId, Is.EqualTo(202));
+            Assert.That(decisions.Single(d => d.RemoteMovie.MovieVersionId == 201).TemporarilyRejected, Is.True);
         }
 
         [Test]

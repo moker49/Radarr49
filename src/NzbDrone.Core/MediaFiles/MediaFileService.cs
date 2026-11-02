@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using NzbDrone.Common;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles.Events;
@@ -35,13 +36,15 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMovieVersionRepository _versions;
         private readonly ICompositeProfileVersionRepository _definitions;
         private readonly IConfigService _config;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public MediaFileService(IMediaFileRepository mediaFileRepository,
                                 IMovieRepository movieRepository,
                                 IEventAggregator eventAggregator,
                                 IMovieVersionRepository versions,
                                 ICompositeProfileVersionRepository definitions,
-                                IConfigService config)
+                                IConfigService config,
+                                IVersionFileDeletionRepository deletions)
         {
             _mediaFileRepository = mediaFileRepository;
             _movieRepository = movieRepository;
@@ -49,6 +52,7 @@ namespace NzbDrone.Core.MediaFiles
             _versions = versions;
             _definitions = definitions;
             _config = config;
+            _deletions = deletions;
         }
 
         public MovieFile Add(MovieFile movieFile)
@@ -97,12 +101,39 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Update(MovieFile movieFile)
         {
-            _mediaFileRepository.Update(movieFile);
+            lock (MovieVersionImportSynchronization.ForMovie(movieFile.MovieId))
+            {
+                _deletions.CheckReady(movieFile.MovieId, movieFile.MovieVersionId);
+                _mediaFileRepository.Update(movieFile);
+            }
         }
 
         public void Update(List<MovieFile> movieFiles)
         {
-            _mediaFileRepository.UpdateMany(movieFiles);
+            var locks = movieFiles.Select(f => f.MovieId).Distinct().OrderBy(id => id).Select(MovieVersionImportSynchronization.ForMovie).ToList();
+            var acquired = 0;
+            try
+            {
+                foreach (var sync in locks)
+                {
+                    Monitor.Enter(sync);
+                    acquired++;
+                }
+
+                foreach (var file in movieFiles)
+                {
+                    _deletions.CheckReady(file.MovieId, file.MovieVersionId);
+                }
+
+                _mediaFileRepository.UpdateMany(movieFiles);
+            }
+            finally
+            {
+                for (var i = acquired - 1; i >= 0; i--)
+                {
+                    Monitor.Exit(locks[i]);
+                }
+            }
         }
 
         public void Delete(MovieFile movieFile, DeleteMediaFileReason reason)

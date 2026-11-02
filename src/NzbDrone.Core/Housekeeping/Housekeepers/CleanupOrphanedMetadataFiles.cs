@@ -39,7 +39,8 @@ namespace NzbDrone.Core.Housekeeping.Housekeepers
                              LEFT OUTER JOIN ""MovieFiles""
                              ON ""MetadataFiles"".""MovieFileId"" = ""MovieFiles"".""Id""
                              WHERE ""MetadataFiles"".""MovieFileId"" > 0
-                             AND ""MovieFiles"".""Id"" IS NULL)");
+                             AND ""MovieFiles"".""Id"" IS NULL
+                             AND NOT EXISTS (SELECT 1 FROM ""VersionFileDeletions"" d WHERE d.""MovieFileId"" = ""MetadataFiles"".""MovieFileId"" AND d.""MovieId"" = ""MetadataFiles"".""MovieId"" AND d.""State"" IN (0, 1, 2, 3, 4)))");
         }
 
         private void DeleteWhereMovieFileIsZero()

@@ -38,7 +38,8 @@ namespace NzbDrone.Core.Housekeeping.Housekeepers
                              LEFT OUTER JOIN ""MovieFiles""
                              ON ""SubtitleFiles"".""MovieFileId"" = ""MovieFiles"".""Id""
                              WHERE ""SubtitleFiles"".""MovieFileId"" > 0
-                             AND ""MovieFiles"".""Id"" IS NULL)");
+                             AND ""MovieFiles"".""Id"" IS NULL
+                             AND NOT EXISTS (SELECT 1 FROM ""VersionFileDeletions"" d WHERE d.""MovieFileId"" = ""SubtitleFiles"".""MovieFileId"" AND d.""MovieId"" = ""SubtitleFiles"".""MovieId"" AND d.""State"" IN (0, 1, 2, 3, 4)))");
         }
     }
 }

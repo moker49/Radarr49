@@ -7,8 +7,6 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Exceptions;
-using NzbDrone.Core.MediaFiles.Events;
-using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.MediaFiles
@@ -26,8 +24,8 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IDownloadReservationRepository _reservations;
         private readonly ITrackedDownloadService _tracked;
         private readonly IDiskProvider _disk;
-        private readonly IRecycleBinProvider _recycle;
-        private readonly IEventAggregator _events;
+        private readonly IVersionFileDeletionRepository _operations;
+        private readonly IVersionFileDeletionRecoveryService _recovery;
 
         public MovieVersionFileDeletionService(IMovieService movies,
                                               IMovieVersionService versions,
@@ -35,8 +33,8 @@ namespace NzbDrone.Core.MediaFiles
                                               IDownloadReservationRepository reservations,
                                               ITrackedDownloadService tracked,
                                               IDiskProvider disk,
-                                              IRecycleBinProvider recycle,
-                                              IEventAggregator events)
+                                              IVersionFileDeletionRepository operations,
+                                              IVersionFileDeletionRecoveryService recovery)
         {
             _movies = movies;
             _versions = versions;
@@ -44,8 +42,8 @@ namespace NzbDrone.Core.MediaFiles
             _reservations = reservations;
             _tracked = tracked;
             _disk = disk;
-            _recycle = recycle;
-            _events = events;
+            _operations = operations;
+            _recovery = recovery;
         }
 
         public void Delete(int movieId, int movieVersionId, int movieFileId, bool unmonitor)
@@ -70,6 +68,14 @@ namespace NzbDrone.Core.MediaFiles
 
         private void DeleteCore(int movieId, int movieVersionId, int movieFileId, bool unmonitor)
         {
+            var existing = _operations.FindRequest(movieId, movieVersionId, movieFileId);
+            if (existing != null)
+            {
+                Require(existing.Unmonitor == unmonitor, "The monitoring choice differs from the persisted deletion request.");
+                _recovery.Resume(movieId, existing.Id, false, false, null);
+                return;
+            }
+
             var movie = _versions.ForVersion(_movies.GetMovie(movieId), movieVersionId);
             Require(movie.ManagedVersion?.Id == movieVersionId && movie.MovieFileId == movieFileId && movie.MovieFile?.Id == movieFileId && movie.MovieFile.MovieId == movieId,
                 "The selected file is no longer owned by this version. Refresh before deleting anything.");
@@ -91,14 +97,7 @@ namespace NzbDrone.Core.MediaFiles
 
             var root = Path.GetDirectoryName(folder);
             Require(!string.IsNullOrWhiteSpace(root) && _disk.FolderExists(root) && _disk.GetDirectories(root).Any(), "The movie's root folder is unavailable or empty. No file ownership was changed.");
-            if (_disk.FileExists(path))
-            {
-                _recycle.DeleteFile(path, root.GetRelativePath(Path.GetDirectoryName(path)));
-            }
-
-            movie.MovieFile.Movie = movie;
-            _files.DeleteManagedVersionFile(movie.MovieFile, movieVersionId, unmonitor);
-            _events.PublishEvent(new DeleteCompletedEvent());
+            _recovery.Start(movie, movie.MovieFile, unmonitor);
         }
 
         private static void Require(bool condition, string message)

@@ -107,6 +107,17 @@ namespace NzbDrone.Core.Test.MediaFiles.DiskScanServiceTests
             Mocker.GetMock<IMediaFileTableCleanupService>().Verify(v => v.Clean(It.IsAny<Movie>(), It.IsAny<List<string>>()), Times.Never());
         }
 
+        [Test]
+        public void unfinished_deletion_should_stop_disk_snapshot_and_cleanup()
+        {
+            Mocker.GetMock<IVersionFileDeletionRepository>().Setup(v => v.CheckReady(_movie.Id, null)).Throws(new VersionFileDeletionPendingException());
+
+            Assert.Throws<VersionFileDeletionPendingException>(() => Subject.Scan(_movie));
+
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.GetFiles(It.IsAny<string>(), It.IsAny<bool>()), Times.Never());
+            Mocker.GetMock<IMediaFileTableCleanupService>().Verify(v => v.Clean(It.IsAny<Movie>(), It.IsAny<List<string>>()), Times.Never());
+        }
+
         private void GivenMovieFolder()
         {
             GivenRootFolder(_movie.Path);

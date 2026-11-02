@@ -227,6 +227,13 @@ namespace NzbDrone.Core.History
 
         public void Handle(MovieFileDeletedEvent message)
         {
+            var deletionId = message.DeletionOperationId?.ToString();
+            if (deletionId != null && (_historyRepository.GetByMovieId(message.MovieFile.MovieId, MovieHistoryEventType.MovieFileDeleted) ?? new List<MovieHistory>())
+                .Any(h => h.Data.GetValueOrDefault("VersionFileDeletionId") == deletionId))
+            {
+                return;
+            }
+
             if (message.Reason == DeleteMediaFileReason.NoLinkedEpisodes)
             {
                 _logger.Debug("Removing movie file from DB as part of cleanup routine, not creating history event.");
@@ -245,6 +252,11 @@ namespace NzbDrone.Core.History
             };
 
             history.Data.Add("Reason", message.Reason.ToString());
+            if (deletionId != null)
+            {
+                history.Data.Add("VersionFileDeletionId", deletionId);
+            }
+
             history.Data.Add("ReleaseGroup", message.MovieFile.ReleaseGroup);
             history.Data.Add("Size", message.MovieFile.Size.ToString());
             history.Data.Add("IndexerFlags", message.MovieFile.IndexerFlags.ToString());

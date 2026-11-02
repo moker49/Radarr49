@@ -31,6 +31,18 @@ namespace NzbDrone.Core.Test.HistoryTests
         }
 
         [Test]
+        public void replayed_journal_delete_should_not_duplicate_recorded_history()
+        {
+            var existing = new MovieHistory { MovieId = 1, EventType = MovieHistoryEventType.MovieFileDeleted };
+            existing.Data["VersionFileDeletionId"] = "42";
+            Mocker.GetMock<IHistoryRepository>().Setup(v => v.GetByMovieId(1, MovieHistoryEventType.MovieFileDeleted)).Returns(new List<MovieHistory> { existing });
+
+            Subject.Handle(new MovieFileDeletedEvent(new MovieFile { Id = 11, MovieId = 1 }, DeleteMediaFileReason.Manual) { DeletionOperationId = 42 });
+
+            Mocker.GetMock<IHistoryRepository>().Verify(v => v.Insert(It.IsAny<MovieHistory>()), Times.Never());
+        }
+
+        [Test]
         public void should_return_null_if_no_history()
         {
             Mocker.GetMock<IHistoryRepository>()

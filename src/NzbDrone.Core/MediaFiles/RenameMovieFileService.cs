@@ -32,6 +32,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
         private readonly IMovieVersionService _versions;
+        private readonly IVersionFileDeletionRepository _deletions;
 
         public RenameMovieFileService(IMovieService movieService,
                                       IMediaFileService mediaFileService,
@@ -40,6 +41,7 @@ namespace NzbDrone.Core.MediaFiles
                                       IBuildFileNames filenameBuilder,
                                       IDiskProvider diskProvider,
                                       IMovieVersionService versions,
+                                      IVersionFileDeletionRepository deletions,
                                       Logger logger)
         {
             _movieService = movieService;
@@ -50,6 +52,7 @@ namespace NzbDrone.Core.MediaFiles
             _diskProvider = diskProvider;
             _logger = logger;
             _versions = versions;
+            _deletions = deletions;
         }
 
         public List<RenameMovieFilePreview> GetRenamePreviews(List<int> movieIds)
@@ -94,6 +97,7 @@ namespace NzbDrone.Core.MediaFiles
             lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
             {
                 movie = _movieService.GetMovie(movie.Id) ?? movie;
+                _deletions.CheckReady(movie.Id, null);
                 return RenameFilesCore(movieFiles, movie);
             }
         }
