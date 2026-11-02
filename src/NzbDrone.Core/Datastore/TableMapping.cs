@@ -143,6 +143,8 @@ namespace NzbDrone.Core.Datastore
             Mapper.Entity<CustomFormat>("CustomFormats").RegisterModel();
 
             Mapper.Entity<QualityProfile>("QualityProfiles").RegisterModel();
+            Mapper.Entity<CompositeProfileVersion>("CompositeProfileVersions").RegisterModel();
+            Mapper.Entity<MovieVersion>("MovieVersions").RegisterModel();
             Mapper.Entity<Log>("Logs").RegisterModel();
             Mapper.Entity<NamingConfig>("NamingConfig").RegisterModel();
             Mapper.Entity<Blocklist>("Blocklist").RegisterModel();

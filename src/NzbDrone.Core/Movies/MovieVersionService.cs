@@ -1,0 +1,96 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using NzbDrone.Core.Profiles.Qualities;
+
+namespace NzbDrone.Core.Movies
+{
+    public interface IMovieVersionService
+    {
+        List<ResolvedMovieVersion> Resolve(Movie movie);
+    }
+
+    public class MovieVersionService : IMovieVersionService
+    {
+        private readonly ICompositeProfileVersionRepository _definitions;
+        private readonly IMovieVersionRepository _versions;
+        private readonly IQualityProfileService _profiles;
+
+        public MovieVersionService(ICompositeProfileVersionRepository definitions,
+                                   IMovieVersionRepository versions,
+                                   IQualityProfileService profiles)
+        {
+            _definitions = definitions;
+            _versions = versions;
+            _profiles = profiles;
+        }
+
+        public List<ResolvedMovieVersion> Resolve(Movie movie)
+        {
+            var definitions = _definitions.ForProfile(movie.QualityProfileId);
+
+            if (definitions.Count == 0)
+            {
+                return new List<ResolvedMovieVersion>
+                {
+                    new ResolvedMovieVersion
+                    {
+                        MovieId = movie.Id,
+                        QualityProfile = _profiles.Get(movie.QualityProfileId),
+                        IsPrimary = true,
+                        Monitored = movie.Monitored,
+                        MovieFileId = movie.MovieFileId > 0 ? movie.MovieFileId : null
+                    }
+                };
+            }
+
+            if (definitions.Count < 2 || definitions.Count(v => v.IsPrimary) != 1 ||
+                definitions.Any(v => string.IsNullOrWhiteSpace(v.Label) || v.Priority < 0) ||
+                definitions.Select(v => v.Label.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != definitions.Count ||
+                definitions.Select(v => v.Priority).Distinct().Count() != definitions.Count)
+            {
+                throw new InvalidOperationException("Composite profile requires distinct labels and priorities and exactly one primary version.");
+            }
+
+            var versions = _versions.ForMovie(movie.Id);
+            var result = new List<ResolvedMovieVersion>();
+            var assignedFiles = new HashSet<int>();
+
+            foreach (var definition in definitions.OrderBy(v => v.Priority))
+            {
+                if (_definitions.ForProfile(definition.QualityProfileId).Count != 0)
+                {
+                    throw new InvalidOperationException("Composite profiles cannot contain composite profiles.");
+                }
+
+                var assignments = versions.Where(v => v.CompositeProfileVersionId == definition.Id).ToList();
+                if (assignments.Count != 1)
+                {
+                    throw new InvalidOperationException("Each composite version must have an explicit movie assignment before it can be used.");
+                }
+
+                var version = assignments[0];
+                if (version.MovieFileId.HasValue &&
+                    (version.MovieFileId.Value <= 0 || !assignedFiles.Add(version.MovieFileId.Value)))
+                {
+                    throw new InvalidOperationException("A movie file can belong to only one managed version.");
+                }
+
+                result.Add(new ResolvedMovieVersion
+                {
+                    Id = version.Id,
+                    MovieId = movie.Id,
+                    CompositeProfileVersionId = definition.Id,
+                    Label = definition.Label,
+                    Priority = definition.Priority,
+                    IsPrimary = definition.IsPrimary,
+                    Monitored = movie.Monitored && version.Monitored,
+                    MovieFileId = version.MovieFileId,
+                    QualityProfile = _profiles.Get(definition.QualityProfileId)
+                });
+            }
+
+            return result;
+        }
+    }
+}
