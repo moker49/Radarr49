@@ -12,6 +12,13 @@ namespace NzbDrone.Core.Test.Profiles
     [TestFixture]
     public class CompositeProfileVersionRepositoryFixture : DbTest<CompositeProfileVersionRepository, CompositeProfileVersion>
     {
+        [SetUp]
+        public void Setup()
+        {
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            connection.Execute("INSERT INTO \"QualityProfiles\" (\"Id\", \"Name\", \"Cutoff\", \"Items\", \"MinFormatScore\", \"CutoffFormatScore\", \"FormatItems\", \"Language\", \"UpgradeAllowed\", \"MinUpgradeFormatScore\") VALUES (10, 'Composite', 0, '[]', 0, 0, '[]', 0, 0, 0)");
+        }
+
         private static List<CompositeProfileVersion> Definitions()
         {
             return new List<CompositeProfileVersion>
@@ -24,7 +31,7 @@ namespace NzbDrone.Core.Test.Profiles
         [Test]
         public void should_save_concurrency_with_definition_configuration()
         {
-            var profile = new QualityProfile { Name = "Composite", Items = new List<QualityProfileQualityItem>() };
+            var profile = new QualityProfile { Name = "Other composite", Items = new List<QualityProfileQualityItem>() };
             Db.Insert(profile);
             var definitions = Definitions();
             definitions.ForEach(v => v.CompositeProfileId = profile.Id);
@@ -33,6 +40,19 @@ namespace NzbDrone.Core.Test.Profiles
 
             using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
             Assert.That(connection.ExecuteScalar<int>("SELECT \"MaximumConcurrentDownloads\" FROM \"QualityProfiles\" WHERE \"Id\" = @Id", profile), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void active_definitions_cannot_be_edited_or_deleted()
+        {
+            var definitions = Definitions();
+            Subject.SaveDefinitions(10, definitions);
+            Subject.SetTestRoot(10, "C:/CompositeTest");
+
+            Assert.Throws<NzbDrone.Core.Exceptions.NzbDroneClientException>(() => Subject.SaveDefinitions(10, definitions));
+            Assert.Throws<NzbDrone.Core.Exceptions.NzbDroneClientException>(() => Subject.DeleteDefinitions(10));
+            Subject.SetTestRoot(10, null);
+            Assert.DoesNotThrow(() => Subject.DeleteDefinitions(10));
         }
 
         [Test]

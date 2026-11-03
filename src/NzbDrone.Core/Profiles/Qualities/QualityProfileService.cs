@@ -64,13 +64,17 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public void Update(QualityProfile profile)
         {
-            // Legacy clients do not know this field. Omission must preserve attached settings.
-            // An explicit empty list resets all qualities to the global defaults.
-            var stored = _profileRepository.Get(profile.Id);
-            profile.SizeDefinitions ??= stored?.SizeDefinitions;
-            profile.MaximumConcurrentDownloads ??= stored?.MaximumConcurrentDownloads;
-            ValidateSizeDefinitions(profile);
-            _profileRepository.Update(profile);
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                // Legacy clients do not know this field. Omission must preserve attached settings.
+                // An explicit empty list resets all qualities to the global defaults.
+                var stored = _profileRepository.Get(profile.Id);
+                profile.SizeDefinitions ??= stored?.SizeDefinitions;
+                profile.MaximumConcurrentDownloads ??= stored?.MaximumConcurrentDownloads;
+                profile.CompositeTestRoot = stored?.CompositeTestRoot;
+                ValidateSizeDefinitions(profile);
+                _profileRepository.Update(profile);
+            }
         }
 
         private static void ValidateSizeDefinitions(QualityProfile profile)

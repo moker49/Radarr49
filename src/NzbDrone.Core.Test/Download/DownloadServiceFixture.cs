@@ -64,7 +64,7 @@ namespace NzbDrone.Core.Test.Download
         [Test]
         public void draft_composite_should_be_rejected_before_selecting_download_client()
         {
-            Mocker.GetMock<ICompositeProfilePolicy>().Setup(s => s.EnsureAssignable(_parseResult.Movie.QualityProfileId))
+            Mocker.GetMock<ICompositeProfilePolicy>().Setup(s => s.EnsureDownloadAllowed(_parseResult.Movie, _parseResult.MovieVersionId))
                 .Throws(new NzbDroneClientException(HttpStatusCode.Conflict, "Draft composite"));
 
             Assert.ThrowsAsync<NzbDroneClientException>(() => Subject.DownloadReport(_parseResult, null));
@@ -87,6 +87,14 @@ namespace NzbDrone.Core.Test.Download
         public async Task version_dispatch_should_persist_intent_and_client_identity_in_order()
         {
             _parseResult.MovieVersionId = 201;
+            _parseResult.Movie.Path = "C:/CompositeTest/Movie";
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Setup(s => s.ForProfile(_parseResult.Movie.QualityProfileId))
+                .Returns(new List<CompositeProfileVersion> { new CompositeProfileVersion { Id = 101 } });
+            Mocker.GetMock<IMovieVersionRepository>().Setup(s => s.ForMovie(_parseResult.Movie.Id))
+                .Returns(new List<MovieVersion> { new MovieVersion { Id = 201, CompositeProfileVersionId = 101 } });
+            Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(_parseResult.Movie.QualityProfileId))
+                .Returns(new QualityProfile { CompositeTestRoot = "C:/CompositeTest" });
+            Mocker.SetConstant<ICompositeProfilePolicy>(Mocker.Resolve<CompositeProfilePolicy>());
             var order = new List<string>();
             var client = WithUsenetClient();
             Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>()))

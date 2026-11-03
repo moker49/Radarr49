@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dapper;
+using FluentValidation;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
@@ -15,6 +17,7 @@ namespace NzbDrone.Core.Movies
     public interface IMovieRepository : IBasicRepository<Movie>
     {
         bool MoviePathExists(string path);
+        void InsertWithVersions(IList<Movie> movies);
         List<Movie> FindByTitles(List<string> titles);
         Movie FindByImdbId(string imdbid);
         Movie FindByTmdbId(int tmdbid);
@@ -46,6 +49,60 @@ namespace NzbDrone.Core.Movies
         {
             _profileRepository = profileRepository;
             _alternativeTitleRepository = alternativeTitleRepository;
+        }
+
+        public void InsertWithVersions(IList<Movie> movies)
+        {
+            if (movies.Any(m => m.Id != 0) || movies.Distinct().Count() != movies.Count)
+            {
+                throw new InvalidOperationException("Only distinct new movies can be inserted.");
+            }
+
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            try
+            {
+                var definitions = new Dictionary<int, List<CompositeProfileVersion>>();
+                foreach (var profileId in movies.Select(m => m.QualityProfileId).Distinct().OrderBy(id => id))
+                {
+                    if (connection.Execute("UPDATE \"QualityProfiles\" SET \"Name\" = \"Name\" WHERE \"Id\" = @profileId", new { profileId }, transaction) != 1)
+                    {
+                        throw new InvalidOperationException("The selected quality profile no longer exists.");
+                    }
+
+                    var children = connection.Query<CompositeProfileVersion>("SELECT * FROM \"CompositeProfileVersions\" WHERE \"CompositeProfileId\" = @profileId", new { profileId }, transaction).ToList();
+                    definitions.Add(profileId, children);
+                    if (children.Any())
+                    {
+                        new CompositeProfileValidator().ValidateAndThrow(children);
+                        var profile = connection.QuerySingle<QualityProfile>("SELECT \"Id\", \"CompositeTestRoot\" FROM \"QualityProfiles\" WHERE \"Id\" = @profileId", new { profileId }, transaction);
+                        foreach (var movie in movies.Where(m => m.QualityProfileId == profileId))
+                        {
+                            CompositeProfileActivation.ValidateNewMovie(movie, profile);
+                        }
+                    }
+                }
+
+                foreach (var movie in movies)
+                {
+                    Insert(connection, transaction, movie);
+                    foreach (var definition in definitions[movie.QualityProfileId])
+                    {
+                        connection.Execute("INSERT INTO \"MovieVersions\" (\"MovieId\", \"CompositeProfileVersionId\", \"Monitored\", \"MovieFileId\") VALUES (@MovieId, @DefinitionId, @Monitored, NULL)", new { MovieId = movie.Id, DefinitionId = definition.Id, Monitored = true }, transaction);
+                    }
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                foreach (var movie in movies)
+                {
+                    movie.Id = 0;
+                }
+
+                throw;
+            }
         }
 
         protected override IEnumerable<Movie> PagedQuery(SqlBuilder builder) =>

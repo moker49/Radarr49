@@ -29,7 +29,7 @@ namespace NzbDrone.Core.Test.MoviesTests
                 .Returns((int id) => _definitions.Where(v => v.CompositeProfileId == id).ToList());
             Mocker.GetMock<IMovieVersionRepository>()
                 .Setup(s => s.ForMovie(_movie.Id)).Returns(_versions);
-            Mocker.GetMock<IQualityProfileService>()
+            Mocker.GetMock<IQualityProfileRepository>()
                 .Setup(s => s.Get(It.IsAny<int>()))
                 .Returns((int id) => new QualityProfile { Id = id });
         }

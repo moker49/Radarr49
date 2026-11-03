@@ -3,9 +3,11 @@ using System.Linq;
 using FluentValidation;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Disk;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Profiles.Qualities;
+using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.Profiles.Qualities
@@ -39,6 +41,39 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
                 new CompositeProfileVersion { QualityProfileId = 1, Label = "SDR", Priority = 0, IsPrimary = true },
                 new CompositeProfileVersion { QualityProfileId = 2, Label = "HDR", Priority = 1 }
             };
+        }
+
+        private void ConfigureActivation()
+        {
+            _stored.AddRange(Definitions());
+            _stored.ForEach(v => v.CompositeProfileId = 10);
+            Mocker.GetMock<IRootFolderService>().Setup(s => s.All()).Returns(new List<RootFolder> { new RootFolder { Path = System.IO.Path.GetFullPath("C:/CompositeTest") } });
+            Mocker.GetMock<IDiskProvider>().Setup(s => s.FolderExists(It.IsAny<string>())).Returns(true);
+        }
+
+        [Test]
+        public void should_activate_unused_composite_in_configured_test_root()
+        {
+            ConfigureActivation();
+            Subject.SetTestRoot(10, "C:/CompositeTest/");
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SetTestRoot(10, "C:\\CompositeTest"), Times.Once());
+        }
+
+        [Test]
+        public void should_reject_activation_in_root_with_existing_movies()
+        {
+            ConfigureActivation();
+            _movies.Add(new Movie { Path = System.IO.Path.GetFullPath("C:/CompositeTest/Existing"), QualityProfileId = 1 });
+            Assert.Throws<ValidationException>(() => Subject.SetTestRoot(10, "C:/CompositeTest"));
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SetTestRoot(It.IsAny<int>(), It.IsAny<string>()), Times.Never());
+        }
+
+        [Test]
+        public void active_definition_configuration_is_frozen()
+        {
+            Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(10)).Returns(new QualityProfile { CompositeTestRoot = "C:/CompositeTest" });
+            Assert.Throws<NzbDroneClientException>(() => Subject.Save(10, Definitions()));
+            Assert.Throws<NzbDroneClientException>(() => Subject.Delete(10));
         }
 
         [Test]

@@ -7688,3 +7688,1001 @@
 2026-11-01 23:09:13.5|Info|AppLifetime|Application stopped without restart pending
 2026-11-01 23:09:13.5|Info|Bootstrap|Radarr has shut down completely
 2026-11-01 23:09:13.5|Info|ConsoleApp|Exiting main.
+2026-11-03 16:28:50.1|Debug|ProcessProvider|Found 1 processes with the name: Radarr.Console
+2026-11-03 16:28:50.1|Debug|ProcessProvider| - [35900] Radarr.Console
+2026-11-03 16:28:50.1|Debug|ProcessProvider|Found 0 processes with the name: Radarr
+2026-11-03 16:28:50.1|Info|MigrationController|*** Migrating data source=C:\Dev\Radarr\_devdata\radarr.db;cache size=-20000;datetimekind=Utc;journal mode=Wal;pooling=True;version=3;busytimeout=1000 ***
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|DatabaseEngineVersionCheck migrating
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|PerformDBOperation 
+2026-11-03 16:28:50.3|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Performing DB Operation
+2026-11-03 16:28:50.3|Info|DatabaseEngineVersionCheck|SQLite 3.53.4
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0490965s
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|DatabaseEngineVersionCheck migrated
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0514627s
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|244: add_composite_profile_versions migrating
+2026-11-03 16:28:50.3|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.3|Info|add_composite_profile_versions|Starting migration of Main DB to 244
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|CreateTable CompositeProfileVersions
+2026-11-03 16:28:50.3|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE TABLE "CompositeProfileVersions" ("Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "CompositeProfileId" INTEGER NOT NULL, "QualityProfileId" INTEGER NOT NULL, "Label" TEXT NOT NULL, "Priority" INTEGER NOT NULL, "IsPrimary" INTEGER NOT NULL)
+2026-11-03 16:28:50.3|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0138094s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex CompositeProfileVersions (CompositeProfileId, Priority)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_CompositeProfileVersions_CompositeProfileId_Priority" ON "CompositeProfileVersions" ("CompositeProfileId" ASC, "Priority" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0017415s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateTable MovieVersions
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE TABLE "MovieVersions" ("Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "MovieId" INTEGER NOT NULL, "CompositeProfileVersionId" INTEGER NOT NULL, "Monitored" INTEGER NOT NULL, "MovieFileId" INTEGER)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015686s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex MovieVersions (MovieId, CompositeProfileVersionId)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_MovieVersions_MovieId_CompositeProfileVersionId" ON "MovieVersions" ("MovieId" ASC, "CompositeProfileVersionId" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.001338s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex MovieVersions (MovieFileId)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_MovieVersions_MovieFileId" ON "MovieVersions" ("MovieFileId" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0019195s
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (244, '2026-11-03T21:28:50', 'add_composite_profile_versions')
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|244: add_composite_profile_versions migrated
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0184239s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|245: add_profile_size_definitions migrating
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.4|Info|add_profile_size_definitions|Starting migration of Main DB to 245
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|AlterTable QualityProfiles
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 7.05E-05s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn QualityProfiles SizeDefinitions String
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "QualityProfiles" ADD COLUMN "SizeDefinitions" TEXT
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0023482s
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (245, '2026-11-03T21:28:50', 'add_profile_size_definitions')
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|245: add_profile_size_definitions migrated
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0096749s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|246: add_download_movie_version_identity migrating
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.4|Info|add_download_movie_version_identity|Starting migration of Main DB to 246
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|AlterTable History
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 3.65E-05s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn History MovieVersionId Int32
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "History" ADD COLUMN "MovieVersionId" INTEGER
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0016943s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex History (MovieVersionId)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_History_MovieVersionId" ON "History" ("MovieVersionId" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.001225s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|AlterTable DownloadHistory
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 2.2E-06s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn DownloadHistory MovieVersionId Int32
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "DownloadHistory" ADD COLUMN "MovieVersionId" INTEGER
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0016999s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex DownloadHistory (MovieVersionId)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_DownloadHistory_MovieVersionId" ON "DownloadHistory" ("MovieVersionId" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0014027s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|AlterTable PendingReleases
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 2.4E-06s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn PendingReleases MovieVersionId Int32
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "PendingReleases" ADD COLUMN "MovieVersionId" INTEGER
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015589s
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex PendingReleases (MovieVersionId)
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_PendingReleases_MovieVersionId" ON "PendingReleases" ("MovieVersionId" ASC)
+2026-11-03 16:28:50.4|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015196s
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (246, '2026-11-03T21:28:50', 'add_download_movie_version_identity')
+2026-11-03 16:28:50.4|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|246: add_download_movie_version_identity migrated
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0082511s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|247: add_composite_download_limit migrating
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.5|Info|add_composite_download_limit|Starting migration of Main DB to 247
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|AlterTable QualityProfiles
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 3.1E-06s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn QualityProfiles MaximumConcurrentDownloads Int32
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "QualityProfiles" ADD COLUMN "MaximumConcurrentDownloads" INTEGER
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015972s
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (247, '2026-11-03T21:28:50', 'add_composite_download_limit')
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|247: add_composite_download_limit migrated
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0082941s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|248: add_download_reservations migrating
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.5|Info|add_download_reservations|Starting migration of Main DB to 248
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateTable DownloadReservations
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE TABLE "DownloadReservations" ("Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "MovieId" INTEGER NOT NULL, "MovieVersionId" INTEGER NOT NULL, "DownloadClientId" INTEGER NOT NULL, "DownloadId" TEXT, "SourceTitle" TEXT NOT NULL, "ReleaseKeys" TEXT NOT NULL, "State" INTEGER NOT NULL, "ImportedMovieFileId" INTEGER, "Created" DATETIME NOT NULL, "Updated" DATETIME NOT NULL, "Note" TEXT)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0020141s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex DownloadReservations (MovieId)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_DownloadReservations_MovieId" ON "DownloadReservations" ("MovieId" ASC)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0013784s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex DownloadReservations (MovieVersionId)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_DownloadReservations_MovieVersionId" ON "DownloadReservations" ("MovieVersionId" ASC)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015103s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex DownloadReservations (DownloadClientId, DownloadId)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_DownloadReservations_DownloadClientId_DownloadId" ON "DownloadReservations" ("DownloadClientId" ASC, "DownloadId" ASC)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0012511s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|ExecuteSqlStatement CREATE UNIQUE INDEX "IX_DownloadReservations_ActiveVersion" ON "DownloadReservations" ("MovieVersionId") WHERE "State" IN (0, 1, 2, 5)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_DownloadReservations_ActiveVersion" ON "DownloadReservations" ("MovieVersionId") WHERE "State" IN (0, 1, 2, 5)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0017228s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|ExecuteSqlStatement CREATE UNIQUE INDEX "IX_DownloadReservations_ActiveDownload" ON "DownloadReservations" ("MovieId", "DownloadClientId", UPPER("DownloadId")) WHERE "DownloadId" IS NOT NULL AND "State" IN (0, 1, 2, 5)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_DownloadReservations_ActiveDownload" ON "DownloadReservations" ("MovieId", "DownloadClientId", UPPER("DownloadId")) WHERE "DownloadId" IS NOT NULL AND "State" IN (0, 1, 2, 5)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015989s
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (248, '2026-11-03T21:28:50', 'add_download_reservations')
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|248: add_download_reservations migrated
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0089328s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|249: add_version_file_deletions migrating
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.5|Info|add_version_file_deletions|Starting migration of Main DB to 249
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateTable VersionFileDeletions
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE TABLE "VersionFileDeletions" ("Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "MovieId" INTEGER NOT NULL, "MovieVersionId" INTEGER NOT NULL, "MovieFileId" INTEGER NOT NULL, "MoviePath" TEXT NOT NULL, "Unmonitor" INTEGER NOT NULL, "State" INTEGER NOT NULL, "Snapshot" TEXT NOT NULL, "ExtraIndex" INTEGER NOT NULL, "RecyclePath" TEXT, "Created" DATETIME NOT NULL, "Updated" DATETIME NOT NULL, "Note" TEXT)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0018542s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex VersionFileDeletions (MovieId)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_VersionFileDeletions_MovieId" ON "VersionFileDeletions" ("MovieId" ASC)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0012802s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|ExecuteSqlStatement CREATE UNIQUE INDEX "IX_VersionFileDeletions_ActiveVersion" ON "VersionFileDeletions" ("MovieVersionId") WHERE "State" IN (0, 1, 2, 3, 4)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_VersionFileDeletions_ActiveVersion" ON "VersionFileDeletions" ("MovieVersionId") WHERE "State" IN (0, 1, 2, 3, 4)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0015657s
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (249, '2026-11-03T21:28:50', 'add_version_file_deletions')
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|249: add_version_file_deletions migrated
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0087295s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|250: add_version_file_imports migrating
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.5|Info|add_version_file_imports|Starting migration of Main DB to 250
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateTable VersionFileImports
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE TABLE "VersionFileImports" ("Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "MovieId" INTEGER NOT NULL, "MovieVersionId" INTEGER NOT NULL, "DownloadReservationId" INTEGER, "OldMovieFileId" INTEGER, "NewMovieFileId" INTEGER, "MoviePath" TEXT NOT NULL, "SourcePath" TEXT NOT NULL, "DestinationRelativePath" TEXT NOT NULL, "StagingRelativePath" TEXT NOT NULL, "BackupRelativePath" TEXT, "CopyOnly" INTEGER NOT NULL, "State" INTEGER NOT NULL, "Snapshot" TEXT NOT NULL, "Created" DATETIME NOT NULL, "Updated" DATETIME NOT NULL, "Note" TEXT)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0021625s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|CreateIndex VersionFileImports (MovieId)
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE INDEX "IX_VersionFileImports_MovieId" ON "VersionFileImports" ("MovieId" ASC)
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.001106s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|ExecuteSqlStatement CREATE UNIQUE INDEX "IX_VersionFileImports_ActiveVersion" ON "VersionFileImports" ("MovieVersionId") WHERE "State" BETWEEN 0 AND 10
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|CREATE UNIQUE INDEX "IX_VersionFileImports_ActiveVersion" ON "VersionFileImports" ("MovieVersionId") WHERE "State" BETWEEN 0 AND 10
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0011408s
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (250, '2026-11-03T21:28:50', 'add_version_file_imports')
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|250: add_version_file_imports migrated
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0077478s
+2026-11-03 16:28:50.5|Info|FluentMigrator.Runner.MigrationRunner|251: add_composite_test_activation migrating
+2026-11-03 16:28:50.5|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.5|Info|add_composite_test_activation|Starting migration of Main DB to 251
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|AlterTable QualityProfiles
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 2.8E-06s
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|CreateColumn QualityProfiles CompositeTestRoot String
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|ALTER TABLE "QualityProfiles" ADD COLUMN "CompositeTestRoot" TEXT
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.001733s
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (251, '2026-11-03T21:28:50', 'add_composite_test_activation')
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|251: add_composite_test_activation migrated
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0092185s
+2026-11-03 16:28:50.6|Debug|MigrationController|Took: 00:00:00.4752003
+2026-11-03 16:28:50.6|Info|MigrationController|*** Migrating data source=C:\Dev\Radarr\_devdata\logs.db;cache size=-20000;datetimekind=Utc;journal mode=Wal;pooling=True;version=3;busytimeout=1000 ***
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|DatabaseEngineVersionCheck migrating
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|PerformDBOperation 
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Performing DB Operation
+2026-11-03 16:28:50.6|Info|DatabaseEngineVersionCheck|SQLite 3.53.4
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0157351s
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|DatabaseEngineVersionCheck migrated
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0168598s
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|244: add_composite_profile_versions migrating
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.6|Info|add_composite_profile_versions|Starting migration of Log DB to 244
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (244, '2026-11-03T21:28:50', 'add_composite_profile_versions')
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|244: add_composite_profile_versions migrated
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0082706s
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|245: add_profile_size_definitions migrating
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.6|Info|add_profile_size_definitions|Starting migration of Log DB to 245
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (245, '2026-11-03T21:28:50', 'add_profile_size_definitions')
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|245: add_profile_size_definitions migrated
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0084652s
+2026-11-03 16:28:50.6|Info|FluentMigrator.Runner.MigrationRunner|246: add_download_movie_version_identity migrating
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.6|Info|add_download_movie_version_identity|Starting migration of Log DB to 246
+2026-11-03 16:28:50.6|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (246, '2026-11-03T21:28:50', 'add_download_movie_version_identity')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|246: add_download_movie_version_identity migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0081476s
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|247: add_composite_download_limit migrating
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.7|Info|add_composite_download_limit|Starting migration of Log DB to 247
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (247, '2026-11-03T21:28:50', 'add_composite_download_limit')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|247: add_composite_download_limit migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0077702s
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|248: add_download_reservations migrating
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.7|Info|add_download_reservations|Starting migration of Log DB to 248
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (248, '2026-11-03T21:28:50', 'add_download_reservations')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|248: add_download_reservations migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.008063s
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|249: add_version_file_deletions migrating
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.7|Info|add_version_file_deletions|Starting migration of Log DB to 249
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (249, '2026-11-03T21:28:50', 'add_version_file_deletions')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|249: add_version_file_deletions migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.009097s
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|250: add_version_file_imports migrating
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.7|Info|add_version_file_imports|Starting migration of Log DB to 250
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (250, '2026-11-03T21:28:50', 'add_version_file_imports')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|250: add_version_file_imports migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0073837s
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|251: add_composite_test_activation migrating
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Beginning Transaction
+2026-11-03 16:28:50.7|Info|add_composite_test_activation|Starting migration of Log DB to 251
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|INSERT INTO "VersionInfo" ("Version", "AppliedOn", "Description") VALUES (251, '2026-11-03T21:28:50', 'add_composite_test_activation')
+2026-11-03 16:28:50.7|Info|NzbDrone.Core.Datastore.Migration.Framework.NzbDroneSQLiteProcessor|Committing Transaction
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|251: add_composite_test_activation migrated
+2026-11-03 16:28:50.7|Info|FluentMigrator.Runner.MigrationRunner|=> 0.0083044s
+2026-11-03 16:28:50.7|Debug|MigrationController|Took: 00:00:00.1374205
+2026-11-03 16:28:51.0|Warn|EventAggregator|Unable to resolve event subscribers for ApplicationStartingEvent, container may be disposed
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Parser.ParsingService: NzbDrone.Core.Parser.IParsingService FactoryId=1181 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Indexers.Torznab.Torznab: NzbDrone.Core.Indexers.IIndexer {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1484 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.Indexers.IIndexer> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Indexers.IndexerFactory: NzbDrone.Core.Indexers.IIndexerFactory as parameter "indexerFactory" FactoryId=1472 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Indexers.CachedIndexerSettingsProvider: NzbDrone.Core.Indexers.ICachedIndexerSettingsProvider as parameter "cachedIndexerSettingsProvider" FactoryId=1469 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Indexers.SeedConfigProvider: NzbDrone.Core.Indexers.ISeedConfigProvider as parameter "indexerSeedConfigProvider" FactoryId=1480 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Download.DownloadSeedConfigProvider: NzbDrone.Core.Download.IDownloadSeedConfigProvider FactoryId=1774 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Download.Clients.RTorrent.RTorrent: NzbDrone.Core.Download.IDownloadClient {ServiceKey=DefaultKey(4), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1810 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.Download.IDownloadClient> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Download.DownloadClientFactory: NzbDrone.Core.Download.IDownloadClientFactory as parameter "downloadClientFactory" FactoryId=1762 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Download.DownloadClientProvider: NzbDrone.Core.Download.IProvideDownloadClient FactoryId=1763 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.HealthCheck.Checks.DownloadClientCheck: NzbDrone.Core.HealthCheck.IProvideHealthCheck {ServiceKey=DefaultKey(4), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1691 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.HealthCheck.IProvideHealthCheck> ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.HealthCheck.HealthCheckService: NzbDrone.Core.Messaging.Events.IHandleAsync<NzbDrone.Common.Messaging.IEvent> {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1686 (IsSingletonOrDependencyOfSingleton)
+  in resolution root wrapper IEnumerable<NzbDrone.Core.Messaging.Events.IHandleAsync<NzbDrone.Common.Messaging.IEvent>> {DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} ExpressionFactory  FactoryId=1115
+  from container without scope
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.WrappersSupport.<>c.<BuildSupportedWrappers>b__9_0(Request r) in /_/src/DryIoc/Container.cs:line 5027
+   at DryIoc.ExpressionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12551
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.WrappersSupport.<>c.<BuildSupportedWrappers>b__9_0(Request r) in /_/src/DryIoc/Container.cs:line 5027
+   at DryIoc.ExpressionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12551
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.WrappersSupport.<>c.<BuildSupportedWrappers>b__9_0(Request r) in /_/src/DryIoc/Container.cs:line 5027
+   at DryIoc.ExpressionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12551
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.WrappersSupport.<>c.<BuildSupportedWrappers>b__9_0(Request r) in /_/src/DryIoc/Container.cs:line 5027
+   at DryIoc.ExpressionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12551
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 426
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at NzbDrone.Common.ServiceFactory.BuildAll[T]() in ./NzbDrone.Common/ServiceFactory.cs:line 36
+   at NzbDrone.Core.Messaging.Events.EventAggregator.EventSubscribers`1..ctor(IServiceFactory serviceFactory) in ./NzbDrone.Core/Messaging/Events/EventAggregator.cs:line 36
+   at NzbDrone.Core.Messaging.Events.EventAggregator.PublishEvent[TEvent](TEvent event) in ./NzbDrone.Core/Messaging/Events/EventAggregator.cs:line 92
+
+
+2026-11-03 16:28:51.2|Info|ConfigureHostFilteringOptions|Allowed Hosts is not configured, accepting requests for any host
+2026-11-03 16:28:51.2|Info|Microsoft.Hosting.Lifetime|Now listening on: http://[::]:7878
+2026-11-03 16:28:51.2|Warn|EventAggregator|Unable to resolve event subscribers for ApplicationStartedEvent, container may be disposed
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService FactoryId=1317 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Messaging.Events.IHandle<NzbDrone.Core.Lifecycle.ApplicationStartedEvent> {ServiceKey=DefaultKey(4), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1177 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in resolution root wrapper IEnumerable<NzbDrone.Core.Messaging.Events.IHandle<NzbDrone.Core.Lifecycle.ApplicationStartedEvent>> {DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} ExpressionFactory  FactoryId=1115
+  from container without scope
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12082
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.WrappersSupport.<>c.<BuildSupportedWrappers>b__9_0(Request r) in /_/src/DryIoc/Container.cs:line 5027
+   at DryIoc.ExpressionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 12551
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 426
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at NzbDrone.Common.ServiceFactory.BuildAll[T]() in ./NzbDrone.Common/ServiceFactory.cs:line 36
+   at NzbDrone.Core.Messaging.Events.EventAggregator.EventSubscribers`1..ctor(IServiceFactory serviceFactory) in ./NzbDrone.Core/Messaging/Events/EventAggregator.cs:line 32
+   at NzbDrone.Core.Messaging.Events.EventAggregator.PublishEvent[TEvent](TEvent event) in ./NzbDrone.Core/Messaging/Events/EventAggregator.cs:line 92
+
+
+2026-11-03 16:28:51.3|Info|Microsoft.Hosting.Lifetime|Application started. Press Ctrl+C to shut down.
+2026-11-03 16:28:51.3|Info|Microsoft.Hosting.Lifetime|Hosting environment: Production
+2026-11-03 16:28:51.3|Info|Microsoft.Hosting.Lifetime|Content root path: C:\Dev\Radarr\_output\dev
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/localization/language: 200.OK (46 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/customFilter: 200.OK (45 ms)
+2026-11-03 16:28:53.1|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/collection
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Movies.Collections.MovieCollectionService: NzbDrone.Core.Movies.Collections.IMovieCollectionService FactoryId=1346 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.Collections.CollectionController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4140 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/language: 200.OK (4 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/collection: 500.InternalServerError (51 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/indexerFlag: 200.OK (3 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/config/ui: 200.OK (10 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/system/status: 200.OK (20 ms)
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/localization: 200.OK (21 ms)
+2026-11-03 16:28:53.1|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/tag
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Parser.ParsingService: NzbDrone.Core.Parser.IParsingService FactoryId=1181 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.Trakt.User.TraktUserImport: NzbDrone.Core.ImportLists.IImportList {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1539 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.ImportLists.IImportList> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.ImportListFactory: NzbDrone.Core.ImportLists.IImportListFactory as parameter "importListFactory" FactoryId=1531 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Tags.TagService: NzbDrone.Core.Tags.ITagService FactoryId=1147 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.Tags.TagController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=3969 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/tag: 500.InternalServerError (88 ms)
+2026-11-03 16:28:53.1|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/movie
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in resolution root Scoped Radarr.Api.V3.Movies.MovieController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4030 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:28:53.2|Debug|Api|[GET] /api/v3/movie: 500.InternalServerError (120 ms)
+2026-11-03 16:28:53.1|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/qualityprofile
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService FactoryId=1177 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in resolution root Scoped Radarr.Api.V3.Profiles.Quality.QualityProfileController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4008 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:28:53.3|Debug|Api|[GET] /api/v3/qualityprofile: 500.InternalServerError (146 ms)
+2026-11-03 16:28:53.2|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/importlist
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Parser.ParsingService: NzbDrone.Core.Parser.IParsingService FactoryId=1181 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.Trakt.User.TraktUserImport: NzbDrone.Core.ImportLists.IImportList {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1539 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.ImportLists.IImportList> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.ImportListFactory: NzbDrone.Core.ImportLists.IImportListFactory FactoryId=1531 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.ImportLists.ImportListController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4089 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5187
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:28:53.3|Debug|Api|[GET] /api/v3/importlist: 500.InternalServerError (137 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/localization/language: 200.OK (0 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/language: 200.OK (0 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/customFilter: 200.OK (3 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/indexerFlag: 200.OK (0 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/config/ui: 200.OK (1 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/system/status: 200.OK (1 ms)
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/localization: 200.OK (4 ms)
+2026-11-03 16:29:05.5|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/collection
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Movies.Collections.MovieCollectionService: NzbDrone.Core.Movies.Collections.IMovieCollectionService FactoryId=1346 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.Collections.CollectionController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4140 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/collection: 500.InternalServerError (37 ms)
+2026-11-03 16:29:05.5|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/movie
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in resolution root Scoped Radarr.Api.V3.Movies.MovieController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4030 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:29:05.5|Debug|Api|[GET] /api/v3/movie: 500.InternalServerError (66 ms)
+2026-11-03 16:29:05.5|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/qualityprofile
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService FactoryId=1177 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in resolution root Scoped Radarr.Api.V3.Profiles.Quality.QualityProfileController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4008 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:29:05.6|Debug|Api|[GET] /api/v3/qualityprofile: 500.InternalServerError (101 ms)
+2026-11-03 16:29:05.5|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/tag
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Parser.ParsingService: NzbDrone.Core.Parser.IParsingService FactoryId=1181 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.Trakt.User.TraktUserImport: NzbDrone.Core.ImportLists.IImportList {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1539 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.ImportLists.IImportList> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.ImportListFactory: NzbDrone.Core.ImportLists.IImportListFactory as parameter "importListFactory" FactoryId=1531 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Tags.TagService: NzbDrone.Core.Tags.ITagService FactoryId=1147 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.Tags.TagController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=3969 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5105
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:29:05.6|Debug|Api|[GET] /api/v3/tag: 500.InternalServerError (137 ms)
+2026-11-03 16:29:05.5|Fatal|RadarrErrorPipeline|Request Failed. GET /api/v3/importlist
+
+[v10.0.0.29622] DryIoc.ContainerException: code: Error.RecursiveDependencyDetected;
+message: Recursive dependency is detected when resolving 
+NzbDrone.Core.Movies.IMovieService as parameter "movieService" (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Profiles.Qualities.QualityProfileService: NzbDrone.Core.Profiles.Qualities.IQualityProfileService as parameter "profiles" FactoryId=1177 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieVersionService: NzbDrone.Core.Movies.IMovieVersionService as parameter "movieVersions" FactoryId=1320 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Organizer.FileNameBuilder: NzbDrone.Core.Organizer.IBuildFileNames as parameter "fileNameBuilder" FactoryId=1183 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MoviePathBuilder: NzbDrone.Core.Movies.IBuildMoviePaths as parameter "moviePathBuilder" FactoryId=1314 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.Movies.MovieService: NzbDrone.Core.Movies.IMovieService as parameter "movieService" FactoryId=1317 (IsSingletonOrDependencyOfSingleton) <--recursive
+  in Singleton NzbDrone.Core.Parser.ParsingService: NzbDrone.Core.Parser.IParsingService FactoryId=1181 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.Trakt.User.TraktUserImport: NzbDrone.Core.ImportLists.IImportList {ServiceKey=DefaultKey(0), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=1539 (IsSingletonOrDependencyOfSingleton)
+  in wrapper IEnumerable<NzbDrone.Core.ImportLists.IImportList> as parameter "providers" ExpressionFactory  FactoryId=1115 (IsSingletonOrDependencyOfSingleton)
+  in Singleton NzbDrone.Core.ImportLists.ImportListFactory: NzbDrone.Core.ImportLists.IImportListFactory FactoryId=1531 (IsSingletonOrDependencyOfSingleton)
+  in resolution root Scoped Radarr.Api.V3.ImportLists.ImportListController {ServiceKey=DefaultKey(1), DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered} FactoryId=4089 (TracksTransientDisposable, IsResolutionCall)
+  from container with scope {Name=null}
+ with Rules with {TrackingDisposableTransients, AutoConcreteTypeResolution, SelectLastRegisteredFactory} and without {ThrowOnRegisteringDisposableTransient, VariantGenericTypesInResolvedCollection}
+ with DefaultReuse=Singleton {Lifespan=1000}
+ with FactorySelector=SelectLastRegisteredFactory
+ with Made={FactoryMethod=ConstructorWithResolvableArguments}.
+   at DryIoc.Throw.It(Int32 error, Object arg0, Object arg1, Object arg2, Object arg3) in /_/src/DryIoc/Container.cs:line 14774
+   at DryIoc.Request.WithResolvedFactory(Factory factory, Boolean skipRecursiveDependencyCheck, Boolean skipCaptiveDependencyCheck, Boolean copyRequest) in /_/src/DryIoc/Container.cs:line 10075
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 10937
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.WrappersSupport.GetArrayExpression(Request request) in /_/src/DryIoc/Container.cs:line 5105
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.ReflectionFactory.CreateExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11923
+   at DryIoc.Factory.GetExpressionOrDefault(Request request) in /_/src/DryIoc/Container.cs:line 11038
+   at DryIoc.Container.ResolveAndCacheKeyed(Int32 serviceTypeHash, Type serviceType, Object serviceKey, IfUnresolved ifUnresolved, Object scopeName, Type requiredServiceType, Request preResolveParent, Object[] args) in /_/src/DryIoc/Container.cs:line 541
+   at DryIoc.Container.ResolveAndCache(Int32 serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved) in /_/src/DryIoc/Container.cs:line 410
+   at DryIoc.Container.System.IServiceProvider.GetService(Type serviceType) in /_/src/DryIoc/Container.cs:line 344
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Radarr.Http.Middleware.BufferingMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/BufferingMiddleware.cs:line 27
+   at Radarr.Http.Middleware.IfModifiedMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/IfModifiedMiddleware.cs:line 40
+   at Radarr.Http.Middleware.CacheHeaderMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/CacheHeaderMiddleware.cs:line 32
+   at Radarr.Http.Middleware.StartingUpMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/StartingUpMiddleware.cs:line 37
+   at Radarr.Http.Middleware.UrlBaseMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/UrlBaseMiddleware.cs:line 28
+   at Radarr.Http.Middleware.VersionMiddleware.InvokeAsync(HttpContext context) in ./Radarr.Http/Middleware/VersionMiddleware.cs:line 28
+   at Microsoft.AspNetCore.ResponseCompression.ResponseCompressionMiddleware.InvokeCore(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+
+
+2026-11-03 16:29:05.6|Debug|Api|[GET] /api/v3/importlist: 500.InternalServerError (166 ms)
+2026-11-03 16:30:32.4|Info|Microsoft.Hosting.Lifetime|Application is shutting down...
+2026-11-03 16:30:32.4|Info|AppLifetime|Application stopped without restart pending
+2026-11-03 16:30:32.4|Info|Bootstrap|Radarr has shut down completely
+2026-11-03 16:30:32.4|Info|ConsoleApp|Exiting main.

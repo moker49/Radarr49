@@ -1,10 +1,14 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using FluentValidation;
 using FluentValidation.Results;
+using NzbDrone.Common.Disk;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.Profiles.Qualities
 {
@@ -13,6 +17,8 @@ namespace NzbDrone.Core.Profiles.Qualities
         List<CompositeProfileVersion> Get(int profileId);
         List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1);
         int GetMaximumConcurrentDownloads(int profileId);
+        string GetTestRoot(int profileId);
+        void SetTestRoot(int profileId, string rootFolderPath);
         void Delete(int profileId);
     }
 
@@ -22,16 +28,22 @@ namespace NzbDrone.Core.Profiles.Qualities
         private readonly IQualityProfileRepository _profiles;
         private readonly IMovieRepository _movies;
         private readonly IMovieVersionRepository _versions;
+        private readonly IRootFolderService _roots;
+        private readonly IDiskProvider _disk;
 
         public CompositeProfileService(ICompositeProfileVersionRepository definitions,
                                        IQualityProfileRepository profiles,
                                        IMovieRepository movies,
-                                       IMovieVersionRepository versions)
+                                       IMovieVersionRepository versions,
+                                       IRootFolderService roots,
+                                       IDiskProvider disk)
         {
             _definitions = definitions;
             _profiles = profiles;
             _movies = movies;
             _versions = versions;
+            _roots = roots;
+            _disk = disk;
         }
 
         public List<CompositeProfileVersion> Get(int profileId)
@@ -45,6 +57,47 @@ namespace NzbDrone.Core.Profiles.Qualities
             return _profiles.Get(profileId).MaximumConcurrentDownloads ?? 1;
         }
 
+        public string GetTestRoot(int profileId)
+        {
+            return _profiles.Get(profileId).CompositeTestRoot;
+        }
+
+        public void SetTestRoot(int profileId, string rootFolderPath)
+        {
+            lock (CompositeProfileSynchronization.SyncRoot)
+            {
+                _profiles.Get(profileId);
+                var definitions = _definitions.ForProfile(profileId);
+                EnsureUnused(profileId, definitions);
+                if (rootFolderPath != null)
+                {
+                    if (string.IsNullOrWhiteSpace(rootFolderPath) || !Path.IsPathFullyQualified(rootFolderPath))
+                    {
+                        throw Invalid("An absolute configured test root is required.");
+                    }
+
+                    rootFolderPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootFolderPath));
+                    if (!_roots.All().Any(r => r.Path.PathEquals(rootFolderPath)) || !_disk.FolderExists(rootFolderPath))
+                    {
+                        throw Invalid("The test root must exist and be configured as a root folder.");
+                    }
+
+                    if (_movies.All().Any(m => rootFolderPath.PathEquals(m.Path) || rootFolderPath.IsParentPath(m.Path)))
+                    {
+                        throw Invalid("Choose a dedicated test root containing no managed movies.");
+                    }
+
+                    new CompositeProfileValidator().ValidateAndThrow(definitions);
+                    if (definitions.Any(v => !_profiles.Exists(v.QualityProfileId) || _definitions.ForProfile(v.QualityProfileId).Any()))
+                    {
+                        throw Invalid("Every version must reference an existing ordinary profile.");
+                    }
+                }
+
+                _definitions.SetTestRoot(profileId, rootFolderPath);
+            }
+        }
+
         public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1)
         {
             lock (CompositeProfileSynchronization.SyncRoot)
@@ -55,7 +108,7 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         private List<CompositeProfileVersion> SaveDefinitions(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads)
         {
-            _profiles.Get(profileId);
+            EnsureDraft(profileId);
             if (maximumConcurrentDownloads is < 1 or > 2)
             {
                 throw Invalid("Maximum concurrent downloads must be 1 or 2.");
@@ -111,9 +164,17 @@ namespace NzbDrone.Core.Profiles.Qualities
         {
             lock (CompositeProfileSynchronization.SyncRoot)
             {
-                _profiles.Get(profileId);
+                EnsureDraft(profileId);
                 EnsureUnused(profileId, _definitions.ForProfile(profileId));
                 _definitions.DeleteDefinitions(profileId);
+            }
+        }
+
+        private void EnsureDraft(int profileId)
+        {
+            if (!string.IsNullOrWhiteSpace(_profiles.Get(profileId).CompositeTestRoot))
+            {
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Deactivate the unused composite before editing its definitions.");
             }
         }
 

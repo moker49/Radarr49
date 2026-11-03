@@ -14,8 +14,8 @@ namespace NzbDrone.Core.Movies
         List<MovieVersion> Assign(int movieId, int compositeProfileId, Dictionary<int, int?> fileAssignments = null);
     }
 
-    // Backend conversion primitive. No public activation route uses this until all
-    // file-changing workflows can operate on a managed version.
+    // Backend conversion primitive. The test activation API adds new movies only;
+    // existing-movie conversion is not publicly exposed.
     public class MovieVersionAssignmentService : IMovieVersionAssignmentService
     {
         private readonly IMovieRepository _movies;

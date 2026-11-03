@@ -1,5 +1,13 @@
 # Composite profile implementation
 
+## Live-test milestone
+
+Opt-in activation and ordinary API additions are now implemented for **new movies only**,
+bound to a configured dedicated test root. See [COMPOSITE_LIVE_TEST.md](COMPOSITE_LIVE_TEST.md)
+for configuration, activation and the first controlled test. Existing-movie conversion,
+managed folder moves and the full composite UI remain unavailable. Earlier validation
+entries below describe their respective stages, rather than current activation status.
+
 ## Contract
 
 An ordinary quality profile is one implicit movie version. A composite is an existing
@@ -10,7 +18,7 @@ Child profiles own their size settings. Composite names do not determine behavio
 Existing movies are not rewritten. MovieVersionService adapts their existing profile
 and file into a single runtime version without persisting anything. Composite movies
 require explicit MovieVersions assignments; their legacy MovieFileId is never guessed
-to belong to a child. Assignments must be created by a later activation/conversion flow.
+to belong to a child. New additions create both assignments atomically; existing-movie conversion remains unexposed.
 
 Legacy discovery and add APIs will retain qualityProfileId. Legacy destructive endpoints
 must reject composite-managed targets, including bulk requests. New explicit APIs will
@@ -27,9 +35,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
 - Read-only runtime resolution for ordinary and composite profiles.
 - Validation for primary selection, unique labels/priorities, nested composites,
   incomplete assignments and duplicate file ownership.
-- Composite draft configuration is available through a separate API. Draft assignment
-  and downloads remain blocked until the remaining lifecycle work and activation flow
-  are complete. Search, tracking, import and naming now use explicit version contexts.
+- Composite configuration is available through a separate API. Draft assignment and
+  downloads remain blocked; opt-in test activation enables new additions under its bound
+  root. Search, tracking, import and naming use explicit version contexts.
 - Ordinary profiles now support per-quality SizeDefinitions in storage, API and profile
   editor. Release size rejection and preferred-size ranking use these settings through
   one shared resolver. Unconfigured qualities retain global defaults. Legacy updates
@@ -182,12 +190,12 @@ the earlier one is unavailable. Primary selection is independent of download ord
 
 1. Profile-owned size settings and their use in independent child decision contexts are implemented.
 2. Draft configuration, legacy protections and backend atomic conversion are implemented.
-   Add version-aware activation/conversion orchestration, events and assignment
-   reconciliation, including files and downloads already in flight, before exposing it.
+   New-movie test activation is implemented. Existing-movie conversion still needs events
+   and assignment reconciliation, including files and downloads already in flight.
 3. Search/RSS expansion, scoped comparisons, prefer-first ordering and durable dispatch
    reservations are implemented. Version-aware runtime imports and manual import context
    now use the journal, with database-backed recovery checks. Expand full host/filesystem
-   lifecycle coverage before activation. Manual imports of
+   lifecycle coverage before general availability. Manual imports of
    a reserved download must retain its bound client/download identity; never infer that
    association from a sole pending job. Keep active and currently owned reservations during
    housekeeping. Targeted file deletion now preserves reservation audit rows and expires
@@ -205,10 +213,10 @@ the earlier one is unavailable. Primary selection is independent of download ord
    Recovery inspection/resume/cancel APIs and phase-aware startup replay are implemented.
    Managed existing-file metadata refresh preserves its file ID and sidecar ownership.
    Explicit version-file deletion has durable
-   recovery. Folder moves still need a dedicated journal before activation.
+   recovery. Folder moves still need a dedicated journal and remain blocked during tests.
 5. Version-aware missing/quality-cutoff queries, wanted bulk searches and the explicit
    versions API status are implemented. Finish UI and remaining movie-level API summaries.
-6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
+6. Use opt-in activation for controlled lifecycle tests and actual nzb360/Seer add-workflow validation.
 
 ## Single-file assumption inventory
 
@@ -226,7 +234,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Download/Pending/PendingRelease.cs | Identity and scoped pending contexts implemented |
 | Download/TrackedDownloads/TrackedDownload.cs | Identity restored; incomplete/conflicting assignments block import |
 | History/History.cs | Identity persisted; scope best-quality/cutoff history queries and file events to version |
-| Radarr.Api.V3 movie/file/profile controllers | Shared guards and explicit manual-import identity implemented; activation and remaining command audits pending |
+| Radarr.Api.V3 movie/file/profile controllers | Shared guards and explicit manual-import identity implemented; new-movie test activation implemented; remaining command audits pending |
 | Extras and housekeeping | Per-file sidecars, shared metadata and secondary-file preservation implemented |
 | Organizer folder moves and notifications | Audit file selection and scope to version |
 
@@ -307,7 +315,7 @@ protection, cancellation, completed replay, startup resumption and housekeeping 
 Gating, per-version search isolation and history replay are also checked. Logs:
 `_temp/deletion-recovery-regression.log` and `_temp/deletion-recovery-api-tests.log`.
 
-## File operation recovery still required before activation
+## Remaining file operation recovery
 
 Explicit version-file deletion has a durable forward-recovery journal. It resumes the
 authorized deletion, rather than restoring recycled files automatically. Size and precise
@@ -318,9 +326,9 @@ database locks/indexes protect records but do not provide a distributed filesyst
 
 Managed new-download/replacement imports now use the complete journal described below;
 existing-file metadata refresh updates the existing registration in place. Folder moves still lack equivalent
-operation recovery. Composite activation remains disabled until those lifecycle paths
-and the remaining UI/API work are ready. No running development app was restarted by
-these test/build steps.
+operation recovery and remain blocked. Composite activation is limited to new movies in
+an explicitly configured test root; general library activation and the full UI are pending.
+No running development app was restarted by these test/build steps.
 
 The folder-move audit found that DiskTransferService.TransferFolder can recursively merge
 into an existing destination, overwrite file paths, and move files incrementally across
@@ -331,12 +339,12 @@ root-folder move can preserve the movie folder basename and all relative paths, 
 filename changes in the same operation. Source cleanup and post-commit events/extras work
 must be recoverable, and incomplete operations must block conflicting writes/acquisition.
 
-## Draft configuration API
+## Composite configuration API
 
 Use an unused ordinary profile as the parent (give it the desired composite name first).
 The separate endpoint is `/api/v3/qualityprofile/{profileId}/composite`:
 
-- GET returns the ordered definitions and `isDraft: true`.
+- GET returns ordered definitions, `isDraft` and nullable `testRootFolderPath`.
 - PUT accepts `versions`, each containing `id` (zero for initial creation),
   `qualityProfileId`, `label`, `priority` (0 or 1), and `isPrimary`.
   The route supplies the parent profile ID. Subsequent saves must retain both definition
@@ -345,11 +353,16 @@ The separate endpoint is `/api/v3/qualityprofile/{profileId}/composite`:
   default), or 2 to allow both versions concurrently once acquisition is enabled.
 - DELETE removes an unused draft's definitions, leaving the ordinary parent profile intact.
 
-No activation endpoint or composite editor is exposed yet. The ordinary profile endpoint
-continues to list the parent, but assignment currently returns HTTP 409. Legacy edits or
-deletes against protected targets also return HTTP 409 with an explanation; this applies
-to the built-in legacy interface as well as external clients. The future legacy add
-workflow will be enabled once version assignments, downloads and imports are ready.
+POST `.../activate` accepts `{ "rootFolderPath": "C:\\CompositeTest" }`. The root must
+exist, be configured and contain no existing managed movies; the parent must be unused.
+POST `.../deactivate` clears activation only while unused. Activation freezes definitions;
+only unused drafts can be edited/deleted. The ordinary profile endpoint continues to list
+the parent. Ordinary POST `/api/v3/movie` now accepts its ID for new movies beneath the
+bound root; an existing destination directory must contain no files recursively. Single
+and mixed batch additions create movie/version records in one transaction before events.
+Draft additions, existing-movie conversion and legacy edits/deletes remain HTTP 409.
+Profile updates preserve activation, including Custom Format maintenance. There is no
+composite editor yet. See the live-test guide for the full procedure.
 
 ## Version-file deletion API
 
@@ -549,7 +562,7 @@ in that gap likewise relies on a later scan. Configured metadata may intentional
 rename imported NFO extras after the journal's captured import has completed.
 
 Remaining work is wider filesystem/host restart tests and the existing activation/UI, remaining movie-level API
-and folder-move lifecycle work. Composite activation remains disabled.
+and folder-move lifecycle work. New-movie test activation is now available; see the milestone above.
 
 Validation including wanted/version status: 1,324 core tests pass, with five existing skips, and 38 profile
 API tests pass. The previously reproduced unrelated
@@ -666,8 +679,9 @@ ID, omit client/reservation IDs and select a version with no active reserved job
 server rejects missing/conflicting identities with HTTP 409, or fails a queued command
 before its first import during preflight.
 
-These backend/API changes do not add a version selector to the UI or enable composite
-activation. A separate version-aware folder relocation and recovery flow is still needed.
+These backend/API changes do not add a version selector to the UI. New-movie activation
+is opt-in and root-scoped. A separate version-aware folder relocation and recovery flow
+is still needed; legacy managed folder moves remain blocked.
 
 ## Reservation state and reconciliation API
 
@@ -689,3 +703,27 @@ release an unresolved, unbound attempt. It cannot clear an already bound submiss
 POST `.../{reservationId}/bind-download` accepts a `downloadId` and verification `note`.
 The client job must already be tracked and match the reserved release. Both operations
 validate route ownership; no legacy DELETE endpoint can release reservations.
+
+## New-movie activation validation
+
+The activation/addition stage passes 1,385 core tests (five existing skips and the same
+previously reproduced unrelated broken-report exclusion) and 41 profile API tests.
+Logs: `_temp/composite-activation-regression.log` and `_temp/composite-activation-api-tests.log`.
+Coverage includes active/draft gates, configured root and empty movie directory restrictions,
+path traversal/sibling-root rejection, frozen definitions, preserved activation on profile
+updates, explicit download identity, atomic version creation before events, mixed batches,
+a real database failure after partial writes with full rollback and reset request IDs, and
+activation/deactivation refusal after assignment. This is automated source-level/database
+coverage; actual hosted downloads, nzb360/Seer request capture and Emby playback checks
+remain to be run using the live-test guide. The live dev output was not overwritten.
+
+The first hosted launch exposed a constructor cycle through MovieService, FileNameBuilder,
+MovieVersionService and QualityProfileService. MovieVersionService now reads profiles
+through IQualityProfileRepository, preserving the same Get behavior without depending on
+profile management. Real DryIoc container regression checks cover movie/version/profile
+services and movie, versions, composite and manual-import controllers. The cycle was
+reproduced before the fix; afterward 15 container checks pass (one existing skip), along
+with 348 version-resolution/naming tests. Logs: `_temp/composite-container-before.log`,
+`_temp/composite-container-after.log` and `_temp/composite-resolver-cycle-tests.log`.
+Host container tests require the platform assembly alongside the test assemblies; on this
+Windows checkout Radarr.Windows was built into `_tests/net8.0` before running them.

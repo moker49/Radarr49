@@ -105,8 +105,16 @@ namespace NzbDrone.Core.Movies
 
         private Movie AddMovieCore(Movie newMovie)
         {
-            _compositeProfilePolicy.EnsureAssignable(newMovie.QualityProfileId);
-            var movie = _movieRepository.Insert(newMovie);
+            Movie movie;
+            if (_compositeProfilePolicy.EnsureNewMovieAllowed(newMovie))
+            {
+                _movieRepository.InsertWithVersions(new List<Movie> { newMovie });
+                movie = newMovie;
+            }
+            else
+            {
+                movie = _movieRepository.Insert(newMovie);
+            }
 
             _eventAggregator.PublishEvent(new MovieAddedEvent(GetMovie(movie.Id)));
 
@@ -123,12 +131,16 @@ namespace NzbDrone.Core.Movies
 
         private List<Movie> AddMoviesCore(List<Movie> newMovies)
         {
-            foreach (var profileId in newMovies.Select(m => m.QualityProfileId).Distinct())
+            // Evaluate every entry before writing any part of a mixed batch.
+            var managed = newMovies.Select(m => _compositeProfilePolicy.EnsureNewMovieAllowed(m)).ToList();
+            if (managed.Any(m => m))
             {
-                _compositeProfilePolicy.EnsureAssignable(profileId);
+                _movieRepository.InsertWithVersions(newMovies);
             }
-
-            _movieRepository.InsertMany(newMovies);
+            else
+            {
+                _movieRepository.InsertMany(newMovies);
+            }
 
             _eventAggregator.PublishEvent(new MoviesImportedEvent(newMovies));
 

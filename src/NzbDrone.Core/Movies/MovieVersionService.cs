@@ -17,13 +17,13 @@ namespace NzbDrone.Core.Movies
     {
         private readonly ICompositeProfileVersionRepository _definitions;
         private readonly IMovieVersionRepository _versions;
-        private readonly IQualityProfileService _profiles;
+        private readonly IQualityProfileRepository _profiles;
         private readonly IMediaFileService _files;
         private readonly IVersionFileDeletionRepository _deletions;
 
         public MovieVersionService(ICompositeProfileVersionRepository definitions,
                                    IMovieVersionRepository versions,
-                                   IQualityProfileService profiles,
+                                   IQualityProfileRepository profiles,
                                    IMediaFileService files,
                                    IVersionFileDeletionRepository deletions)
         {

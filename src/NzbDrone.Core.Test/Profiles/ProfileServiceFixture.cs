@@ -36,6 +36,17 @@ namespace NzbDrone.Core.Test.Profiles
         }
 
         [Test]
+        public void profile_updates_should_preserve_activation_even_with_stale_or_missing_fields()
+        {
+            Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(10))
+                .Returns(new QualityProfile { Id = 10, CompositeTestRoot = "C:/CompositeTest" });
+
+            Subject.Update(new QualityProfile { Id = 10, CompositeTestRoot = "C:/Other" });
+
+            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.CompositeTestRoot == "C:/CompositeTest")), Times.Once());
+        }
+
+        [Test]
         public void explicit_empty_size_settings_should_reset_to_global_defaults()
         {
             var definitions = new List<ProfileSizeDefinition>();

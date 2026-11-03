@@ -9,9 +9,11 @@ if not exist "%DOTNET_ROOT%\dotnet.exe" (
 )
 
 echo Building Radarr backend...
-dotnet build src\NzbDrone.Console\Radarr.Console.csproj -c Debug -p:Platform=Windows -p:RuntimeIdentifiers=win-x64 "-p:OutDir=%CD%\_output\dev/" "-p:SolutionDir=%CD%\src/"
+rem Keep package audit findings visible without blocking this local development build.
+rem Double percent escapes the MSBuild list separator for batch-file expansion.
+dotnet build src\NzbDrone.Console\Radarr.Console.csproj -c Debug -p:Platform=Windows -p:RuntimeIdentifiers=win-x64 "-p:WarningsNotAsErrors=NU1902%%3BNU1903" "-p:OutDir=%CD%\_output\dev/" "-p:SolutionDir=%CD%\src/"
 if errorlevel 1 goto failed
-dotnet build src\NzbDrone.Windows\Radarr.Windows.csproj -c Debug -p:Platform=Windows -p:RuntimeIdentifiers=win-x64 "-p:OutDir=%CD%\_output\dev/" "-p:SolutionDir=%CD%\src/"
+dotnet build src\NzbDrone.Windows\Radarr.Windows.csproj -c Debug -p:Platform=Windows -p:RuntimeIdentifiers=win-x64 "-p:WarningsNotAsErrors=NU1902%%3BNU1903" "-p:OutDir=%CD%\_output\dev/" "-p:SolutionDir=%CD%\src/"
 if errorlevel 1 goto failed
 echo Backend build succeeded.
 pause

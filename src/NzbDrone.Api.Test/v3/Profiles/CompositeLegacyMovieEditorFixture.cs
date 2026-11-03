@@ -29,9 +29,7 @@ namespace NzbDrone.Api.Test.v3.Profiles
             Mocker.GetMock<ICompositeProfileVersionRepository>().Setup(s => s.ForProfile(It.IsAny<int>()))
                 .Returns((int id) => id == 10 ? new List<CompositeProfileVersion> { new CompositeProfileVersion() } : new List<CompositeProfileVersion>());
             Mocker.GetMock<IMovieVersionRepository>().Setup(s => s.ForMovie(It.IsAny<int>())).Returns(new List<MovieVersion>());
-            Mocker.SetConstant<ICompositeProfilePolicy>(new CompositeProfilePolicy(
-                Mocker.GetMock<ICompositeProfileVersionRepository>().Object,
-                Mocker.GetMock<IMovieVersionRepository>().Object));
+            Mocker.SetConstant<ICompositeProfilePolicy>(Mocker.Resolve<CompositeProfilePolicy>());
         }
 
         [Test]

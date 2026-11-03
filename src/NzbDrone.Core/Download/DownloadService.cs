@@ -61,7 +61,7 @@ namespace NzbDrone.Core.Download
         {
             if (remoteMovie.Movie != null)
             {
-                _compositeProfilePolicy.EnsureAssignable(remoteMovie.Movie.QualityProfileId);
+                _compositeProfilePolicy.EnsureDownloadAllowed(remoteMovie.Movie, remoteMovie.MovieVersionId);
             }
 
             var filterBlockedClients = remoteMovie.Release.PendingReleaseReason == PendingReleaseReason.DownloadClientUnavailable;

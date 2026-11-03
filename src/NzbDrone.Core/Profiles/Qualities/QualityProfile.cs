@@ -25,6 +25,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         public bool UpgradeAllowed { get; set; }
         public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
         public int? MaximumConcurrentDownloads { get; set; }
+        public string CompositeTestRoot { get; set; }
 
         public Quality FirststAllowedQuality()
         {

@@ -21,9 +21,15 @@ using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.Movies;
+using NzbDrone.Core.Organizer;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Host;
 using NzbDrone.SignalR;
 using NzbDrone.Test.Common;
+using Radarr.Api.V3.ManualImport;
+using Radarr.Api.V3.Movies;
+using Radarr.Api.V3.Profiles.Quality;
 using IServiceProvider = System.IServiceProvider;
 
 namespace NzbDrone.App.Test
@@ -61,6 +67,20 @@ namespace NzbDrone.App.Test
         public void should_be_able_to_resolve_indexers()
         {
             _container.GetRequiredService<IEnumerable<IIndexer>>().Should().NotBeEmpty();
+        }
+
+        [TestCase(typeof(IMovieService))]
+        [TestCase(typeof(IMovieVersionService))]
+        [TestCase(typeof(IBuildFileNames))]
+        [TestCase(typeof(IQualityProfileService))]
+        [TestCase(typeof(ICompositeProfileService))]
+        [TestCase(typeof(MovieController))]
+        [TestCase(typeof(MovieVersionsController))]
+        [TestCase(typeof(CompositeProfileController))]
+        [TestCase(typeof(ManualImportController))]
+        public void should_resolve_movie_and_composite_services_without_dependency_cycles(System.Type serviceType)
+        {
+            _container.GetRequiredService(serviceType).Should().NotBeNull();
         }
 
         [Test]
