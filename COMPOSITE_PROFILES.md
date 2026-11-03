@@ -203,8 +203,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
    primitive, through registration. Durable incoming-sidecar installation and registration
    are also implemented as an internal primitive. Runtime imports still use the existing
    standard recycle-before-transfer behavior until durable finalization is ready. Durable
-   old-extra and backup/source cleanup now reach EventsPending internally. Finish event
-   delivery, recovery APIs and restart integration before routing
+   old-extra and backup/source cleanup now reach EventsPending internally, and durable
+   audit recording/event checkpoints reach Completed. Finish recovery APIs and restart
+   integration before routing
    managed imports through the new journal. Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
@@ -478,16 +479,46 @@ preserved with `preserveChangedExtras` / `preserveChangedSources` and a note. Th
 cannot bypass a changed backup identity or installed-file ownership checks. Finished
 entries are never revisited, even if a new file later appears at their original path.
 
-EventsPending is deliberately still active: no events have been emitted and client
-completion/writer gates remain closed. Event/history delivery and the final Completed
-transition are the next step.
+VersionImportCompletionService now continues EventsPending through Completed. Movie import,
+upgrade deletion and (when reserved) exact client/download FileImported history rows commit
+in one database transaction with their journal IDs before any event is published. A failed
+transaction leaves no partial audit rows. Repeated or concurrent preparation reuses the
+same persisted IDs. The records carry `versionFileImportId` and exact file/version identity;
+missing or altered audit rows block dispatch/completion rather than silently replacing them.
+
+An ordered event manifest persists Prepared, Dispatching and Dispatched checkpoints.
+Upgrades publish MovieFileDeletedEvent (Upgrade), DeleteCompletedEvent, MovieFileAddedEvent
+and MovieFileImportedEvent. First acquisitions publish only the added/imported events.
+Each file event carries ImportOperationId. Event payloads rebuild an isolated child-version
+context, previous-file/recycle information and captured score, format names/IDs and release
+details. Manual imports without a reserved client retain an absent download identity;
+recovery never infers one from unrelated history.
+
+Journal-tagged file events bypass legacy history insertion, root detachment and folder/
+sidecar cleanup handlers: those mutations already belong to the transaction/journal.
+Normal event behavior remains unchanged. Deletion history replay also recognizes the camel
+case dictionary keys stored by the existing JSON converter.
+
+EventsPending remains active until every dispatch checkpoint is committed, installed
+contents still verify, and file/version, sidecar, reservation and audit ownership pass their
+final checks. Completed then releases operation gates. A retry after completion is a no-op
+even if a later upgrade has changed the assignment. A failed final commit retries without
+republishing events already marked Dispatched.
+
+Dispatching can mean publication happened before a crash; retry may publish that event
+again. Dispatched means PublishEvent returned, not that every subscriber acknowledged
+delivery. The existing event bus catches synchronous subscriber failures and launches
+asynchronous handlers without durable acknowledgements. Movie/download audit rows are
+transactional and recorded once; external notifications retain existing best-effort delivery
+and may be duplicated after an interrupted dispatch. Exactly-once external effects are
+not promised. Subscriber changes to installed content block the final completion check.
 
 There is no public begin/resume/complete import route and no startup replay of these
-primitives. Normal runtime imports do not call them yet. Remaining work is event/history
-dispatch and operator recovery APIs,
-followed by runtime routing and restart integration. Folder-move recovery is separate.
+primitives. Normal runtime imports do not call them yet. Remaining work is operator recovery
+APIs, a phase-aware coordinator/startup replay and runtime routing, plus real-filesystem
+restart tests. Folder-move recovery is separate.
 
-Validation including the cleanup stage: 1,222 core tests pass, with five existing skips, and 29 profile
+Validation including the completion stage: 1,243 core tests pass, with five existing skips, and 29 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
@@ -500,10 +531,14 @@ changed sources/destinations/backups/owners/reservations, shared-file protection
 stable captured settings and premature finalization rejection. Twenty-five cleanup tests
 cover obsolete and replaced sidecars, copy/move source handling, interruptions before/after
 physical recycling, atomic checkpoint rollback, explicit retry/preservation, duplicate and
-reassigned claims, changed content, reappearing files and unfinished phase gates. Filesystem
+reassigned claims, changed content, reappearing files and unfinished phase gates. Completion
+coverage includes atomic audit rollback, concurrent preparation, interrupted dispatch,
+ordered replay, captured event payloads, missing/changed audit rows, final commit failure,
+legacy subscriber isolation and download-completion gating through the final checkpoint.
+Filesystem
 handoff tests use a simulated disk and real SQLite; full real-filesystem/restart integration
-remains pending. Logs: `_temp/import-cleanup-regression.log` and
-`_temp/import-cleanup-api-tests.log`.
+remains pending. Logs: `_temp/import-completion-regression.log` and
+`_temp/import-completion-api-tests.log`.
 
 ## Manual import API
 

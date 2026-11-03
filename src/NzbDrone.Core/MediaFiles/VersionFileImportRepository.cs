@@ -26,9 +26,13 @@ namespace NzbDrone.Core.MediaFiles
         void StartCleanupItem(int id, int index, string note);
         void FinishCleanupItem(int id, int index, VersionImportCleanupState expected, bool preserve, string recyclePath, string note);
         void AdvanceCleanup(int id, VersionFileImportState expected, VersionFileImportState next);
+        void RecordEventHistory(int id);
+        void BeginEventDelivery(int id, int index);
+        void FinishEventDelivery(int id, int index);
+        void CompleteEvents(int id);
     }
 
-    public class VersionFileImportRepository : BasicRepository<VersionFileImport>, IVersionFileImportRepository
+    public partial class VersionFileImportRepository : BasicRepository<VersionFileImport>, IVersionFileImportRepository
     {
         public VersionFileImportRepository(IMainDatabase database, IEventAggregator events)
             : base(database, events)

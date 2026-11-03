@@ -99,7 +99,9 @@ namespace NzbDrone.Core.MediaFiles
                 {
                     Incoming = Copy(incoming), Previous = local.Movie.MovieFile == null ? null : Copy(local.Movie.MovieFile),
                     FileMovieInfo = local.FileMovieInfo, FolderMovieInfo = local.FolderMovieInfo, SceneSource = local.SceneSource,
-                    DownloadClientInfo = local.DownloadItem?.DownloadClientInfo, DownloadId = local.DownloadItem?.DownloadId
+                    DownloadClientInfo = local.DownloadItem?.DownloadClientInfo, DownloadId = local.DownloadItem?.DownloadId,
+                    CustomFormatScore = local.CustomFormatScore, Release = local.Release,
+                    CustomFormats = (local.CustomFormats ?? new List<CustomFormat>()).Select(f => new VersionImportFormat { Id = f.Id, Name = f.Name }).ToList()
                 };
                 snapshot.Incoming.Quality = local.Quality;
                 snapshot.Incoming.Languages = local.Languages;

@@ -57,9 +57,48 @@ namespace NzbDrone.Core.MediaFiles
         public bool SceneSource { get; set; }
         public DownloadClientItemClientInfo DownloadClientInfo { get; set; }
         public string DownloadId { get; set; }
+        public int CustomFormatScore { get; set; }
+        public List<VersionImportFormat> CustomFormats { get; set; } = new List<VersionImportFormat>();
+        public GrabbedReleaseInfo Release { get; set; }
         public List<VersionFileDeletionExtra> PreviousExtras { get; set; } = new List<VersionFileDeletionExtra>();
         public List<VersionImportSourceExtra> IncomingExtras { get; set; } = new List<VersionImportSourceExtra>();
         public List<VersionImportCleanupItem> Cleanup { get; set; }
+        public VersionImportEventProgress Events { get; set; }
+    }
+
+    public class VersionImportFormat : IEmbeddedDocument
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class VersionImportEventProgress : IEmbeddedDocument
+    {
+        public int ImportHistoryId { get; set; }
+        public int? DeletedHistoryId { get; set; }
+        public int? DownloadHistoryId { get; set; }
+        public List<VersionImportDelivery> Deliveries { get; set; } = new List<VersionImportDelivery>();
+    }
+
+    public class VersionImportDelivery : IEmbeddedDocument
+    {
+        public VersionImportEventKind Kind { get; set; }
+        public VersionImportDeliveryState State { get; set; }
+    }
+
+    public enum VersionImportEventKind
+    {
+        OldFileDeleted = 0,
+        DeleteCompleted = 1,
+        FileAdded = 2,
+        FileImported = 3
+    }
+
+    public enum VersionImportDeliveryState
+    {
+        Prepared = 0,
+        Dispatching = 1,
+        Dispatched = 2
     }
 
     public class VersionImportSourceExtra : IEmbeddedDocument

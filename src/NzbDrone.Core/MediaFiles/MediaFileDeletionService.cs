@@ -143,6 +143,11 @@ namespace NzbDrone.Core.MediaFiles
         [EventHandleOrder(EventHandleOrder.Last)]
         public void Handle(MovieFileDeletedEvent message)
         {
+            if (message.ImportOperationId.HasValue)
+            {
+                return;
+            }
+
             if (_configService.DeleteEmptyFolders)
             {
                 var movie = message.MovieFile.Movie;

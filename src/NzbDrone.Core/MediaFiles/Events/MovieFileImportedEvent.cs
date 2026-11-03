@@ -13,6 +13,7 @@ namespace NzbDrone.Core.MediaFiles.Events
         public bool NewDownload { get; private set; }
         public DownloadClientItemClientInfo DownloadClientInfo { get; set; }
         public string DownloadId { get; private set; }
+        public int? ImportOperationId { get; set; }
 
         public MovieFileImportedEvent(LocalMovie movieInfo, MovieFile importedMovie, List<DeletedMovieFile> oldFiles, bool newDownload, DownloadClientItem downloadClientItem)
         {

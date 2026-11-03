@@ -14,6 +14,11 @@ namespace NzbDrone.Core.Parser.Model
 
         public List<int> MovieIds { get; set; }
 
+        public GrabbedReleaseInfo()
+        {
+            MovieIds = new List<int>();
+        }
+
         public GrabbedReleaseInfo(List<MovieHistory> grabbedHistories)
         {
             var grabbedHistory = grabbedHistories.MaxBy(h => h.Date);

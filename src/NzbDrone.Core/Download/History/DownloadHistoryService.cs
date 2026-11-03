@@ -123,6 +123,12 @@ namespace NzbDrone.Core.Download.History
 
         public void Handle(MovieFileImportedEvent message)
         {
+            if (message.ImportOperationId.HasValue)
+            {
+                // The journal owns the exact client/download audit identity.
+                return;
+            }
+
             if (!message.NewDownload)
             {
                 return;

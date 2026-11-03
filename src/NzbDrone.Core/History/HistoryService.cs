@@ -187,6 +187,12 @@ namespace NzbDrone.Core.History
 
         public void Handle(MovieFileImportedEvent message)
         {
+            if (message.ImportOperationId.HasValue)
+            {
+                // Journal-owned audit rows commit before event dispatch.
+                return;
+            }
+
             if (!message.NewDownload)
             {
                 return;
@@ -227,9 +233,14 @@ namespace NzbDrone.Core.History
 
         public void Handle(MovieFileDeletedEvent message)
         {
+            if (message.ImportOperationId.HasValue)
+            {
+                return;
+            }
+
             var deletionId = message.DeletionOperationId?.ToString();
             if (deletionId != null && (_historyRepository.GetByMovieId(message.MovieFile.MovieId, MovieHistoryEventType.MovieFileDeleted) ?? new List<MovieHistory>())
-                .Any(h => h.Data.GetValueOrDefault("VersionFileDeletionId") == deletionId))
+                .Any(h => h.Data.Any(d => d.Key.Equals("VersionFileDeletionId", StringComparison.OrdinalIgnoreCase) && d.Value == deletionId)))
             {
                 return;
             }

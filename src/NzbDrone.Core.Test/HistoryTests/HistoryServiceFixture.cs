@@ -30,11 +30,12 @@ namespace NzbDrone.Core.Test.HistoryTests
             _profileCustom = new QualityProfile { Cutoff = Quality.WEBDL720p.Id, Items = QualityFixture.GetDefaultQualities(Quality.DVD) };
         }
 
-        [Test]
-        public void replayed_journal_delete_should_not_duplicate_recorded_history()
+        [TestCase("VersionFileDeletionId")]
+        [TestCase("versionFileDeletionId")]
+        public void replayed_journal_delete_should_not_duplicate_recorded_history(string key)
         {
             var existing = new MovieHistory { MovieId = 1, EventType = MovieHistoryEventType.MovieFileDeleted };
-            existing.Data["VersionFileDeletionId"] = "42";
+            existing.Data = new Dictionary<string, string> { { key, "42" } };
             Mocker.GetMock<IHistoryRepository>().Setup(v => v.GetByMovieId(1, MovieHistoryEventType.MovieFileDeleted)).Returns(new List<MovieHistory> { existing });
 
             Subject.Handle(new MovieFileDeletedEvent(new MovieFile { Id = 11, MovieId = 1 }, DeleteMediaFileReason.Manual) { DeletionOperationId = 42 });

@@ -523,6 +523,12 @@ namespace NzbDrone.Core.Movies
 
         public void Handle(MovieFileDeletedEvent message)
         {
+            if (message.ImportOperationId.HasValue)
+            {
+                // The import journal committed the replacement and primary summary.
+                return;
+            }
+
             foreach (var movie in GetMoviesByFileId(message.MovieFile.Id))
             {
                 _logger.Debug("Detaching movie {0} from file.", movie.Id);

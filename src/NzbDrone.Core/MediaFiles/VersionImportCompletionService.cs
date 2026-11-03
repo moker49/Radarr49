@@ -1,0 +1,174 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using NzbDrone.Common.Disk;
+using NzbDrone.Common.Extensions;
+using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Download;
+using NzbDrone.Core.MediaFiles.Events;
+using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.Movies;
+using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.RootFolders;
+
+namespace NzbDrone.Core.MediaFiles
+{
+    public interface IVersionImportCompletionService
+    {
+        void Resume(int movieId, int operationId);
+    }
+
+    public class VersionImportCompletionService : IVersionImportCompletionService
+    {
+        private readonly IVersionFileImportRepository _operations;
+        private readonly IMovieService _movies;
+        private readonly IMovieVersionService _versions;
+        private readonly IDiskProvider _disk;
+        private readonly IVersionImportFileVerifier _verifier;
+        private readonly IRootFolderService _roots;
+        private readonly IEventAggregator _events;
+
+        public VersionImportCompletionService(IVersionFileImportRepository operations,
+                                              IMovieService movies,
+                                              IMovieVersionService versions,
+                                              IDiskProvider disk,
+                                              IVersionImportFileVerifier verifier,
+                                              IRootFolderService roots,
+                                              IEventAggregator events)
+        {
+            _operations = operations;
+            _movies = movies;
+            _versions = versions;
+            _disk = disk;
+            _verifier = verifier;
+            _roots = roots;
+            _events = events;
+        }
+
+        public void Resume(int movieId, int operationId)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movieId))
+            {
+                var operation = _operations.Get(operationId);
+                Require(operation.MovieId == movieId, "The import completion belongs to another movie.");
+                if (operation.State == VersionFileImportState.Completed)
+                {
+                    return;
+                }
+
+                Require(operation.State == VersionFileImportState.EventsPending, "Physical import finalization is still pending.");
+                var movie = _movies.GetMovie(movieId);
+                Require(movie.Path == operation.MoviePath, "The movie folder changed. Completion remains blocked.");
+                var root = _roots.GetBestRootFolderPath(movie.Path);
+                Require(!string.IsNullOrWhiteSpace(root) && _disk.FolderExists(root) && Path.GetFullPath(root).IsParentPath(Path.GetFullPath(movie.Path)), "The configured movie root is unavailable.");
+                VerifyInstalled(movie, operation);
+                _operations.RecordEventHistory(operationId);
+                operation = _operations.Get(operationId);
+                for (var index = 0; index < operation.Snapshot.Events.Deliveries.Count; index++)
+                {
+                    var delivery = operation.Snapshot.Events.Deliveries[index];
+                    if (delivery.State == VersionImportDeliveryState.Dispatched)
+                    {
+                        continue;
+                    }
+
+                    _operations.BeginEventDelivery(operationId, index);
+                    Dispatch(movie, operation, delivery.Kind);
+                    _operations.FinishEventDelivery(operationId, index);
+                    operation = _operations.Get(operationId);
+                }
+
+                VerifyInstalled(movie, operation);
+                _operations.CompleteEvents(operationId);
+            }
+        }
+
+        private void Dispatch(Movie movie, VersionFileImport operation, VersionImportEventKind kind)
+        {
+            var version = _versions.Get(movie, operation.MovieVersionId);
+            Require(version.MovieFileId == operation.NewMovieFileId, "The registered version changed before dispatch.");
+            var file = Copy(operation.Snapshot.Incoming);
+            file.Id = operation.NewMovieFileId.Value;
+            file.RelativePath = operation.DestinationRelativePath;
+            file.MovieVersionId = operation.MovieVersionId;
+            file.Path = Owned(movie.Path, file.RelativePath);
+            var context = movie.WithVersion(version, file);
+            file.Movie = context;
+            var oldFiles = new List<DeletedMovieFile>();
+            if (operation.Snapshot.Previous != null)
+            {
+                var old = Copy(operation.Snapshot.Previous);
+                old.MovieVersionId = operation.MovieVersionId;
+                old.Movie = context;
+                old.Path = Owned(movie.Path, old.RelativePath);
+                var recycled = operation.Snapshot.Cleanup.SingleOrDefault(i => i.Kind == VersionImportCleanupKind.Backup && i.Path == operation.BackupRelativePath)?.RecyclePath;
+                oldFiles.Add(new DeletedMovieFile(old, recycled));
+            }
+
+            switch (kind)
+            {
+                case VersionImportEventKind.OldFileDeleted:
+                    _events.PublishEvent(new MovieFileDeletedEvent(oldFiles.Single().MovieFile, DeleteMediaFileReason.Upgrade) { ImportOperationId = operation.Id });
+                    break;
+                case VersionImportEventKind.DeleteCompleted:
+                    _events.PublishEvent(new DeleteCompletedEvent());
+                    break;
+                case VersionImportEventKind.FileAdded:
+                    _events.PublishEvent(new MovieFileAddedEvent(file) { ImportOperationId = operation.Id });
+                    break;
+                case VersionImportEventKind.FileImported:
+                    var snapshot = operation.Snapshot;
+                    var client = snapshot.DownloadClientInfo == null ? null : new DownloadClientItem { DownloadClientInfo = snapshot.DownloadClientInfo, DownloadId = snapshot.DownloadId };
+                    var local = new LocalMovie
+                    {
+                        Movie = context, MovieVersionId = operation.MovieVersionId, DownloadReservationId = operation.DownloadReservationId,
+                        DownloadItem = client, Path = operation.SourcePath, Size = file.Size, Quality = file.Quality, Languages = file.Languages,
+                        MediaInfo = file.MediaInfo, ReleaseGroup = file.ReleaseGroup, Edition = file.Edition, SceneName = file.SceneName,
+                        IndexerFlags = file.IndexerFlags, FileMovieInfo = snapshot.FileMovieInfo, FolderMovieInfo = snapshot.FolderMovieInfo,
+                        SceneSource = snapshot.SceneSource, CustomFormatScore = snapshot.CustomFormatScore, Release = snapshot.Release,
+                        CustomFormats = snapshot.CustomFormats.Select(f => new CustomFormat { Id = f.Id, Name = f.Name }).ToList(), OldFiles = oldFiles
+                    };
+                    _events.PublishEvent(new MovieFileImportedEvent(local, file, oldFiles, true, client) { ImportOperationId = operation.Id });
+                    break;
+                default:
+                    throw new InvalidOperationException("Unknown import event category.");
+            }
+        }
+
+        private void VerifyInstalled(Movie movie, VersionFileImport operation)
+        {
+            Require(Matches(Owned(movie.Path, operation.DestinationRelativePath), operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The installed video changed. Completion remains blocked.");
+            foreach (var extra in operation.Snapshot.IncomingExtras)
+            {
+                Require(extra.State == VersionImportExtraState.Registered && Matches(Owned(movie.Path, extra.DestinationRelativePath), extra.Size, extra.ContentHash), "An installed sidecar changed. Completion remains blocked.");
+            }
+        }
+
+        private bool Matches(string path, long size, string hash) => _disk.FileExists(path) && _disk.GetFileSize(path) == size && string.Equals(_verifier.Hash(path), hash, StringComparison.OrdinalIgnoreCase);
+
+        private static string Owned(string folder, string relative)
+        {
+            Require(!string.IsNullOrWhiteSpace(relative) && !Path.IsPathRooted(relative), "A relative event path inside the movie folder is required.");
+            var path = Path.GetFullPath(Path.Combine(folder, relative));
+            Require(Path.GetFullPath(folder).IsParentPath(path), "An event path escapes the movie folder.");
+            return path;
+        }
+
+        private static MovieFile Copy(MovieFile file) => new MovieFile
+        {
+            Id = file.Id, MovieId = file.MovieId, MovieVersionId = file.MovieVersionId, RelativePath = file.RelativePath,
+            Size = file.Size, DateAdded = file.DateAdded, OriginalFilePath = file.OriginalFilePath, SceneName = file.SceneName,
+            ReleaseGroup = file.ReleaseGroup, Quality = file.Quality, IndexerFlags = file.IndexerFlags,
+            MediaInfo = file.MediaInfo, Edition = file.Edition, Languages = file.Languages?.ToList()
+        };
+
+        private static void Require(bool condition, string message)
+        {
+            if (!condition)
+            {
+                throw new InvalidOperationException(message);
+            }
+        }
+    }
+}
