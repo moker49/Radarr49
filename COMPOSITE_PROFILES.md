@@ -206,7 +206,8 @@ the earlier one is unavailable. Primary selection is independent of download ord
    Managed existing-file metadata refresh preserves its file ID and sidecar ownership.
    Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
-5. Version-aware UI, API summaries and wanted/cutoff queries.
+5. Version-aware missing/quality-cutoff queries, wanted bulk searches and the explicit
+   versions API status are implemented. Finish UI and remaining movie-level API summaries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
 
 ## Single-file assumption inventory
@@ -214,7 +215,7 @@ the earlier one is unavailable. Primary selection is independent of download ord
 | Location | Required change |
 | --- | --- |
 | Movies/Movie.cs | Retain legacy fields as summaries; resolve actual version state explicitly |
-| Movies/MovieRepository.cs | Primary file joins implemented; version-aware missing/cutoff queries remain |
+| Movies/MovieRepository.cs | Primary file joins and version-aware missing/quality-cutoff queries implemented |
 | Movies/MovieService.cs | Managed file-event ownership/summary updates implemented |
 | MediaFiles/UpgradeMediaFileService.cs | Targeted replacement and pre-recycle checks implemented |
 | MediaFiles/MovieImport/ImportApprovedMovie.cs | Movie/version grouping and validation implemented |
@@ -547,10 +548,10 @@ Generation is best effort after the Completed commit, including startup recovery
 in that gap likewise relies on a later scan. Configured metadata may intentionally rewrite or
 rename imported NFO extras after the journal's captured import has completed.
 
-Remaining work is wider filesystem/host restart tests and the existing activation/UI, query
+Remaining work is wider filesystem/host restart tests and the existing activation/UI, remaining movie-level API
 and folder-move lifecycle work. Composite activation remains disabled.
 
-Validation including runtime routing: 1,293 core tests pass, with five existing skips, and 36 profile
+Validation including wanted/version status: 1,324 core tests pass, with five existing skips, and 38 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
@@ -578,7 +579,46 @@ tests remain pending. Runtime tests additionally cover copy/move/auto routing, e
 reservations, failure reporting and pending-intent protection, selected indexer flags,
 in-place metadata refresh, source-folder retention and derived metadata failures. These
 runtime tests exercise real validators and SQLite with simulated disk state.
-Logs: `_temp/managed-runtime-regression.log` and `_temp/managed-runtime-api-tests.log`.
+Wanted/status coverage adds SQLite pagination/count tests, per-child quality/format status,
+queue/target isolation for wanted searches and additive versions API fields. Logs:
+`_temp/version-wanted-regression.log` and `_temp/version-wanted-api-tests.log`.
+
+## Version-aware wanted queries and status
+
+Missing and quality-cutoff queries now use correlated version/file ownership checks instead
+of the singular primary summary. Ordinary movie predicates retain their existing behavior.
+A composite is missing when a monitored child lacks its own registered movie file. A missing
+assignment or a dangling/foreign file pointer also remains visible as missing; searches
+never infer a replacement assignment from the primary file. Unmonitored children do not
+make the movie wanted. The existing root monitoring filter, missing-movie year restriction,
+sort order and pagination remain in place. Both missing children still produce one movie
+row and one counted record, without expanding the library into an in-memory filtered page.
+
+Quality-cutoff selection evaluates each present, monitored child against that child's
+ordinary profile quality cutoff. The composite parent's nominal quality settings do not
+participate. Missing copies belong to the missing query rather than the cutoff query.
+This preserves master's quality-only wanted/cutoff behavior: Custom Format-only upgrades
+are reported separately in version status, not added to the quality-cutoff wanted list.
+Empty cutoff sets return zero records/counts rather than generating invalid SQL or keeping
+a reused page's stale total.
+
+MissingMoviesSearch and CutoffUnmetMoviesSearch select only the eligible movie/version
+pairs, then filter expanded release decisions to those targets before acquisition. They
+do not suppress an entire composite because another version is queued. A queued SDR copy
+can leave HDR eligible; matching queued versions are excluded. Ambiguous or conflicting
+queue version identity blocks that movie conservatively. Ordinary implicit versions keep
+the old whole-movie queue exclusion. The existing reservation/scheduling layer still enforces
+concurrency and release ownership immediately before dispatch.
+
+GET `/api/v3/movie/{movieId}/versions` retains its IDs/profile/ordering/monitoring fields and
+adds `hasFile`, `quality`, `sizeOnDisk`, `qualityCutoffNotMet`, `cutoffNotMet`,
+`customFormatScore` and `error`. Each file is evaluated in its own child profile context;
+the combined cutoff field includes Custom Formats. Presence means valid database file
+ownership, not a new physical disk scan. Missing/foreign registrations have no file/quality
+fallback and report an error when an assigned file ID is invalid. Read-only status uses
+version resolution without acquiring a write context, so pending operations do not prevent
+inspection. Legacy movie-level singular fields remain unchanged by this stage; the new
+UI and remaining aggregate API work must use explicit version status for completeness.
 
 ## Import recovery API
 

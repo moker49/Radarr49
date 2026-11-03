@@ -21,13 +21,22 @@ namespace NzbDrone.Core.IndexerSearch
         private readonly IProcessDownloadDecisions _processDownloadDecisions;
         private readonly IQueueService _queueService;
         private readonly Logger _logger;
+        private readonly IMovieVersionStatusService _versions;
+
+        private enum WantedSearch
+        {
+            None,
+            Missing,
+            QualityCutoff
+        }
 
         public MovieSearchService(IMovieService movieService,
                                    IMovieCutoffService movieCutoffService,
                                    ISearchForReleases releaseSearchService,
                                    IProcessDownloadDecisions processDownloadDecisions,
                                    IQueueService queueService,
-                                   Logger logger)
+                                   Logger logger,
+                                   IMovieVersionStatusService versions)
         {
             _movieService = movieService;
             _movieCutoffService = movieCutoffService;
@@ -35,6 +44,7 @@ namespace NzbDrone.Core.IndexerSearch
             _processDownloadDecisions = processDownloadDecisions;
             _queueService = queueService;
             _logger = logger;
+            _versions = versions;
         }
 
         public void Execute(MoviesSearchCommand message)
@@ -62,10 +72,7 @@ namespace NzbDrone.Core.IndexerSearch
 
             var movies = _movieService.MoviesWithoutFiles(pagingSpec).Records.ToList();
 
-            var queue = _queueService.GetQueue().Where(q => q.Movie != null).Select(q => q.Movie.Id);
-            var missing = movies.Where(e => !queue.Contains(e.Id)).ToList();
-
-            SearchForBulkMovies(missing, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
+            SearchForBulkMovies(movies, message.Trigger == CommandTrigger.Manual, WantedSearch.Missing).GetAwaiter().GetResult();
         }
 
         public void Execute(CutoffUnmetMoviesSearchCommand message)
@@ -82,16 +89,14 @@ namespace NzbDrone.Core.IndexerSearch
 
             var movies = _movieCutoffService.MoviesWhereCutoffUnmet(pagingSpec).Records.ToList();
 
-            var queue = _queueService.GetQueue().Where(q => q.Movie != null).Select(q => q.Movie.Id);
-            var missing = movies.Where(e => !queue.Contains(e.Id)).ToList();
-
-            SearchForBulkMovies(missing, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
+            SearchForBulkMovies(movies, message.Trigger == CommandTrigger.Manual, WantedSearch.QualityCutoff).GetAwaiter().GetResult();
         }
 
-        private async Task SearchForBulkMovies(List<Movie> movies, bool userInvokedSearch)
+        private async Task SearchForBulkMovies(List<Movie> movies, bool userInvokedSearch, WantedSearch wanted = WantedSearch.None)
         {
             _logger.ProgressInfo("Performing search for {0} movies", movies.Count);
             var downloadedCount = 0;
+            var queue = wanted == WantedSearch.None ? null : _queueService.GetQueue();
 
             foreach (var movieId in movies.GroupBy(e => e.Id).OrderBy(g => g.Min(m => m.LastSearchTime ?? DateTime.MinValue)))
             {
@@ -99,7 +104,26 @@ namespace NzbDrone.Core.IndexerSearch
 
                 try
                 {
+                    HashSet<int?> targets = null;
+                    if (wanted != WantedSearch.None)
+                    {
+                        var statuses = _versions.Get(movieId.First());
+                        var queued = queue.Where(q => q.Movie?.Id == movieId.Key).ToList();
+                        targets = statuses.Where(s => s.Version.Monitored && s.Error == null &&
+                                (wanted == WantedSearch.Missing ? !s.HasFile : s.HasFile && s.QualityCutoffNotMet) &&
+                                !IsQueued(queued, s.Version.Id))
+                            .Select(s => s.Version.Id).ToHashSet();
+                        if (targets.Count == 0)
+                        {
+                            continue;
+                        }
+                    }
+
                     decisions = await _releaseSearchService.MovieSearch(movieId.Key, userInvokedSearch, false);
+                    if (targets != null)
+                    {
+                        decisions = decisions.Where(d => d.RemoteMovie?.Movie?.Id == movieId.Key && targets.Contains(d.RemoteMovie.MovieVersionId)).ToList();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -114,5 +138,23 @@ namespace NzbDrone.Core.IndexerSearch
 
             _logger.ProgressInfo("Completed search for {0} movies. {1} reports downloaded.", movies.Count, downloadedCount);
         }
+
+        private static bool IsQueued(IEnumerable<Queue.Queue> queue, int? versionId) => queue.Any(q =>
+        {
+            if (!versionId.HasValue)
+            {
+                return true;
+            }
+
+            var remote = q.RemoteMovie?.MovieVersionId;
+            var context = q.Movie?.ManagedVersion?.Id;
+            if (remote.HasValue && context.HasValue && remote != context)
+            {
+                return true;
+            }
+
+            var queuedVersion = remote ?? context;
+            return !queuedVersion.HasValue || queuedVersion <= 0 || queuedVersion == versionId;
+        });
     }
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Qualities;
 using Radarr.Http;
 
 namespace Radarr.Api.V3.Movies
@@ -11,30 +12,37 @@ namespace Radarr.Api.V3.Movies
     public class MovieVersionsController : Controller
     {
         private readonly IMovieService _movies;
-        private readonly IMovieVersionService _versions;
+        private readonly IMovieVersionStatusService _statuses;
         private readonly IMovieVersionFileDeletionService _deletions;
 
-        public MovieVersionsController(IMovieService movies, IMovieVersionService versions, IMovieVersionFileDeletionService deletions)
+        public MovieVersionsController(IMovieService movies, IMovieVersionStatusService statuses, IMovieVersionFileDeletionService deletions)
         {
             _movies = movies;
-            _versions = versions;
+            _statuses = statuses;
             _deletions = deletions;
         }
 
         [HttpGet]
         public List<MovieVersionResource> Get(int movieId)
         {
-            return _versions.Resolve(_movies.GetMovie(movieId)).Select(v => new MovieVersionResource
+            return _statuses.Get(_movies.GetMovie(movieId)).Select(s => new MovieVersionResource
             {
-                Id = v.Id,
-                MovieId = v.MovieId,
-                CompositeProfileVersionId = v.CompositeProfileVersionId,
-                QualityProfileId = v.QualityProfile.Id,
-                Label = v.Label,
-                Priority = v.Priority,
-                IsPrimary = v.IsPrimary,
-                Monitored = v.Monitored,
-                MovieFileId = v.MovieFileId
+                Id = s.Version.Id,
+                MovieId = s.Version.MovieId,
+                CompositeProfileVersionId = s.Version.CompositeProfileVersionId,
+                QualityProfileId = s.Version.QualityProfile.Id,
+                Label = s.Version.Label,
+                Priority = s.Version.Priority,
+                IsPrimary = s.Version.IsPrimary,
+                Monitored = s.Version.Monitored,
+                MovieFileId = s.Version.MovieFileId,
+                HasFile = s.HasFile,
+                Quality = s.File?.Quality,
+                SizeOnDisk = s.File?.Size ?? 0,
+                QualityCutoffNotMet = s.QualityCutoffNotMet,
+                CutoffNotMet = s.CutoffNotMet,
+                CustomFormatScore = s.CustomFormatScore,
+                Error = s.Error
             }).ToList();
         }
 
@@ -57,6 +65,13 @@ namespace Radarr.Api.V3.Movies
         public bool IsPrimary { get; set; }
         public bool Monitored { get; set; }
         public int? MovieFileId { get; set; }
+        public bool HasFile { get; set; }
+        public QualityModel Quality { get; set; }
+        public long SizeOnDisk { get; set; }
+        public bool QualityCutoffNotMet { get; set; }
+        public bool CutoffNotMet { get; set; }
+        public int CustomFormatScore { get; set; }
+        public string Error { get; set; }
         public bool IsImplicit => !Id.HasValue;
     }
 }

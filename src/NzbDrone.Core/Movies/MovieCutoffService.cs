@@ -45,6 +45,7 @@ namespace NzbDrone.Core.Movies
             if (qualitiesBelowCutoff.Empty())
             {
                 pagingSpec.Records = new List<Movie>();
+                pagingSpec.TotalRecords = 0;
 
                 return pagingSpec;
             }
