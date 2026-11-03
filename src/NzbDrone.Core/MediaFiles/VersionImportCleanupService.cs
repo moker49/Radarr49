@@ -15,7 +15,7 @@ namespace NzbDrone.Core.MediaFiles
 {
     public interface IVersionImportCleanupService
     {
-        void Resume(int movieId, int operationId, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null);
+        void Resume(int movieId, int operationId, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null, int? recoveryIndex = null);
     }
 
     // Stops at EventsPending; notification/history delivery and runtime routing are separate.
@@ -58,7 +58,7 @@ namespace NzbDrone.Core.MediaFiles
             _others = others;
         }
 
-        public void Resume(int movieId, int operationId, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null)
+        public void Resume(int movieId, int operationId, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null, int? recoveryIndex = null)
         {
             lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
@@ -89,7 +89,8 @@ namespace NzbDrone.Core.MediaFiles
                             continue;
                         }
 
-                        RunItem(movie, operation, index, retryPhysical, preserveChangedExtras, preserveChangedSources, note);
+                        var authorized = !recoveryIndex.HasValue || recoveryIndex.Value == index;
+                        RunItem(movie, operation, index, authorized && retryPhysical, authorized && preserveChangedExtras, authorized && preserveChangedSources, note);
                         operation = _operations.Get(operationId);
                     }
 

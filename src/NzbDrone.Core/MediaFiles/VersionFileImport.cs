@@ -64,6 +64,8 @@ namespace NzbDrone.Core.MediaFiles
         public List<VersionImportSourceExtra> IncomingExtras { get; set; } = new List<VersionImportSourceExtra>();
         public List<VersionImportCleanupItem> Cleanup { get; set; }
         public VersionImportEventProgress Events { get; set; }
+        public string LastRecoveryError { get; set; }
+        public DateTime? LastRecoveryAttempt { get; set; }
     }
 
     public class VersionImportFormat : IEmbeddedDocument

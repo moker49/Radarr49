@@ -14,6 +14,8 @@ namespace NzbDrone.Core.MediaFiles
     public interface IVersionFileImportRepository : IBasicRepository<VersionFileImport>
     {
         List<VersionFileImport> ForMovie(int movieId);
+        List<VersionFileImport> Pending();
+        void RecordRecoveryResult(int id, string error);
         VersionFileImport Begin(VersionFileImport intent);
         void Advance(int id, VersionFileImportState expected, VersionFileImportState next);
         MovieFile Register(int id);
@@ -40,6 +42,24 @@ namespace NzbDrone.Core.MediaFiles
         }
 
         public List<VersionFileImport> ForMovie(int movieId) => Query(r => r.MovieId == movieId);
+        public List<VersionFileImport> Pending() => Query(r => r.State != VersionFileImportState.Completed && r.State != VersionFileImportState.Cancelled);
+
+        public void RecordRecoveryResult(int id, string error)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            if (row.State == VersionFileImportState.Completed && error != null)
+            {
+                transaction.Commit();
+                return;
+            }
+
+            row.Snapshot.LastRecoveryAttempt = DateTime.UtcNow;
+            row.Snapshot.LastRecoveryError = error?.Length > 2000 ? error[..2000] : error;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
 
         public VersionFileImport Begin(VersionFileImport intent)
         {

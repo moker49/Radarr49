@@ -204,8 +204,8 @@ the earlier one is unavailable. Primary selection is independent of download ord
    are also implemented as an internal primitive. Runtime imports still use the existing
    standard recycle-before-transfer behavior until durable finalization is ready. Durable
    old-extra and backup/source cleanup now reach EventsPending internally, and durable
-   audit recording/event checkpoints reach Completed. Finish recovery APIs and restart
-   integration before routing
+   audit recording/event checkpoints reach Completed. Recovery inspection/resume/cancel
+   APIs and phase-aware startup replay are implemented. Finish runtime integration before routing
    managed imports through the new journal. Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
@@ -513,12 +513,20 @@ transactional and recorded once; external notifications retain existing best-eff
 and may be duplicated after an interrupted dispatch. Exactly-once external effects are
 not promised. Subscriber changes to installed content block the final completion check.
 
-There is no public begin/resume/complete import route and no startup replay of these
-primitives. Normal runtime imports do not call them yet. Remaining work is operator recovery
-APIs, a phase-aware coordinator/startup replay and runtime routing, plus real-filesystem
-restart tests. Folder-move recovery is separate.
+VersionImportRecoveryService now coordinates the remaining phases from the saved state
+under the shared movie mutation lock. Every phase must reach its defined next checkpoint;
+an implementation returning without progress stops recovery instead of looping. Startup
+attempts each pending intent once, with no physical retry/preservation overrides. A blocked
+intent retains its gates and diagnostic error while other intents continue. Completed and
+cancelled intents are excluded from startup selection. Recovery attempts/errors are persisted
+in the existing embedded snapshot and successful recovery clears the previous error.
 
-Validation including the completion stage: 1,243 core tests pass, with five existing skips, and 29 profile
+Recovery inspection/resume/cancel routes are described below. There is no public begin or
+force-complete route. Normal runtime imports do not create/call these intents yet. Remaining
+work is runtime routing, wider filesystem/host restart tests and the existing activation/UI,
+query and folder-move lifecycle work. Composite activation remains disabled.
+
+Validation including the recovery API/startup stage: 1,273 core tests pass, with five existing skips, and 36 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
@@ -535,10 +543,45 @@ reassigned claims, changed content, reappearing files and unfinished phase gates
 coverage includes atomic audit rollback, concurrent preparation, interrupted dispatch,
 ordered replay, captured event payloads, missing/changed audit rows, final commit failure,
 legacy subscriber isolation and download-completion gating through the final checkpoint.
-Filesystem
-handoff tests use a simulated disk and real SQLite; full real-filesystem/restart integration
-remains pending. Logs: `_temp/import-completion-regression.log` and
-`_temp/import-completion-api-tests.log`.
+Recovery tests cover all saved phases, stale checkpoints, single-entry overrides, cancellation,
+error retention/clearing and startup continuation after a blocked intent. Most handoff tests
+use a simulated disk and real SQLite. A real-filesystem integration test uses actual bytes,
+copies, moves, SHA-256 verification and a temporary recycle directory: it interrupts the old
+video backup move, invokes the startup event handler and verifies completed import, subtitle,
+HDR preservation and source cleanup. This simulates an interrupted checkpoint within the test
+process; full hosted-process termination/relaunch, remote mounts and cross-filesystem transfer
+tests remain pending. Logs: `_temp/import-recovery-regression.log` and
+`_temp/import-recovery-api-tests.log`.
+
+## Import recovery API
+
+GET `/api/v3/movie/{movieId}/versionfileimports` lists journal operations. GET
+`.../{operationId}` inspects one operation with route ownership enforced. Resources include
+version/file/reservation IDs, state, source/destination/staging/backup paths and content
+identities, sidecar checkpoints, indexed cleanup entries, current cleanup index, event
+checkpoints, audit IDs, cancellation eligibility, timestamps and the last recovery error.
+Raw embedded snapshots, release details and download-client configuration are not exposed.
+
+POST `.../{operationId}/resume` accepts `{}` to continue ordinary forward recovery through
+completion. It performs synchronous disk work; large-file copies/hashes can make the request
+long-running. A client timeout does not cancel an already executing intent. Inspect the
+persisted operation before retrying. An optional `checkpoint` must match the inspection
+resource when supplied; stale checkpoints return HTTP 409 before running a phase.
+
+Physical overrides require that exact `checkpoint` and a nonempty verification `note`:
+`retryPhysical: true` retries only the current cleanup entry already marked Recycling;
+`preserveChangedExtras: true` applies only to the current old-extra entry; and
+`preserveChangedSources: true` applies only to the current source entry. Overrides cannot be
+authorized from an earlier phase for future cleanup. They are scoped to that one indexed
+entry: if a later file also needs verification, recovery stops again and requires a fresh
+inspection/checkpoint. Hash/ownership checks still apply. Diagnostics/progress changes can
+change the checkpoint, so retrieve it again after a failed attempt.
+
+POST `.../{operationId}/cancel` requires `checkpoint` and `note`. It cancels only Prepared,
+Staging or Staged intents, before the previous-file backup marker. Original files remain
+unchanged; any private staging artifacts are deliberately retained for inspection. It cannot
+cancel once backing up may have begun. There is no legacy DELETE route for journal intents,
+and no API timeout automatically releases an unfinished intent.
 
 ## Manual import API
 
