@@ -185,8 +185,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
    Add version-aware activation/conversion orchestration, events and assignment
    reconciliation, including files and downloads already in flight, before exposing it.
 3. Search/RSS expansion, scoped comparisons, prefer-first ordering and durable dispatch
-   reservations are implemented. Finish integration with version-aware imports and manual
-   import context, and add end-to-end recovery checks before activation. Manual imports of
+   reservations are implemented. Version-aware runtime imports and manual import context
+   now use the journal, with database-backed recovery checks. Expand full host/filesystem
+   lifecycle coverage before activation. Manual imports of
    a reserved download must retain its bound client/download identity; never infer that
    association from a sole pending job. Keep active and currently owned reservations during
    housekeeping. Targeted file deletion now preserves reservation audit rows and expires
@@ -199,14 +200,11 @@ the earlier one is unavailable. Primary selection is independent of download ord
    audit notifications
    and remaining command paths. Legacy folder moves are protected, not enabled for composites.
    Managed download script imports are rejected pending dedicated
-   support. A durable main-file import handoff is now implemented and tested as an internal
-   primitive, through registration. Durable incoming-sidecar installation and registration
-   are also implemented as an internal primitive. Runtime imports still use the existing
-   standard recycle-before-transfer behavior until durable finalization is ready. Durable
-   old-extra and backup/source cleanup now reach EventsPending internally, and durable
-   audit recording/event checkpoints reach Completed. Recovery inspection/resume/cancel
-   APIs and phase-aware startup replay are implemented. Finish runtime integration before routing
-   managed imports through the new journal. Explicit version-file deletion has durable
+   support. Managed new-download/replacement imports now use the durable handoff, sidecar,
+   cleanup and completion journal. Ordinary imports retain their existing behavior.
+   Recovery inspection/resume/cancel APIs and phase-aware startup replay are implemented.
+   Managed existing-file metadata refresh preserves its file ID and sidecar ownership.
+   Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
@@ -317,8 +315,8 @@ An explicit physical retry still requires operator verification of the original 
 The supported runtime assumes one application instance owns the media filesystem; the
 database locks/indexes protect records but do not provide a distributed filesystem lease.
 
-Upgrades/imports now have the internal main-file handoff foundation described below;
-finalization and runtime routing remain unfinished. Folder moves still lack equivalent
+Managed new-download/replacement imports now use the complete journal described below;
+existing-file metadata refresh updates the existing registration in place. Folder moves still lack equivalent
 operation recovery. Composite activation remains disabled until those lifecycle paths
 and the remaining UI/API work are ready. No running development app was restarted by
 these test/build steps.
@@ -394,7 +392,7 @@ unfinished operation. Inspection/resumption is scoped to the route's owning movi
 | Completed | Journal no longer blocks writes; exact request can replay safely |
 | Cancelled | Unstarted intent cancelled; files and monitoring were not changed |
 
-## Import handoff foundation (internal, not runtime-routed)
+## Durable managed import pipeline
 
 Migration 250 adds VersionFileImports. VersionImportHandoffService prepares a detached
 snapshot of the incoming file, previous file, reservation identity and source/old sidecars.
@@ -522,11 +520,37 @@ cancelled intents are excluded from startup selection. Recovery attempts/errors 
 in the existing embedded snapshot and successful recovery clears the previous error.
 
 Recovery inspection/resume/cancel routes are described below. There is no public begin or
-force-complete route. Normal runtime imports do not create/call these intents yet. Remaining
-work is runtime routing, wider filesystem/host restart tests and the existing activation/UI,
-query and folder-move lifecycle work. Composite activation remains disabled.
+force-complete route. ImportApprovedMovie now sends managed new-download/replacement
+imports through ManagedMovieImportService: prepare an intent, run the recovery coordinator
+through Completed, then reload the committed version/file context. Only then is an Imported
+result returned. The importer does not run legacy replacement, registration, source-extra
+import or duplicate import events for this path. Failed intents return a skipped result
+identifying the operation/recovery API. Routine later import attempts are blocked by the
+unfinished-operation guard instead of starting another intent or authorizing physical retries.
+The legacy recycle-before-transfer upgrader also explicitly rejects managed replacements.
 
-Validation including the recovery API/startup stage: 1,273 core tests pass, with five existing skips, and 36 profile
+Auto mode uses the actual bound LocalMovie.DownloadItem when no separate client argument is
+provided; Copy and Move retain their explicit choices. Managed imports retain their selected
+indexer flags rather than guessing them from a potentially reused download ID. Automatic and
+manual folder imports disable recursive source-folder removal for managed results/contexts;
+only captured journal files can be removed. Uncaptured and explicitly preserved sources remain.
+
+Managed existing-file registration still avoids transfer/replacement. Refreshing an already
+registered file updates its metadata in place, preserving file ID, DateAdded, scene/original
+source information and attached extras. An unassigned existing file still requires explicit
+version selection and uses atomic version-file registration.
+
+After durable completion, generated metadata is invoked separately from source-sidecar import.
+Its managed assignment is rechecked. A metadata-provider failure logs a warning but does not
+make the completed import retry or recopy sidecars; a later scan can regenerate metadata.
+Generation is best effort after the Completed commit, including startup recovery, so a crash
+in that gap likewise relies on a later scan. Configured metadata may intentionally rewrite or
+rename imported NFO extras after the journal's captured import has completed.
+
+Remaining work is wider filesystem/host restart tests and the existing activation/UI, query
+and folder-move lifecycle work. Composite activation remains disabled.
+
+Validation including runtime routing: 1,293 core tests pass, with five existing skips, and 36 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
@@ -550,8 +574,11 @@ copies, moves, SHA-256 verification and a temporary recycle directory: it interr
 video backup move, invokes the startup event handler and verifies completed import, subtitle,
 HDR preservation and source cleanup. This simulates an interrupted checkpoint within the test
 process; full hosted-process termination/relaunch, remote mounts and cross-filesystem transfer
-tests remain pending. Logs: `_temp/import-recovery-regression.log` and
-`_temp/import-recovery-api-tests.log`.
+tests remain pending. Runtime tests additionally cover copy/move/auto routing, exact bound
+reservations, failure reporting and pending-intent protection, selected indexer flags,
+in-place metadata refresh, source-folder retention and derived metadata failures. These
+runtime tests exercise real validators and SQLite with simulated disk state.
+Logs: `_temp/managed-runtime-regression.log` and `_temp/managed-runtime-api-tests.log`.
 
 ## Import recovery API
 

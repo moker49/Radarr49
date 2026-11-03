@@ -95,6 +95,30 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void managed_folder_import_should_leave_uncaptured_or_preserved_files_in_place()
+        {
+            GivenValidMovie();
+            GivenSuccessfulImport();
+            Mocker.GetMock<IImportApprovedMovie>()
+                .Setup(v => v.Import(It.IsAny<List<ImportDecision>>(), It.IsAny<bool>(), It.IsAny<DownloadClientItem>(), It.IsAny<ImportMode>()))
+                .Returns<List<ImportDecision>, bool, DownloadClientItem, ImportMode>((decisions, fresh, item, mode) =>
+                {
+                    WasImportedResponse();
+                    return new List<ImportResult> { new ImportResult(new ImportDecision(new LocalMovie { MovieVersionId = 7 })) };
+                });
+            Subject.ProcessPath(_droneFactory, ImportMode.Move, _trackedDownload.RemoteMovie.Movie, _trackedDownload.DownloadItem);
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.DeleteFolder(It.IsAny<string>(), true), Times.Never());
+        }
+
+        [Test]
+        public void explicit_managed_context_should_never_allow_recursive_source_cleanup()
+        {
+            var movie = new Movie { ManagedVersion = new ResolvedMovieVersion { Id = 7 } };
+            Assert.That(Subject.ShouldDeleteFolder(new DirectoryInfo(_droneFactory), movie), Is.False);
+            Mocker.GetMock<IDiskScanService>().Verify(v => v.GetVideoFiles(It.IsAny<string>(), It.IsAny<bool>()), Times.Never());
+        }
+
+        [Test]
         public void should_search_for_series_using_folder_name()
         {
             Subject.ProcessRootFolder(new DirectoryInfo(_droneFactory));

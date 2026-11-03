@@ -115,6 +115,11 @@ namespace NzbDrone.Core.MediaFiles
 
         public bool ShouldDeleteFolder(DirectoryInfo directoryInfo, Movie movie)
         {
+            if (movie?.ManagedVersion?.Id.HasValue == true)
+            {
+                return false;
+            }
+
             try
             {
                 var videoFiles = _diskScanService.GetVideoFiles(directoryInfo.FullName);
@@ -224,6 +229,7 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             if (importMode == ImportMode.Move &&
+                !importResults.Any(r => r.ImportDecision.LocalMovie?.MovieVersionId.HasValue == true || r.ImportDecision.LocalMovie?.Movie?.ManagedVersion?.Id.HasValue == true) &&
                 importResults.Any(i => i.Result == ImportResultType.Imported) &&
                 ShouldDeleteFolder(directoryInfo, movie))
             {

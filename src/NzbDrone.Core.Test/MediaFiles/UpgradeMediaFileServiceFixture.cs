@@ -56,6 +56,16 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void managed_replacement_should_never_enter_recycle_before_transfer_path()
+        {
+            GivenSingleMovieWithSingleMovieFile();
+            _localMovie.MovieVersionId = 7;
+            Assert.Throws<MovieVersionImportException>(() => Subject.UpgradeMovieFile(_movieFile, _localMovie));
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
+        }
+
+        [Test]
         public void should_delete_single_movie_file_once()
         {
             GivenSingleMovieWithSingleMovieFile();

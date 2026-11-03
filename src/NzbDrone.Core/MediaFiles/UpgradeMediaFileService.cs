@@ -40,6 +40,10 @@ namespace NzbDrone.Core.MediaFiles
         {
             _logger.Trace("Upgrading movie file.");
             _versionImports.ValidateForWrite(localMovie, localMovie.DownloadItem, true);
+            if (localMovie.MovieVersionId.HasValue || localMovie.Movie.ManagedVersion?.Id.HasValue == true)
+            {
+                throw new MovieVersionImportException("Managed replacements must use the durable version import pipeline.");
+            }
 
             var moveFileResult = new MovieFileMoveResult();
 

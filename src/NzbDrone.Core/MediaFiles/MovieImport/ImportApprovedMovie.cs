@@ -35,6 +35,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly Logger _logger;
         private readonly IMovieVersionImportService _versionImports;
+        private readonly IManagedMovieImportService _managedImports;
 
         public ImportApprovedMovie(IUpgradeMediaFiles movieFileUpgrader,
                                    IMediaFileService mediaFileService,
@@ -45,7 +46,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                                    IEventAggregator eventAggregator,
                                    IManageCommandQueue commandQueueManager,
                                    Logger logger,
-                                   IMovieVersionImportService versionImports)
+                                   IMovieVersionImportService versionImports,
+                                   IManagedMovieImportService managedImports)
         {
             _movieFileUpgrader = movieFileUpgrader;
             _mediaFileService = mediaFileService;
@@ -57,6 +59,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _commandQueueManager = commandQueueManager;
             _logger = logger;
             _versionImports = versionImports;
+            _managedImports = managedImports;
         }
 
         public List<ImportResult> Import(List<ImportDecision> decisions, bool newDownload, DownloadClientItem downloadClientItem = null, ImportMode importMode = ImportMode.Auto)
@@ -107,9 +110,14 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                         movieFile.ReleaseGroup = localMovie.ReleaseGroup;
                         movieFile.Edition = localMovie.Edition;
 
-                        if (downloadClientItem?.DownloadId.IsNotNullOrWhiteSpace() == true)
+                        var client = localMovie.DownloadItem;
+                        if (localMovie.MovieVersionId.HasValue)
                         {
-                            var grabHistory = _historyService.FindByDownloadId(downloadClientItem.DownloadId)
+                            movieFile.IndexerFlags = localMovie.IndexerFlags;
+                        }
+                        else if (client?.DownloadId.IsNotNullOrWhiteSpace() == true)
+                        {
+                            var grabHistory = _historyService.FindByDownloadId(client.DownloadId)
                                 .OrderByDescending(h => h.Date)
                                 .FirstOrDefault(h => h.EventType == MovieHistoryEventType.Grabbed && h.MovieVersionId == localMovie.MovieVersionId);
 
@@ -128,7 +136,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                         {
                             default:
                             case ImportMode.Auto:
-                                copyOnly = downloadClientItem is { CanMoveFiles: false };
+                                copyOnly = client is { CanMoveFiles: false };
                                 break;
                             case ImportMode.Move:
                                 copyOnly = false;
@@ -141,12 +149,34 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                         if (newDownload)
                         {
                             movieFile.SceneName = localMovie.SceneName;
-                            movieFile.OriginalFilePath = GetOriginalFilePath(downloadClientItem, localMovie);
+                            movieFile.OriginalFilePath = GetOriginalFilePath(client, localMovie);
+
+                            if (localMovie.MovieVersionId.HasValue)
+                            {
+                                _managedImports.Import(localMovie, movieFile, copyOnly);
+                                importResults.Add(new ImportResult(importDecision));
+                                continue;
+                            }
 
                             oldFiles = _movieFileUpgrader.UpgradeMovieFile(movieFile, localMovie, copyOnly).OldFiles;
                         }
                         else
                         {
+                            if (localMovie.MovieVersionId.HasValue && localMovie.Movie.MovieFile != null)
+                            {
+                                var current = localMovie.Movie.MovieFile;
+                                movieFile.Id = current.Id;
+                                movieFile.RelativePath = current.RelativePath;
+                                movieFile.DateAdded = current.DateAdded;
+                                movieFile.SceneName = current.SceneName;
+                                movieFile.OriginalFilePath = current.OriginalFilePath;
+                                _mediaFileService.Update(movieFile);
+                                localMovie.Movie.MovieFile = movieFile;
+                                importResults.Add(new ImportResult(importDecision));
+                                _eventAggregator.PublishEvent(new MovieFileImportedEvent(localMovie, movieFile, oldFiles, false, client));
+                                continue;
+                            }
+
                             movieFile.RelativePath = localMovie.Movie.Path.GetRelativePath(movieFile.Path);
 
                             // Delete existing files from the DB mapped to this path
@@ -181,7 +211,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                             }
                         }
 
-                        _eventAggregator.PublishEvent(new MovieFileImportedEvent(localMovie, movieFile, oldFiles, newDownload, downloadClientItem));
+                        _eventAggregator.PublishEvent(new MovieFileImportedEvent(localMovie, movieFile, oldFiles, newDownload, client));
                     }
                     catch (MovieVersionImportException ex)
                     {

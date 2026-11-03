@@ -25,7 +25,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
     [TestFixture]
 
     // TODO: Update all of this for movies.
-    public class ImportApprovedMoviesFixture : CoreTest<ImportApprovedMovie>
+    public partial class ImportApprovedMoviesFixture : CoreTest<ImportApprovedMovie>
     {
         private List<ImportDecision> _rejectedDecisions;
         private List<ImportDecision> _approvedDecisions;
@@ -136,6 +136,8 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             var first = _approvedDecisions.First().LocalMovie;
             first.MovieVersionId = 7;
             var second = new LocalMovie { Movie = first.Movie, MovieVersionId = 8, Path = first.Path + ".hdr.mkv", Quality = first.Quality };
+            Mocker.GetMock<IMovieVersionImportService>().Setup(v => v.ValidateForWrite(It.IsAny<LocalMovie>(), null, false))
+                .Callback<LocalMovie, DownloadClientItem, bool>((local, client, fresh) => local.Movie = local.Movie.WithVersion(new ResolvedMovieVersion { Id = local.MovieVersionId, QualityProfile = local.Movie.QualityProfile }, null));
 
             var results = Subject.Import(new List<ImportDecision> { new ImportDecision(first), new ImportDecision(second) }, false);
 

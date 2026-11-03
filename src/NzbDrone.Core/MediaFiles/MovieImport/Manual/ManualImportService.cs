@@ -529,6 +529,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                     continue;
                 }
 
+                if (trackedDownload.MovieVersionId.HasValue || importMovie.ManagedVersion?.Id.HasValue == true)
+                {
+                    // The journal owns exact source cleanup; retained files must survive.
+                    continue;
+                }
+
                 if (_diskProvider.FolderExists(outputPath))
                 {
                     if (_downloadedMovieImportService.ShouldDeleteFolder(

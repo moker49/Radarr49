@@ -19,8 +19,7 @@ using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.MediaFiles
 {
-    // This primitive intentionally stops at Registered. Runtime routing is deferred until
-    // durable extras, source cleanup and event finalization can complete the operation.
+    // Main-file handoff stops at Registered; the coordinator runs later phases.
     public interface IVersionImportHandoffService
     {
         VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly);

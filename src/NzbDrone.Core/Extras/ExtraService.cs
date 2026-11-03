@@ -19,6 +19,7 @@ namespace NzbDrone.Core.Extras
     {
         void MoveFilesAfterRename(Movie movie, MovieFile movieFile);
         void ImportMovie(LocalMovie localMovie, MovieFile movieFile, bool isReadOnly);
+        void CreateAfterMovieImport(Movie movie, MovieFile movieFile);
     }
 
     public class ExtraService : IExtraService,
@@ -104,11 +105,23 @@ namespace NzbDrone.Core.Extras
             }
         }
 
-        private void CreateAfterMovieImport(Movie movie, MovieFile movieFile)
+        public void CreateAfterMovieImport(Movie movie, MovieFile movieFile)
         {
-            foreach (var extraFileManager in _extraFileManagers)
+            lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
             {
-                extraFileManager.CreateAfterMovieImport(movie, movieFile);
+                if (movie.ManagedVersion?.Id is int versionId)
+                {
+                    var current = _versions.ForVersion(_movieService.GetMovie(movie.Id), versionId);
+                    if (current.MovieFileId != movieFile.Id)
+                    {
+                        throw new InvalidOperationException("The managed file assignment changed before metadata generation.");
+                    }
+                }
+
+                foreach (var extraFileManager in _extraFileManagers)
+                {
+                    extraFileManager.CreateAfterMovieImport(movie, movieFile);
+                }
             }
         }
 

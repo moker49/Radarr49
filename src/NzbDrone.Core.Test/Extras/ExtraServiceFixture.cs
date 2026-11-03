@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using FizzWare.NBuilder;
@@ -104,6 +105,29 @@ namespace NzbDrone.Core.Test.Extras
 
             Mocker.GetMock<IDiskProvider>().Setup(v => v.FileExists(path)).Returns(exists);
             Mocker.GetMock<IDiskProvider>().Setup(v => v.GetFileSize(path)).Returns(size);
+        }
+
+        [Test]
+        public void metadata_generation_after_managed_import_should_not_import_sources_again()
+        {
+            _movie.ManagedVersion = new ResolvedMovieVersion { Id = 7 };
+            _movie.MovieFileId = _movieFile.Id;
+            Mocker.GetMock<IMovieService>().Setup(v => v.GetMovie(_movie.Id)).Returns(_movie);
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.ForVersion(_movie, 7)).Returns(_movie);
+            Subject.CreateAfterMovieImport(_movie, _movieFile);
+            _subtitleService.Verify(v => v.CreateAfterMovieImport(_movie, _movieFile), Times.Once());
+            _otherExtraService.Verify(v => v.CreateAfterMovieImport(_movie, _movieFile), Times.Once());
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.GetFiles(It.IsAny<string>(), It.IsAny<bool>()), Times.Never());
+        }
+
+        [Test]
+        public void changed_managed_assignment_should_block_metadata_generation()
+        {
+            _movie.ManagedVersion = new ResolvedMovieVersion { Id = 7 };
+            Mocker.GetMock<IMovieService>().Setup(v => v.GetMovie(_movie.Id)).Returns(_movie);
+            Mocker.GetMock<IMovieVersionService>().Setup(v => v.ForVersion(_movie, 7)).Returns(new Movie { MovieFileId = _movieFile.Id + 1 });
+            Assert.Throws<InvalidOperationException>(() => Subject.CreateAfterMovieImport(_movie, _movieFile));
+            _subtitleService.Verify(v => v.CreateAfterMovieImport(It.IsAny<Movie>(), It.IsAny<MovieFile>()), Times.Never());
         }
 
         private void WithExistingFiles(List<string> files)

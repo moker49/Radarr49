@@ -77,6 +77,16 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
         }
 
         [Test]
+        public void verified_managed_import_should_not_recursively_delete_retained_sources()
+        {
+            Mocker.GetMock<ICompletedDownloadService>().Setup(v => v.VerifyImport(_download, It.IsAny<List<ImportResult>>())).Returns(true);
+            Mocker.GetMock<IDiskProvider>().Setup(v => v.FolderExists(It.IsAny<string>())).Returns(true);
+            Mocker.GetMock<IDownloadedMovieImportService>().Setup(v => v.ShouldDeleteFolder(It.IsAny<DirectoryInfo>(), _movie)).Returns(true);
+            Subject.Execute(new ManualImportCommand { Files = new List<ManualImportFile> { _file } });
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.DeleteFolder(It.IsAny<string>(), true), Times.Never());
+        }
+
+        [Test]
         public void invalid_later_selection_should_fail_before_any_imports()
         {
             var invalid = new ManualImportFile { MovieId = 1, Path = _file.Path + ".other.mkv" };
