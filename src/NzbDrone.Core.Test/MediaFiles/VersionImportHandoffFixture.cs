@@ -28,7 +28,7 @@ using NzbDrone.Test.Common;
 namespace NzbDrone.Core.Test.MediaFiles
 {
     [TestFixture]
-    public class VersionImportHandoffFixture : DbTest<VersionImportHandoffService, VersionFileImport>
+    public partial class VersionImportHandoffFixture : DbTest<VersionImportHandoffService, VersionFileImport>
     {
         private Movie _movie;
         private MovieVersion _sdr;
@@ -110,7 +110,7 @@ namespace NzbDrone.Core.Test.MediaFiles
                 DownloadReservationId = _reservation?.Id,
                 DownloadItem = _reservation == null ? null : new DownloadClientItem { DownloadId = _reservation.DownloadId, DownloadClientInfo = new DownloadClientItemClientInfo { Id = _reservation.DownloadClientId } }
             };
-            return Subject.Prepare(local, File(null), false);
+            return Subject.Prepare(local, File(null), _copyOnly);
         }
 
         private void Move(string source, string destination)

@@ -59,6 +59,7 @@ namespace NzbDrone.Core.MediaFiles
         public string DownloadId { get; set; }
         public List<VersionFileDeletionExtra> PreviousExtras { get; set; } = new List<VersionFileDeletionExtra>();
         public List<VersionImportSourceExtra> IncomingExtras { get; set; } = new List<VersionImportSourceExtra>();
+        public List<VersionImportCleanupItem> Cleanup { get; set; }
     }
 
     public class VersionImportSourceExtra : IEmbeddedDocument
@@ -83,5 +84,35 @@ namespace NzbDrone.Core.MediaFiles
         BackingUp = 3,
         Installing = 4,
         Registered = 5
+    }
+
+    public enum VersionImportCleanupKind
+    {
+        OldExtra = 0,
+        Backup = 1,
+        Source = 2
+    }
+
+    public enum VersionImportCleanupState
+    {
+        Prepared = 0,
+        Recycling = 1,
+        Finished = 2
+    }
+
+    public class VersionImportCleanupItem : IEmbeddedDocument
+    {
+        // Source paths are absolute; old extras and backups are movie-relative.
+        public VersionImportCleanupKind Kind { get; set; }
+        public string Path { get; set; }
+        public bool Existed { get; set; }
+        public long Size { get; set; }
+        public string ContentHash { get; set; }
+        public bool Preserve { get; set; }
+        public string Table { get; set; }
+        public int? ExtraId { get; set; }
+        public VersionImportCleanupState State { get; set; }
+        public string RecyclePath { get; set; }
+        public string Note { get; set; }
     }
 }

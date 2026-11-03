@@ -202,8 +202,9 @@ the earlier one is unavailable. Primary selection is independent of download ord
    support. A durable main-file import handoff is now implemented and tested as an internal
    primitive, through registration. Durable incoming-sidecar installation and registration
    are also implemented as an internal primitive. Runtime imports still use the existing
-   standard recycle-before-transfer behavior until durable finalization is ready. Finish
-   old-extra cleanup, backup/source cleanup and event delivery before routing
+   standard recycle-before-transfer behavior until durable finalization is ready. Durable
+   old-extra and backup/source cleanup now reach EventsPending internally. Finish event
+   delivery, recovery APIs and restart integration before routing
    managed imports through the new journal. Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
@@ -403,7 +404,8 @@ The handoff always makes a full isolated staging copy, even when ordinary import
 prefer hardlinks or moves. This costs additional disk space and sequential I/O. It verifies
 that copy before moving the previous version to a private backup under
 `.radarr-version-imports/{operation}/`. It then installs the incoming file without overwrite.
-The original download remains present regardless of the eventual copy/move choice.
+The original download remains present throughout the handoff, until the separate cleanup
+runner applies the persisted copy/move choice.
 
 | Checkpoint | Recovery behavior |
 | --- | --- |
@@ -446,16 +448,46 @@ reservation are revalidated as well.
 
 CleaningOldExtras remains active. The sidecar runner stops there, with video/sidecar
 sources, all previous-file backups and non-replaced old extra registrations retained.
-Subsequent cleanup must distinguish replaced sidecars (whose previous content is at
-their private backup) from untouched old extras; it must never recycle an installed
-replacement using an old snapshot's destination path. No cleanup events are emitted yet.
+
+VersionImportCleanupService now continues through CleaningOldExtras, RecyclingBackup and
+RemovingSource to EventsPending. A manifest is persisted inside the existing snapshot
+before cleanup starts; no additional schema migration or existing movie conversion is
+needed. Each entry has Prepared, Recycling and Finished checkpoints, captured content
+identity, preservation choice, recycle destination when known and verification notes.
+
+Replaced sidecars retain their installed destination and new registration. Only their
+private previous-content backups are recycled. Untouched obsolete extras lose only their
+exact previous registrations, in the same transaction that commits the cleanup checkpoint.
+Snapshot-protected/shared extras and paths newly claimed by another owner retain their
+physical files. Duplicate old registrations for one physical path recycle it at most once.
+Video and sidecar backups require their captured SHA-256 identities and stay confined to
+the private import area. Installed replacement paths can never be cleanup targets.
+
+The runner revalidates installed video/sidecar contents at each phase boundary and checks
+their registrations and imported reservation before checkpoint changes. Full-video hashing
+is bounded by phases, rather than repeated for every cleanup entry. It retains the
+single-application movie mutation lock across the run; external writers do not participate
+in that lock. Move imports recycle the captured video and sidecar sources last. Copy
+imports retain all sources. Recycling honors the configured recycle bin; without one the
+existing provider permanently deletes files. No source directories are recursively removed.
+
+Recovery accepts an already absent file without attempting another recycle. An existing
+file after a Recycling checkpoint requires `retryPhysical: true` plus a nonempty inspection
+note, and must still match its captured hash. Changed extras or sources can be explicitly
+preserved with `preserveChangedExtras` / `preserveChangedSources` and a note. These options
+cannot bypass a changed backup identity or installed-file ownership checks. Finished
+entries are never revisited, even if a new file later appears at their original path.
+
+EventsPending is deliberately still active: no events have been emitted and client
+completion/writer gates remain closed. Event/history delivery and the final Completed
+transition are the next step.
 
 There is no public begin/resume/complete import route and no startup replay of these
-primitives. Normal runtime imports do not call them yet. Remaining work is old-extra
-cleanup, backup/source cleanup, event/history dispatch and operator recovery APIs,
+primitives. Normal runtime imports do not call them yet. Remaining work is event/history
+dispatch and operator recovery APIs,
 followed by runtime routing and restart integration. Folder-move recovery is separate.
 
-Validation including the incoming-sidecar stage: 1,197 core tests pass, with five existing skips, and 29 profile
+Validation including the cleanup stage: 1,222 core tests pass, with five existing skips, and 29 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
@@ -465,10 +497,13 @@ cross-operation gates, pending sidecar retention and delayed download completion
 additional sidecar tests cover fresh installs and replacements, language/tag suffixes,
 other extras, interruptions after both physical moves, registration rollback/retry,
 changed sources/destinations/backups/owners/reservations, shared-file protection,
-stable captured settings and premature finalization rejection. Filesystem
+stable captured settings and premature finalization rejection. Twenty-five cleanup tests
+cover obsolete and replaced sidecars, copy/move source handling, interruptions before/after
+physical recycling, atomic checkpoint rollback, explicit retry/preservation, duplicate and
+reassigned claims, changed content, reappearing files and unfinished phase gates. Filesystem
 handoff tests use a simulated disk and real SQLite; full real-filesystem/restart integration
-remains pending. Logs: `_temp/import-sidecar-regression.log` and
-`_temp/import-sidecar-api-tests.log`.
+remains pending. Logs: `_temp/import-cleanup-regression.log` and
+`_temp/import-cleanup-api-tests.log`.
 
 ## Manual import API
 

@@ -22,6 +22,10 @@ namespace NzbDrone.Core.MediaFiles
         void AdvanceExtra(int id, int index, VersionImportExtraState expected, VersionImportExtraState next);
         void RegisterExtra(int id, int index);
         void FinishExtras(int id);
+        void BeginCleanup(int id);
+        void StartCleanupItem(int id, int index, string note);
+        void FinishCleanupItem(int id, int index, VersionImportCleanupState expected, bool preserve, string recyclePath, string note);
+        void AdvanceCleanup(int id, VersionFileImportState expected, VersionFileImportState next);
     }
 
     public class VersionFileImportRepository : BasicRepository<VersionFileImport>, IVersionFileImportRepository
@@ -204,6 +208,101 @@ namespace NzbDrone.Core.MediaFiles
             var row = Load(connection, transaction, id);
             CheckRegisteredOwnership(connection, transaction, row);
             Require(row.State == VersionFileImportState.Finalizing && row.Snapshot.IncomingExtras.All(e => e.State == VersionImportExtraState.Registered), "All incoming sidecars must be registered before old-extra cleanup.");
+            CheckInstalledExtras(connection, transaction, row);
+            row.State = VersionFileImportState.CleaningOldExtras;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void BeginCleanup(int id)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            Require(row.State is VersionFileImportState.CleaningOldExtras or VersionFileImportState.RecyclingBackup or VersionFileImportState.RemovingSource or VersionFileImportState.EventsPending, "Sidecars must be fully registered before cleanup.");
+            CheckRegisteredOwnership(connection, transaction, row);
+            CheckInstalledExtras(connection, transaction, row);
+            if (row.Snapshot.Cleanup == null)
+            {
+                Require(row.State == VersionFileImportState.CleaningOldExtras, "The cleanup manifest is missing after cleanup began.");
+                row.Snapshot.Cleanup = VersionImportCleanupPlan.Create(row);
+                Save(connection, transaction, row);
+            }
+
+            transaction.Commit();
+        }
+
+        public void StartCleanupItem(int id, int index, string note)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            var item = CleanupItem(connection, transaction, row, index);
+            Require(!item.Preserve && item.State is VersionImportCleanupState.Prepared or VersionImportCleanupState.Recycling, "This cleanup item cannot start recycling.");
+            if (item.State == VersionImportCleanupState.Recycling)
+            {
+                Require(!string.IsNullOrWhiteSpace(note), "A verification note is required before retrying physical cleanup.");
+            }
+
+            item.State = VersionImportCleanupState.Recycling;
+            item.Note = note;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void FinishCleanupItem(int id, int index, VersionImportCleanupState expected, bool preserve, string recyclePath, string note)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            var item = CleanupItem(connection, transaction, row, index);
+            Require(item.State == expected && item.State != VersionImportCleanupState.Finished, "The cleanup checkpoint changed. Refresh before continuing.");
+            if (item.Kind == VersionImportCleanupKind.OldExtra)
+            {
+                var table = ExtraTable(item.Table);
+                connection.Execute($"DELETE FROM \"{table}\" WHERE \"Id\" = @id AND \"MovieId\" = @MovieId AND \"MovieFileId\" = @OldMovieFileId AND \"RelativePath\" = @path", new { id = item.ExtraId, row.MovieId, row.OldMovieFileId, path = item.Path }, transaction);
+            }
+
+            item.State = VersionImportCleanupState.Finished;
+            item.Preserve |= preserve;
+            item.RecyclePath = recyclePath;
+            item.Note = note ?? item.Note;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void AdvanceCleanup(int id, VersionFileImportState expected, VersionFileImportState next)
+        {
+            Require((expected == VersionFileImportState.CleaningOldExtras && next == VersionFileImportState.RecyclingBackup) ||
+                (expected == VersionFileImportState.RecyclingBackup && next == VersionFileImportState.RemovingSource) ||
+                (expected == VersionFileImportState.RemovingSource && next == VersionFileImportState.EventsPending),
+                "Invalid cleanup phase transition.");
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            CheckRegisteredOwnership(connection, transaction, row);
+            CheckInstalledExtras(connection, transaction, row);
+            Require(row.State == expected && row.Snapshot.Cleanup != null && row.Snapshot.Cleanup.Where(i => VersionImportCleanupPlan.Phase(i.Kind) <= expected).All(i => i.State == VersionImportCleanupState.Finished), "The cleanup phase still has unfinished entries.");
+            row.State = next;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        private static VersionImportCleanupItem CleanupItem(IDbConnection connection, IDbTransaction transaction, VersionFileImport row, int index)
+        {
+            CheckRegisteredOwnership(connection, transaction, row);
+            CheckInstalledExtras(connection, transaction, row);
+            Require(row.Snapshot.Cleanup != null && index >= 0 && index < row.Snapshot.Cleanup.Count, "The cleanup entry is missing.");
+            var item = row.Snapshot.Cleanup[index];
+            Require(row.State == VersionImportCleanupPlan.Phase(item.Kind) && row.Snapshot.Cleanup.Take(index).All(i => i.State == VersionImportCleanupState.Finished), "The cleanup entry is out of sequence.");
+            return item;
+        }
+
+        private static string ExtraTable(string table) => table is "SubtitleFiles" or "MetadataFiles" or "ExtraFiles" ? table : throw new InvalidOperationException("Unknown import extras table.");
+
+        private static void CheckInstalledExtras(IDbConnection connection, IDbTransaction transaction, VersionFileImport row)
+        {
+            Require(row.Snapshot.IncomingExtras.All(e => e.State == VersionImportExtraState.Registered), "Incoming sidecar registration is incomplete.");
             foreach (var extra in row.Snapshot.IncomingExtras)
             {
                 var table = extra.Subtitle == null ? "ExtraFiles" : "SubtitleFiles";
@@ -213,10 +312,6 @@ namespace NzbDrone.Core.MediaFiles
                     Require(category == table ? claims.Count == 1 && claims[0].Id == extra.RegisteredExtraId && claims[0].MovieFileId == row.NewMovieFileId : claims.Count == 0, "An installed sidecar registration changed before finalization.");
                 }
             }
-
-            row.State = VersionFileImportState.CleaningOldExtras;
-            Save(connection, transaction, row);
-            transaction.Commit();
         }
 
         private static void CheckRegisteredOwnership(IDbConnection connection, IDbTransaction transaction, VersionFileImport row)
