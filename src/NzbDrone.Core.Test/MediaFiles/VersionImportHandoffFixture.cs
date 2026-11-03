@@ -358,5 +358,268 @@ namespace NzbDrone.Core.Test.MediaFiles
             Assert.That(Db.All<VersionFileDeletion>(), Is.Empty);
             Assert.That(_disk.ContainsKey(Full(_old.RelativePath)), Is.True);
         }
+
+        private VersionFileImport WithIncomingSidecar(bool previous = true, string suffix = ".en.forced.srt")
+        {
+            var source = Path.Combine(Path.GetDirectoryName(_source), Path.GetFileNameWithoutExtension(_source) + suffix);
+            _disk.Add(source, (20, new string('F', 64)));
+            if (previous)
+            {
+                var relative = "300 (2006) - SDR" + suffix;
+                Db.Insert(new SubtitleFile { MovieId = _movie.Id, MovieFileId = _old.Id, RelativePath = relative, Extension = Path.GetExtension(suffix), Language = Language.English });
+                _disk.Add(Full(relative), (10, new string('E', 64)));
+            }
+
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.ImportExtraFiles).Returns(true);
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.ExtraFileExtensions).Returns("srt,txt,nfo");
+            Mocker.GetMock<IDiskProvider>().Setup(v => v.GetFiles(Path.GetDirectoryName(_source), false)).Returns(new[] { source, _source });
+            var op = Prepare();
+            Subject.Resume(_movie.Id, op.Id);
+            return op;
+        }
+
+        private void ResumeSidecars(VersionFileImport op) => Mocker.Resolve<VersionImportSidecarService>().Resume(_movie.Id, op.Id);
+
+        private void AssertSidecarInstalled(VersionFileImport op, bool previous = true)
+        {
+            var row = _operations.Get(op.Id);
+            var extra = row.Snapshot.IncomingExtras.Single();
+            Assert.That(row.State, Is.EqualTo(VersionFileImportState.CleaningOldExtras));
+            Assert.That(extra.State, Is.EqualTo(VersionImportExtraState.Registered));
+            Assert.That(_disk[Full(extra.DestinationRelativePath)].Hash, Is.EqualTo(new string('F', 64)));
+            Assert.That(_disk[extra.SourcePath].Hash, Is.EqualTo(new string('F', 64)));
+            if (previous)
+            {
+                Assert.That(_disk[Full(extra.BackupRelativePath)].Hash, Is.EqualTo(new string('E', 64)));
+            }
+
+            var file = Db.Single<SubtitleFile>();
+            Assert.That(file.Id, Is.EqualTo(extra.RegisteredExtraId));
+            Assert.That(file.MovieFileId, Is.EqualTo(row.NewMovieFileId));
+            Assert.That(file.RelativePath, Is.EqualTo("300 (2006) - SDR.en.forced.srt"));
+            Assert.That(file.Language, Is.EqualTo(Language.English));
+            Assert.That(file.LanguageTags, Does.Contain("forced"));
+            Assert.That(_disk.ContainsKey(_source), Is.True);
+            Assert.That(_disk.ContainsKey(Full(op.BackupRelativePath)), Is.True);
+            Assert.That(_disk[Full(_other.RelativePath)].Hash, Is.EqualTo(new string('C', 64)));
+            Assert.That(row.IsActive, Is.True);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void should_install_and_register_sidecar_while_retaining_sources_and_backups(bool previous)
+        {
+            var op = WithIncomingSidecar(previous);
+            ResumeSidecars(op);
+            AssertSidecarInstalled(op, previous);
+            ResumeSidecars(op);
+            AssertSidecarInstalled(op, previous);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void should_recover_sidecar_move_completed_before_checkpoint(bool backupMove)
+        {
+            var op = WithIncomingSidecar();
+            var failed = false;
+            Mocker.GetMock<IDiskProvider>().Setup(v => v.MoveFile(It.IsAny<string>(), It.IsAny<string>(), false)).Callback<string, string, bool>((s, d, o) =>
+            {
+                Move(s, d);
+                if (!failed && (backupMove ? d.Contains(".previous", StringComparison.Ordinal) : d.EndsWith("SDR.en.forced.srt", StringComparison.Ordinal)))
+                {
+                    failed = true;
+                    throw new IOException("Simulated stop after sidecar move");
+                }
+            });
+            Assert.Throws<IOException>(() => ResumeSidecars(op));
+            var extra = _operations.Get(op.Id).Snapshot.IncomingExtras.Single();
+            Assert.That(extra.State, Is.EqualTo(backupMove ? VersionImportExtraState.BackingUp : VersionImportExtraState.Installing));
+            ResumeSidecars(op);
+            AssertSidecarInstalled(op);
+        }
+
+        [Test]
+        public void incomplete_sidecar_copy_should_keep_previous_physical_file_and_registration()
+        {
+            var op = WithIncomingSidecar();
+            Mocker.GetMock<IDiskTransferService>().Setup(v => v.TransferFile(It.IsAny<string>(), It.IsAny<string>(), TransferMode.Copy, false)).Returns<string, string, TransferMode, bool>((s, d, m, o) =>
+            {
+                _disk.Add(d, (5, new string('D', 64)));
+                return TransferMode.Copy;
+            });
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_operations.Get(op.Id).Snapshot.IncomingExtras.Single().State, Is.EqualTo(VersionImportExtraState.Copying));
+            Assert.That(_disk[Full("300 (2006) - SDR.en.forced.srt")].Hash, Is.EqualTo(new string('E', 64)));
+            Assert.That(Db.Single<SubtitleFile>().MovieFileId, Is.EqualTo(_old.Id));
+        }
+
+        [TestCase("source")]
+        [TestCase("old")]
+        [TestCase("video")]
+        public void changed_files_should_stop_before_sidecar_replacement(string changed)
+        {
+            var op = WithIncomingSidecar();
+            var path = changed == "source" ? op.Snapshot.IncomingExtras.Single().SourcePath : Full(changed == "old" ? "300 (2006) - SDR.en.forced.srt" : op.DestinationRelativePath);
+            _disk[path] = (_disk[path].Size, new string('D', 64));
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(Db.Single<SubtitleFile>().MovieFileId, Is.EqualTo(_old.Id));
+        }
+
+        [Test]
+        public void unregistered_sidecar_destination_should_never_be_overwritten()
+        {
+            var op = WithIncomingSidecar(false);
+            _disk.Add(Full("300 (2006) - SDR.en.forced.srt"), (20, new string('F', 64)));
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(Db.All<SubtitleFile>(), Is.Empty);
+        }
+
+        [Test]
+        public void sidecar_claimed_by_hdr_should_block_sdr_replacement()
+        {
+            var op = WithIncomingSidecar();
+            Db.Insert(new OtherExtraFile { MovieId = _movie.Id, MovieFileId = _other.Id, RelativePath = "300 (2006) - SDR.en.forced.srt", Extension = ".srt" });
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_disk[Full("300 (2006) - SDR.en.forced.srt")].Hash, Is.EqualTo(new string('E', 64)));
+        }
+
+        [Test]
+        public void should_install_non_subtitle_as_other_extra_preserving_its_suffix()
+        {
+            var op = WithIncomingSidecar(false, ".notes.nfo");
+            ResumeSidecars(op);
+            var file = Db.Single<OtherExtraFile>();
+            Assert.That(file.RelativePath, Is.EqualTo("300 (2006) - SDR.notes.nfo"));
+            Assert.That(file.MovieFileId, Is.EqualTo(_operations.Get(op.Id).NewMovieFileId));
+            Assert.That(Db.All<SubtitleFile>(), Is.Empty);
+        }
+
+        [Test]
+        public void no_incoming_sidecars_should_advance_without_removing_old_extras()
+        {
+            var op = Prepare();
+            Subject.Resume(_movie.Id, op.Id);
+            ResumeSidecars(op);
+            Assert.That(_operations.Get(op.Id).State, Is.EqualTo(VersionFileImportState.CleaningOldExtras));
+            Assert.That(_disk.ContainsKey(_source), Is.True);
+            Assert.That(_disk.ContainsKey(Full(op.BackupRelativePath)), Is.True);
+        }
+
+        [Test]
+        public void failed_sidecar_registration_should_rollback_old_claim_removal_and_allow_retry()
+        {
+            var database = Mocker.Resolve<IMainDatabase>();
+            if (database.DatabaseType != DatabaseType.SQLite)
+            {
+                Assert.Ignore("SQLite fault injection trigger");
+            }
+
+            var op = WithIncomingSidecar();
+            var oldId = Db.Single<SubtitleFile>().Id;
+            using (var connection = database.OpenConnection())
+            {
+                connection.Execute("CREATE TRIGGER FailSidecarInsert BEFORE INSERT ON SubtitleFiles BEGIN SELECT RAISE(ABORT, 'Simulated sidecar registration failure'); END;");
+            }
+
+            Assert.Catch(() => ResumeSidecars(op));
+            var extra = _operations.Get(op.Id).Snapshot.IncomingExtras.Single();
+            Assert.That(extra.State, Is.EqualTo(VersionImportExtraState.Installing));
+            Assert.That(extra.RegisteredExtraId, Is.Null);
+            Assert.That(Db.Single<SubtitleFile>().Id, Is.EqualTo(oldId));
+            Assert.That(Db.Single<SubtitleFile>().MovieFileId, Is.EqualTo(_old.Id));
+            Assert.That(_disk[Full(extra.DestinationRelativePath)].Hash, Is.EqualTo(new string('F', 64)));
+            Assert.That(_disk[Full(extra.BackupRelativePath)].Hash, Is.EqualTo(new string('E', 64)));
+            using (var connection = database.OpenConnection())
+            {
+                connection.Execute("DROP TRIGGER FailSidecarInsert;");
+            }
+
+            ResumeSidecars(op);
+            AssertSidecarInstalled(op);
+        }
+
+        [Test]
+        public void changed_sidecar_backup_should_stop_before_registration()
+        {
+            var op = WithIncomingSidecar();
+            Mocker.GetMock<IDiskProvider>().Setup(v => v.MoveFile(It.IsAny<string>(), It.IsAny<string>(), false)).Callback<string, string, bool>((s, d, o) =>
+            {
+                Move(s, d);
+                if (d.EndsWith("SDR.en.forced.srt", StringComparison.Ordinal))
+                {
+                    throw new IOException("Stop after install move");
+                }
+            });
+            Assert.Throws<IOException>(() => ResumeSidecars(op));
+            var extra = _operations.Get(op.Id).Snapshot.IncomingExtras.Single();
+            _disk[Full(extra.BackupRelativePath)] = (10, new string('D', 64));
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(Db.Single<SubtitleFile>().MovieFileId, Is.EqualTo(_old.Id));
+            Assert.That(_operations.Get(op.Id).Snapshot.IncomingExtras.Single().State, Is.EqualTo(VersionImportExtraState.Installing));
+        }
+
+        [Test]
+        public void shared_old_sidecar_should_stay_protected_even_if_guard_later_allows_it()
+        {
+            Mocker.GetMock<IExtraFileDeletionGuard>().Setup(v => v.CanRecycle(It.IsAny<Movie>(), It.IsAny<int>(), It.IsAny<string>())).Returns(false);
+            var op = WithIncomingSidecar();
+            Mocker.GetMock<IExtraFileDeletionGuard>().Setup(v => v.CanRecycle(It.IsAny<Movie>(), It.IsAny<int>(), It.IsAny<string>())).Returns(true);
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_disk[Full("300 (2006) - SDR.en.forced.srt")].Hash, Is.EqualTo(new string('E', 64)));
+            Assert.That(Db.Single<SubtitleFile>().MovieFileId, Is.EqualTo(_old.Id));
+        }
+
+        [Test]
+        public void sidecar_plan_should_not_change_with_live_import_settings()
+        {
+            var op = WithIncomingSidecar();
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.ImportExtraFiles).Returns(false);
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.ExtraFileExtensions).Returns(string.Empty);
+            ResumeSidecars(op);
+            AssertSidecarInstalled(op);
+        }
+
+        [Test]
+        public void changed_installed_sidecar_should_block_replay()
+        {
+            var op = WithIncomingSidecar();
+            ResumeSidecars(op);
+            var extra = _operations.Get(op.Id).Snapshot.IncomingExtras.Single();
+            _disk[Full(extra.DestinationRelativePath)] = (20, new string('D', 64));
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_operations.Get(op.Id).IsActive, Is.True);
+        }
+
+        [Test]
+        public void changed_registered_sidecar_owner_should_block_replay()
+        {
+            var op = WithIncomingSidecar();
+            ResumeSidecars(op);
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            connection.Execute("UPDATE SubtitleFiles SET MovieFileId = @Id", _other);
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_operations.Get(op.Id).IsActive, Is.True);
+        }
+
+        [Test]
+        public void should_revalidate_imported_reservation_before_modifying_sidecars()
+        {
+            _reservation = Db.Insert(new DownloadReservation { MovieId = _movie.Id, MovieVersionId = _sdr.Id, DownloadClientId = 7, DownloadId = "download-1", SourceTitle = "300 SDR", State = DownloadReservationState.Submitted });
+            var op = WithIncomingSidecar();
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            connection.Execute("UPDATE DownloadReservations SET DownloadId = 'different' WHERE Id = @Id", _reservation);
+            Assert.Throws<InvalidOperationException>(() => ResumeSidecars(op));
+            Assert.That(_disk[Full("300 (2006) - SDR.en.forced.srt")].Hash, Is.EqualTo(new string('E', 64)));
+            Assert.That(_operations.Get(op.Id).State, Is.EqualTo(VersionFileImportState.Registered));
+        }
+
+        [Test]
+        public void should_not_finish_sidecars_before_all_checkpoints_register()
+        {
+            var op = WithIncomingSidecar();
+            _operations.BeginExtras(op.Id);
+            Assert.Throws<InvalidOperationException>(() => _operations.FinishExtras(op.Id));
+            Assert.That(_operations.Get(op.Id).State, Is.EqualTo(VersionFileImportState.Finalizing));
+        }
     }
 }

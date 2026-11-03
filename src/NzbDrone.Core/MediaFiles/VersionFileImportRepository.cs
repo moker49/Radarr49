@@ -4,6 +4,8 @@ using System.Data;
 using System.Linq;
 using Dapper;
 using NzbDrone.Core.Datastore;
+using NzbDrone.Core.Extras.Files;
+using NzbDrone.Core.Extras.Others;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 
@@ -16,6 +18,10 @@ namespace NzbDrone.Core.MediaFiles
         void Advance(int id, VersionFileImportState expected, VersionFileImportState next);
         MovieFile Register(int id);
         void CancelBeforeBackup(int id, string note);
+        void BeginExtras(int id);
+        void AdvanceExtra(int id, int index, VersionImportExtraState expected, VersionImportExtraState next);
+        void RegisterExtra(int id, int index);
+        void FinishExtras(int id);
     }
 
     public class VersionFileImportRepository : BasicRepository<VersionFileImport>, IVersionFileImportRepository
@@ -69,8 +75,10 @@ namespace NzbDrone.Core.MediaFiles
             var row = Load(connection, transaction, id);
             if (row.State == VersionFileImportState.Registered)
             {
+                CheckRegisteredOwnership(connection, transaction, row);
                 var existing = connection.QuerySingleOrDefault<MovieFile>("SELECT f.* FROM \"MovieFiles\" f JOIN \"MovieVersions\" v ON v.\"MovieFileId\" = f.\"Id\" WHERE f.\"Id\" = @NewMovieFileId AND v.\"Id\" = @MovieVersionId AND f.\"MovieId\" = @MovieId", row, transaction);
                 Require(existing != null, "The registered import is no longer owned by this version.");
+                existing.MovieVersionId = row.MovieVersionId;
                 return existing;
             }
 
@@ -116,6 +124,110 @@ namespace NzbDrone.Core.MediaFiles
             transaction.Commit();
         }
 
+        public void BeginExtras(int id)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            Require(row.State is VersionFileImportState.Registered or VersionFileImportState.Finalizing or VersionFileImportState.CleaningOldExtras, "The main-file handoff must be registered before installing sidecars.");
+            CheckRegisteredOwnership(connection, transaction, row);
+            if (row.State == VersionFileImportState.Registered)
+            {
+                VersionImportExtraPlan.Create(row);
+                row.State = VersionFileImportState.Finalizing;
+                Save(connection, transaction, row);
+            }
+
+            transaction.Commit();
+        }
+
+        public void AdvanceExtra(int id, int index, VersionImportExtraState expected, VersionImportExtraState next)
+        {
+            Require((expected == VersionImportExtraState.Prepared && next == VersionImportExtraState.Copying) ||
+                (expected == VersionImportExtraState.Copying && next == VersionImportExtraState.Staged) ||
+                (expected == VersionImportExtraState.Staged && next == VersionImportExtraState.BackingUp) ||
+                (expected == VersionImportExtraState.BackingUp && next == VersionImportExtraState.Installing),
+                "Invalid sidecar handoff transition.");
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            CheckRegisteredOwnership(connection, transaction, row);
+            Require(row.State == VersionFileImportState.Finalizing && index >= 0 && index < row.Snapshot.IncomingExtras.Count, "The sidecar checkpoint is no longer available.");
+            var extra = row.Snapshot.IncomingExtras[index];
+            Require(extra.State == expected, "The sidecar checkpoint changed. Refresh before continuing.");
+            extra.State = next;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void RegisterExtra(int id, int index)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            CheckRegisteredOwnership(connection, transaction, row);
+            Require(row.State == VersionFileImportState.Finalizing && index >= 0 && index < row.Snapshot.IncomingExtras.Count, "The sidecar registration is no longer available.");
+            var extra = row.Snapshot.IncomingExtras[index];
+            Require(extra.State == VersionImportExtraState.Installing, "The sidecar has not reached its installation checkpoint.");
+            var previous = row.Snapshot.PreviousExtras.Where(e => string.Equals(e.RelativePath, extra.DestinationRelativePath, StringComparison.OrdinalIgnoreCase)).ToList();
+            Require(previous.All(e => !e.Preserve), "A shared sidecar cannot be replaced.");
+            foreach (var table in new[] { "SubtitleFiles", "MetadataFiles", "ExtraFiles" })
+            {
+                var claims = connection.Query<OtherExtraFile>($"SELECT * FROM \"{table}\" WHERE \"MovieId\" = @MovieId AND LOWER(\"RelativePath\") = LOWER(@relative)", new { row.MovieId, relative = extra.DestinationRelativePath }, transaction).ToList();
+                Require(claims.Count == previous.Count(e => e.Table == table) && claims.All(c => c.MovieFileId == row.OldMovieFileId && previous.Any(e => e.Table == table && e.Id == c.Id)), "Sidecar registrations changed before commit.");
+                foreach (var claim in claims)
+                {
+                    connection.Execute($"DELETE FROM \"{table}\" WHERE \"Id\" = @Id", claim, transaction);
+                }
+            }
+
+            var incoming = (ExtraFile)extra.Subtitle ?? new OtherExtraFile();
+            incoming.MovieId = row.MovieId;
+            incoming.MovieFileId = row.NewMovieFileId;
+            incoming.RelativePath = extra.DestinationRelativePath;
+            incoming.Extension = System.IO.Path.GetExtension(extra.SourcePath);
+            incoming.Added = incoming.LastUpdated = DateTime.UtcNow;
+            var insert = extra.Subtitle != null
+                ? "INSERT INTO \"SubtitleFiles\" (\"MovieId\", \"MovieFileId\", \"RelativePath\", \"Extension\", \"Added\", \"LastUpdated\", \"Language\", \"LanguageTags\", \"Copy\", \"Title\") VALUES (@MovieId, @MovieFileId, @RelativePath, @Extension, @Added, @LastUpdated, @Language, @LanguageTags, @Copy, @Title)"
+                : "INSERT INTO \"ExtraFiles\" (\"MovieId\", \"MovieFileId\", \"RelativePath\", \"Extension\", \"Added\", \"LastUpdated\") VALUES (@MovieId, @MovieFileId, @RelativePath, @Extension, @Added, @LastUpdated)";
+            insert += _database.DatabaseType == DatabaseType.PostgreSQL ? " RETURNING \"Id\"" : "; SELECT last_insert_rowid()";
+            extra.RegisteredExtraId = connection.ExecuteScalar<int>(insert, incoming, transaction);
+            extra.State = VersionImportExtraState.Registered;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void FinishExtras(int id)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            CheckRegisteredOwnership(connection, transaction, row);
+            Require(row.State == VersionFileImportState.Finalizing && row.Snapshot.IncomingExtras.All(e => e.State == VersionImportExtraState.Registered), "All incoming sidecars must be registered before old-extra cleanup.");
+            foreach (var extra in row.Snapshot.IncomingExtras)
+            {
+                var table = extra.Subtitle == null ? "ExtraFiles" : "SubtitleFiles";
+                foreach (var category in new[] { "SubtitleFiles", "MetadataFiles", "ExtraFiles" })
+                {
+                    var claims = connection.Query<OtherExtraFile>($"SELECT * FROM \"{category}\" WHERE \"MovieId\" = @MovieId AND LOWER(\"RelativePath\") = LOWER(@relative)", new { row.MovieId, relative = extra.DestinationRelativePath }, transaction).ToList();
+                    Require(category == table ? claims.Count == 1 && claims[0].Id == extra.RegisteredExtraId && claims[0].MovieFileId == row.NewMovieFileId : claims.Count == 0, "An installed sidecar registration changed before finalization.");
+                }
+            }
+
+            row.State = VersionFileImportState.CleaningOldExtras;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        private static void CheckRegisteredOwnership(IDbConnection connection, IDbTransaction transaction, VersionFileImport row)
+        {
+            Require(row.NewMovieFileId.HasValue && connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"MovieFiles\" f ON f.\"Id\" = v.\"MovieFileId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" WHERE v.\"Id\" = @MovieVersionId AND v.\"MovieId\" = @MovieId AND m.\"Path\" = @MoviePath AND f.\"MovieId\" = @MovieId AND f.\"Id\" = @NewMovieFileId AND f.\"RelativePath\" = @DestinationRelativePath AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", row, transaction) == 1, "The registered movie, version, file or path changed. Finalization is blocked.");
+            if (row.DownloadReservationId.HasValue)
+            {
+                Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"DownloadReservations\" WHERE \"Id\" = @id AND \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"ImportedMovieFileId\" = @NewMovieFileId AND \"DownloadClientId\" = @client AND UPPER(\"DownloadId\") = UPPER(@download) AND \"State\" = 3", new { id = row.DownloadReservationId.Value, row.MovieId, row.MovieVersionId, row.NewMovieFileId, client = row.Snapshot.DownloadClientInfo?.Id, download = row.Snapshot.DownloadId }, transaction) == 1, "The exact imported reservation changed. Finalization is blocked.");
+            }
+        }
+
         private static void CheckOwnership(IDbConnection connection, IDbTransaction transaction, VersionFileImport row)
         {
             var version = connection.QuerySingleOrDefault<MovieVersion>("SELECT v.* FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" WHERE v.\"Id\" = @MovieVersionId AND v.\"MovieId\" = @MovieId AND m.\"Path\" = @MoviePath AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", row, transaction);
@@ -148,7 +260,7 @@ namespace NzbDrone.Core.MediaFiles
         private static void Save(IDbConnection connection, IDbTransaction transaction, VersionFileImport row)
         {
             row.Updated = DateTime.UtcNow;
-            connection.Execute("UPDATE \"VersionFileImports\" SET \"State\" = @State, \"NewMovieFileId\" = @NewMovieFileId, \"Updated\" = @Updated, \"Note\" = @Note WHERE \"Id\" = @Id", row, transaction);
+            connection.Execute("UPDATE \"VersionFileImports\" SET \"State\" = @State, \"NewMovieFileId\" = @NewMovieFileId, \"Snapshot\" = @Snapshot, \"Updated\" = @Updated, \"Note\" = @Note WHERE \"Id\" = @Id", row, transaction);
         }
 
         private static bool ValidHash(string hash) => hash?.Length == 64 && hash.All(Uri.IsHexDigit);

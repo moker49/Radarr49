@@ -200,9 +200,10 @@ the earlier one is unavailable. Primary selection is independent of download ord
    and remaining command paths. Legacy folder moves are protected, not enabled for composites.
    Managed download script imports are rejected pending dedicated
    support. A durable main-file import handoff is now implemented and tested as an internal
-   primitive, through registration. Runtime imports still use the existing standard
-   recycle-before-transfer behavior until durable finalization is ready. Finish sidecar
-   installation, old-extra cleanup, backup/source cleanup and event delivery before routing
+   primitive, through registration. Durable incoming-sidecar installation and registration
+   are also implemented as an internal primitive. Runtime imports still use the existing
+   standard recycle-before-transfer behavior until durable finalization is ready. Finish
+   old-extra cleanup, backup/source cleanup and event delivery before routing
    managed imports through the new journal. Explicit version-file deletion has durable
    recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
@@ -419,27 +420,55 @@ registration and can retry against the already installed, verified replacement. 
 monitoring is preserved. Other-version files are untouched. Path ownership, active deletions,
 exact submitted reservation identity and current child-profile rules are rechecked.
 
-Registered is deliberately still active: no source cleanup, backup recycling, sidecar
-installation or event publication occurs here. Pending imports block target-version writes
+Registered is deliberately still active: no source cleanup, backup recycling or event
+publication occurs here. Pending imports block target-version writes
 and acquisitions, retain old sidecar registrations during housekeeping, and prevent completed
 download handling from removing the client job/source. Whole-movie mutations also remain
 blocked through the existing shared operation guard.
 
-There is no public begin/resume/complete import route and no startup replay of this primitive.
-Normal runtime imports do not call it yet. Remaining work is durable sidecar finalization,
-old-extra cleanup, backup/source cleanup, event/history dispatch and operator recovery APIs,
+VersionImportSidecarService continues Registered imports through Finalizing to
+CleaningOldExtras. It persists a sidecar plan in the existing embedded snapshot before
+performing any sidecar transfer. Each incoming sidecar has independent Prepared, Copying,
+Staged, BackingUp, Installing and Registered checkpoints. The source video stem is replaced
+with the destination video stem while retaining the sidecar suffix, for example
+`300.2006.SDR.en.forced.srt` becomes `300 (2006) - SDR.en.forced.srt`. Existing subtitle
+language/tag parsing populates the new registration; other supported sidecars use ExtraFiles.
+Import options changing after capture do not change the persisted source selection/plan.
+
+Each sidecar is copied and SHA-256 verified before its old destination is moved to a
+private backup. Unregistered destinations, changed old files, shared ownership and new
+claims across all three extra-file categories block replacement. The installation move
+never overwrites an existing file. Exact old registrations are removed and the new owner
+and Registered checkpoint commit atomically; a failed transaction retains the old rows
+and safely retries the verified physical installation. Replay verifies installed content,
+backup identity and the exact new registration. Video ownership and any imported
+reservation are revalidated as well.
+
+CleaningOldExtras remains active. The sidecar runner stops there, with video/sidecar
+sources, all previous-file backups and non-replaced old extra registrations retained.
+Subsequent cleanup must distinguish replaced sidecars (whose previous content is at
+their private backup) from untouched old extras; it must never recycle an installed
+replacement using an old snapshot's destination path. No cleanup events are emitted yet.
+
+There is no public begin/resume/complete import route and no startup replay of these
+primitives. Normal runtime imports do not call them yet. Remaining work is old-extra
+cleanup, backup/source cleanup, event/history dispatch and operator recovery APIs,
 followed by runtime routing and restart integration. Folder-move recovery is separate.
 
-Validation for this stage: 1,177 core tests pass, with five existing skips, and 29 profile
+Validation including the incoming-sidecar stage: 1,197 core tests pass, with five existing skips, and 29 profile
 API tests pass. The previously reproduced unrelated
 `DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
 excluded from this regression selection. Tests cover SHA-256 against actual bytes,
 interrupted copies, restarts between physical moves/checkpoints, first acquisition,
 transaction rollback/retry, changed sources/backups/profiles/reservations, path containment,
-cross-operation gates, pending sidecar retention and delayed download completion. Filesystem
+cross-operation gates, pending sidecar retention and delayed download completion. Twenty
+additional sidecar tests cover fresh installs and replacements, language/tag suffixes,
+other extras, interruptions after both physical moves, registration rollback/retry,
+changed sources/destinations/backups/owners/reservations, shared-file protection,
+stable captured settings and premature finalization rejection. Filesystem
 handoff tests use a simulated disk and real SQLite; full real-filesystem/restart integration
-remains pending. Logs: `_temp/import-handoff-regression.log` and
-`_temp/import-handoff-api-tests.log`.
+remains pending. Logs: `_temp/import-sidecar-regression.log` and
+`_temp/import-sidecar-api-tests.log`.
 
 ## Manual import API
 

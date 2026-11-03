@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Download;
+using NzbDrone.Core.Extras.Subtitles;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MediaFiles
@@ -66,5 +67,21 @@ namespace NzbDrone.Core.MediaFiles
         public long Size { get; set; }
         public long LastWriteUtcTicks { get; set; }
         public string ContentHash { get; set; }
+        public string DestinationRelativePath { get; set; }
+        public string StagingRelativePath { get; set; }
+        public string BackupRelativePath { get; set; }
+        public VersionImportExtraState State { get; set; }
+        public SubtitleFile Subtitle { get; set; }
+        public int? RegisteredExtraId { get; set; }
+    }
+
+    public enum VersionImportExtraState
+    {
+        Prepared = 0,
+        Copying = 1,
+        Staged = 2,
+        BackingUp = 3,
+        Installing = 4,
+        Registered = 5
     }
 }
