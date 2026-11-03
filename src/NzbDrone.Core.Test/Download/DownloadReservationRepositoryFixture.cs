@@ -66,6 +66,25 @@ namespace NzbDrone.Core.Test.Download
             connection.Execute("UPDATE \"QualityProfiles\" SET \"MaximumConcurrentDownloads\" = 2 WHERE \"Id\" = @Id", _profile);
         }
 
+        [TestCase(VersionFileImportState.Prepared, false)]
+        [TestCase(VersionFileImportState.Registered, false)]
+        [TestCase(VersionFileImportState.EventsPending, false)]
+        [TestCase(VersionFileImportState.Completed, true)]
+        [TestCase(VersionFileImportState.Cancelled, true)]
+        public void pending_import_should_block_only_its_target_version(VersionFileImportState state, bool canReserve)
+        {
+            AllowTwo();
+            Db.Insert(new VersionFileImport
+            {
+                MovieId = _movie.Id, MovieVersionId = _sdr.Id, MoviePath = _movie.Path, SourcePath = "download.mkv",
+                DestinationRelativePath = "movie - SDR.mkv", StagingRelativePath = ".radarr-version-imports/test/incoming.mkv",
+                Snapshot = new VersionFileImportSnapshot(), State = state
+            });
+
+            Assert.That(Reserve(_sdr) != null, Is.EqualTo(canReserve));
+            Assert.That(Reserve(_hdr), Is.Not.Null);
+        }
+
         [Test]
         public void should_persist_intent_before_dispatch()
         {

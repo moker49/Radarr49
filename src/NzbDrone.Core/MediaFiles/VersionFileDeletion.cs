@@ -53,5 +53,6 @@ namespace NzbDrone.Core.MediaFiles
         public long LastWriteUtcTicks { get; set; }
         public bool SourceExisted { get; set; }
         public bool Preserve { get; set; }
+        public string ContentHash { get; set; }
     }
 }

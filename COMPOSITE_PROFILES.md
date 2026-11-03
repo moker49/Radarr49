@@ -199,10 +199,12 @@ the earlier one is unavailable. Primary selection is independent of download ord
    audit notifications
    and remaining command paths. Legacy folder moves are protected, not enabled for composites.
    Managed download script imports are rejected pending dedicated
-   support. Existing standard recycle-before-transfer behavior remains: a transfer failure
-   can leave the target's previous file in the recycle bin; there is no physical rollback.
-   Explicit version-file deletion now has durable recovery. Finish equivalent auditing and
-   recovery for acquisition/import/replacement and folder moves before activation.
+   support. A durable main-file import handoff is now implemented and tested as an internal
+   primitive, through registration. Runtime imports still use the existing standard
+   recycle-before-transfer behavior until durable finalization is ready. Finish sidecar
+   installation, old-extra cleanup, backup/source cleanup and event delivery before routing
+   managed imports through the new journal. Explicit version-file deletion has durable
+   recovery. Folder moves still need a dedicated journal before activation.
 5. Version-aware UI, API summaries and wanted/cutoff queries.
 6. Full lifecycle tests and actual nzb360/Seer add-workflow validation before activation.
 
@@ -312,9 +314,11 @@ An explicit physical retry still requires operator verification of the original 
 The supported runtime assumes one application instance owns the media filesystem; the
 database locks/indexes protect records but do not provide a distributed filesystem lease.
 
-Upgrades/imports and folder moves still lack equivalent operation recovery. Composite
-activation remains disabled until those lifecycle paths and the remaining UI/API work
-are ready. No running development app was restarted by these test/build steps.
+Upgrades/imports now have the internal main-file handoff foundation described below;
+finalization and runtime routing remain unfinished. Folder moves still lack equivalent
+operation recovery. Composite activation remains disabled until those lifecycle paths
+and the remaining UI/API work are ready. No running development app was restarted by
+these test/build steps.
 
 The folder-move audit found that DiskTransferService.TransferFolder can recursively merge
 into an existing destination, overwrite file paths, and move files incrementally across
@@ -386,6 +390,56 @@ unfinished operation. Inspection/resumption is scoped to the route's owning movi
 | EventsPending | Durable physical/registration cleanup done; event dispatch pending |
 | Completed | Journal no longer blocks writes; exact request can replay safely |
 | Cancelled | Unstarted intent cancelled; files and monitoring were not changed |
+
+## Import handoff foundation (internal, not runtime-routed)
+
+Migration 250 adds VersionFileImports. VersionImportHandoffService prepares a detached
+snapshot of the incoming file, previous file, reservation identity and source/old sidecars.
+It hashes file contents with SHA-256; the snapshot records exact sidecar write-time ticks
+as well as sizes and hashes. Preparation does not move or remove any file.
+
+The handoff always makes a full isolated staging copy, even when ordinary import settings
+prefer hardlinks or moves. This costs additional disk space and sequential I/O. It verifies
+that copy before moving the previous version to a private backup under
+`.radarr-version-imports/{operation}/`. It then installs the incoming file without overwrite.
+The original download remains present regardless of the eventual copy/move choice.
+
+| Checkpoint | Recovery behavior |
+| --- | --- |
+| Prepared | Verify original source identity before beginning copy |
+| Staging | Reuse only an exact verified staging copy; partial copies stop for inspection |
+| Staged | Revalidate child profile and verify staging before writing backup marker |
+| BackingUp | Recover an already completed backup move; ambiguous paths stop |
+| Installing | Recover an already completed install move; verify destination and backup |
+| Registered | File, version pointer, primary summary and reservation import ownership committed together |
+| Cancelled | Allowed only before BackingUp; retain private staging artifacts for inspection |
+
+Registration is atomic and repeatable. A failed database transaction preserves the previous
+registration and can retry against the already installed, verified replacement. Both versions'
+monitoring is preserved. Other-version files are untouched. Path ownership, active deletions,
+exact submitted reservation identity and current child-profile rules are rechecked.
+
+Registered is deliberately still active: no source cleanup, backup recycling, sidecar
+installation or event publication occurs here. Pending imports block target-version writes
+and acquisitions, retain old sidecar registrations during housekeeping, and prevent completed
+download handling from removing the client job/source. Whole-movie mutations also remain
+blocked through the existing shared operation guard.
+
+There is no public begin/resume/complete import route and no startup replay of this primitive.
+Normal runtime imports do not call it yet. Remaining work is durable sidecar finalization,
+old-extra cleanup, backup/source cleanup, event/history dispatch and operator recovery APIs,
+followed by runtime routing and restart integration. Folder-move recovery is separate.
+
+Validation for this stage: 1,177 core tests pass, with five existing skips, and 29 profile
+API tests pass. The previously reproduced unrelated
+`DownloadDecisionMakerFixture.broken_report_shouldnt_blowup_the_process` failure remains
+excluded from this regression selection. Tests cover SHA-256 against actual bytes,
+interrupted copies, restarts between physical moves/checkpoints, first acquisition,
+transaction rollback/retry, changed sources/backups/profiles/reservations, path containment,
+cross-operation gates, pending sidecar retention and delayed download completion. Filesystem
+handoff tests use a simulated disk and real SQLite; full real-filesystem/restart integration
+remains pending. Logs: `_temp/import-handoff-regression.log` and
+`_temp/import-handoff-api-tests.log`.
 
 ## Manual import API
 

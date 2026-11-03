@@ -17,6 +17,7 @@ namespace NzbDrone.Core.Housekeeping.Housekeepers
             using var mapper = _database.OpenConnection();
             mapper.Execute(@"DELETE FROM ""MetadataFiles""
                              WHERE ""Type"" = 1
+                             AND NOT EXISTS (SELECT 1 FROM ""VersionFileImports"" i WHERE i.""MovieId"" = ""MetadataFiles"".""MovieId"" AND i.""OldMovieFileId"" = ""MetadataFiles"".""MovieFileId"" AND i.""State"" BETWEEN 0 AND 10)
                              AND NOT EXISTS (SELECT 1 FROM ""VersionFileDeletions"" d WHERE d.""MovieId"" = ""MetadataFiles"".""MovieId"" AND d.""MovieFileId"" = ""MetadataFiles"".""MovieFileId"" AND d.""State"" IN (0, 1, 2, 3, 4))
                              AND ""Id"" NOT IN (
                                  SELECT MAX(""Id"") FROM ""MetadataFiles""

@@ -43,7 +43,13 @@ namespace NzbDrone.Core.MediaFiles
                 sql += " AND \"MovieVersionId\" = @versionId";
             }
 
-            if (connection.ExecuteScalar<int>(sql, new { movieId, versionId }) != 0)
+            var importSql = "SELECT COUNT(*) FROM \"VersionFileImports\" WHERE \"MovieId\" = @movieId AND \"State\" BETWEEN 0 AND 10";
+            if (versionId.HasValue)
+            {
+                importSql += " AND \"MovieVersionId\" = @versionId";
+            }
+
+            if (connection.ExecuteScalar<int>(sql, new { movieId, versionId }) != 0 || connection.ExecuteScalar<int>(importSql, new { movieId, versionId }) != 0)
             {
                 throw new VersionFileDeletionPendingException();
             }
@@ -148,6 +154,7 @@ namespace NzbDrone.Core.MediaFiles
 
         private static void CheckOwnership(IDbConnection connection, IDbTransaction transaction, VersionFileDeletion row)
         {
+            Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileImports\" WHERE \"MovieVersionId\" = @MovieVersionId AND \"State\" BETWEEN 0 AND 10", row, transaction) == 0, "This version has an unfinished import.");
             Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" JOIN \"MovieFiles\" f ON f.\"Id\" = v.\"MovieFileId\" WHERE v.\"Id\" = @MovieVersionId AND v.\"MovieId\" = @MovieId AND f.\"MovieId\" = @MovieId AND f.\"Id\" = @MovieFileId AND m.\"Path\" = @MoviePath AND f.\"RelativePath\" = @relativePath AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", new { row.MovieVersionId, row.MovieId, row.MovieFileId, row.MoviePath, relativePath = row.Snapshot.File.RelativePath }, transaction) == 1,
                 "The movie, version, file or path changed. No ownership was modified.");
             Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"DownloadReservations\" WHERE \"MovieVersionId\" = @MovieVersionId AND \"State\" IN (0, 1, 2, 5)", row, transaction) == 0, "This version has an active download reservation.");

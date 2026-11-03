@@ -147,9 +147,10 @@ namespace NzbDrone.Core.MediaFiles
 
         private static void CheckNoDeletion(IDbConnection connection, IDbTransaction transaction, int movieId, int versionId)
         {
-            if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @movieId AND \"MovieVersionId\" = @versionId AND \"State\" IN (0, 1, 2, 3, 4)", new { movieId, versionId }, transaction) != 0)
+            if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @movieId AND \"MovieVersionId\" = @versionId AND \"State\" IN (0, 1, 2, 3, 4)", new { movieId, versionId }, transaction) != 0 ||
+                connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileImports\" WHERE \"MovieId\" = @movieId AND \"MovieVersionId\" = @versionId AND \"State\" BETWEEN 0 AND 10", new { movieId, versionId }, transaction) != 0)
             {
-                throw new InvalidOperationException("This version has an unfinished deletion. Recover it before changing files.");
+                throw new InvalidOperationException("This version has an unfinished file operation. Recover it before changing files.");
             }
         }
 

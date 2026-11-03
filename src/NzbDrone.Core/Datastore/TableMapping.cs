@@ -149,6 +149,8 @@ namespace NzbDrone.Core.Datastore
             Mapper.Entity<MovieVersion>("MovieVersions").RegisterModel();
             Mapper.Entity<VersionFileDeletion>("VersionFileDeletions").RegisterModel()
                   .Ignore(r => r.IsActive);
+            Mapper.Entity<VersionFileImport>("VersionFileImports").RegisterModel()
+                  .Ignore(r => r.IsActive);
             Mapper.Entity<DownloadReservation>("DownloadReservations").RegisterModel()
                   .Ignore(r => r.IsActive);
             Mapper.Entity<Log>("Logs").RegisterModel();

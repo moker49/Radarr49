@@ -52,7 +52,8 @@ namespace NzbDrone.Core.Download
             }
 
             var owned = connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"Movies\" m ON m.\"Id\" = v.\"MovieId\" JOIN \"CompositeProfileVersions\" d ON d.\"Id\" = v.\"CompositeProfileVersionId\" JOIN \"QualityProfiles\" p ON p.\"Id\" = d.\"QualityProfileId\" WHERE v.\"Id\" = @MovieVersionId AND v.\"MovieId\" = @MovieId AND d.\"CompositeProfileId\" = m.\"QualityProfileId\"", intent, transaction);
-            if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"State\" IN (0, 1, 2, 3, 4)", intent, transaction) != 0)
+            if (connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"State\" IN (0, 1, 2, 3, 4)", intent, transaction) != 0 ||
+                connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileImports\" WHERE \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"State\" BETWEEN 0 AND 10", intent, transaction) != 0)
             {
                 return null;
             }

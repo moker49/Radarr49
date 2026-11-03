@@ -36,6 +36,7 @@ namespace NzbDrone.Core.Download
         private readonly IRejectedImportService _rejectedImportService;
         private readonly Logger _logger;
         private readonly IDownloadReservationRepository _reservations;
+        private readonly IVersionFileImportRepository _imports;
 
         public CompletedDownloadService(IEventAggregator eventAggregator,
                                         IHistoryService historyService,
@@ -46,7 +47,8 @@ namespace NzbDrone.Core.Download
                                         ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
                                         IRejectedImportService rejectedImportService,
                                         Logger logger,
-                                        IDownloadReservationRepository reservations)
+                                        IDownloadReservationRepository reservations,
+                                        IVersionFileImportRepository imports)
         {
             _eventAggregator = eventAggregator;
             _historyService = historyService;
@@ -58,6 +60,7 @@ namespace NzbDrone.Core.Download
             _rejectedImportService = rejectedImportService;
             _logger = logger;
             _reservations = reservations;
+            _imports = imports;
         }
 
         public void Check(TrackedDownload trackedDownload)
@@ -209,6 +212,12 @@ namespace NzbDrone.Core.Download
 
         public bool VerifyImport(TrackedDownload trackedDownload, List<ImportResult> importResults)
         {
+            if (trackedDownload.MovieVersionId.HasValue && (_imports.ForMovie(trackedDownload.RemoteMovie.Movie.Id) ?? new List<VersionFileImport>())
+                .Any(i => i.MovieVersionId == trackedDownload.MovieVersionId && i.IsActive))
+            {
+                return false;
+            }
+
             if (trackedDownload.DownloadReservationId.HasValue)
             {
                 var completed = _reservations.FindForDownload(trackedDownload.DownloadClient, trackedDownload.DownloadItem.DownloadId)
