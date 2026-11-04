@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
-import { fetchQualityProfileSchema, saveQualityProfile, setQualityProfileValue } from 'Store/Actions/settingsActions';
+import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
+import { fetchQualityProfileSchema, saveQualityProfile, saveQualityProfileEditor, setQualityProfileValue } from 'Store/Actions/settingsActions';
 import createProfileInUseSelector from 'Store/Selectors/createProfileInUseSelector';
 import createProviderSettingsSelector from 'Store/Selectors/createProviderSettingsSelector';
 import EditQualityProfileModalContent from './EditQualityProfileModalContent';
@@ -121,13 +122,17 @@ function createMapStateToProps() {
     createFormatsSelector(),
     createLanguagesSelector(),
     createProfileInUseSelector('qualityProfileId'),
-    (qualityProfile, qualities, customFormats, languages, isInUse) => {
+    (state) => state.settings.qualityProfiles.items,
+    (state) => state.rootFolders.items,
+    (qualityProfile, qualities, customFormats, languages, isInUse, profiles, rootFolders) => {
       return {
         qualities,
         customFormats,
         languages,
         ...qualityProfile,
-        isInUse
+        isInUse,
+        profiles,
+        rootFolders
       };
     }
   );
@@ -136,7 +141,9 @@ function createMapStateToProps() {
 const mapDispatchToProps = {
   fetchQualityProfileSchema,
   setQualityProfileValue,
-  saveQualityProfile
+  saveQualityProfile,
+  saveQualityProfileEditor,
+  fetchRootFolders
 };
 
 class EditQualityProfileModalContentConnector extends Component {
@@ -151,11 +158,13 @@ class EditQualityProfileModalContentConnector extends Component {
       dragQualityIndex: null,
       dropQualityIndex: null,
       dropPosition: null,
-      editGroups: false
+      editGroups: false,
+      compositeRows: this.getCompositeRows(props)
     };
   }
 
   componentDidMount() {
+    this.props.fetchRootFolders();
     if (!this.props.id && !this.props.isPopulated) {
       this.props.fetchQualityProfileSchema();
     }
@@ -169,6 +178,22 @@ class EditQualityProfileModalContentConnector extends Component {
 
   //
   // Control
+
+  getCompositeRows = (props) => {
+    const definitions = props.item.compositeVersions?.value || [];
+    return props.profiles.filter((profile) => profile.id !== props.id && !profile.isComposite).map((profile) => {
+      const definition = definitions.find((entry) => entry.qualityProfileId === profile.id);
+      return { id: profile.id, name: profile.name, allowed: !!definition, definition };
+    }).sort((a, b) => (a.definition?.priority ?? 1000) - (b.definition?.priority ?? 1000) || a.name.localeCompare(b.name));
+  };
+
+  onCompositeAllowedChange = (id, allowed) => {
+    this.setState({ compositeRows: this.state.compositeRows.map((row) => (row.id === id ? { ...row, allowed } : row)) });
+  };
+
+  onCompositeOrderChange = (compositeRows) => {
+    this.setState({ compositeRows });
+  };
 
   ensureCutoff = (qualityProfile) => {
     const cutoff = qualityProfile.cutoff.value;
@@ -226,7 +251,42 @@ class EditQualityProfileModalContentConnector extends Component {
   };
 
   onSavePress = () => {
-    this.props.saveQualityProfile({ id: this.props.id });
+    const enabled = !!this.props.item.isComposite?.value;
+    const original = this.props.profiles.find((profile) => profile.id === this.props.id);
+    if (enabled || original?.isComposite) {
+      const selected = this.state.compositeRows.filter((row) => row.allowed);
+      const primary = selected.find((row) => row.definition?.isPrimary) || selected[0];
+      const labels = new Set(selected.filter((row) => row.definition).map((row) => row.definition.label.toLowerCase()));
+      const compositeVersions = selected.map((row, priority) => {
+        const base = Array.from(row.name).map((character) => {
+          const code = character.charCodeAt(0);
+          return code < 32 || (code >= 127 && code <= 159) || '<>:"/\\|?*'.includes(character) ? '_' : character;
+        }).join('').trim().replace(/\.+$/, '').slice(0, 64) || `Version ${row.id}`;
+        let label = row.definition?.label || base;
+        let collision = 0;
+        while (!row.definition && labels.has(label.toLowerCase())) {
+          const suffix = `-${row.id}${collision ? `-${collision}` : ''}`;
+          label = `${base.slice(0, 64 - suffix.length)}${suffix}`;
+          collision++;
+        }
+        labels.add(label.toLowerCase());
+        return {
+          id: this.props.id ? row.definition?.id || 0 : 0,
+          qualityProfileId: row.id,
+          label,
+          priority,
+          isPrimary: row.id === primary.id
+        };
+      });
+      this.props.saveQualityProfileEditor({
+        id: this.props.id,
+        isComposite: enabled,
+        compositeVersions: enabled ? compositeVersions : [],
+        compositeRootFolder: this.props.item.compositeRootFolder?.value || this.props.rootFolders[0]?.path || null
+      });
+    } else {
+      this.props.saveQualityProfile({ id: this.props.id });
+    }
   };
 
   onQualityProfileItemAllowedChange = (id, allowed) => {
@@ -502,6 +562,8 @@ class EditQualityProfileModalContentConnector extends Component {
         onQualityProfileItemDragEnd={this.onQualityProfileItemDragEnd}
         onQualityProfileFormatItemScoreChange={this.onQualityProfileFormatItemScoreChange}
         onToggleEditGroupsMode={this.onToggleEditGroupsMode}
+        onCompositeAllowedChange={this.onCompositeAllowedChange}
+        onCompositeOrderChange={this.onCompositeOrderChange}
       />
     );
   }
@@ -518,7 +580,12 @@ EditQualityProfileModalContentConnector.propTypes = {
   setQualityProfileValue: PropTypes.func.isRequired,
   fetchQualityProfileSchema: PropTypes.func.isRequired,
   saveQualityProfile: PropTypes.func.isRequired,
+  saveQualityProfileEditor: PropTypes.func.isRequired,
+  fetchRootFolders: PropTypes.func.isRequired,
+  profiles: PropTypes.arrayOf(PropTypes.object).isRequired,
+  rootFolders: PropTypes.arrayOf(PropTypes.object).isRequired,
   onModalClose: PropTypes.func.isRequired
 };
 
 export default connect(createMapStateToProps, mapDispatchToProps)(EditQualityProfileModalContentConnector);
+

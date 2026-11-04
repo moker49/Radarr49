@@ -20,6 +20,7 @@ const section = 'settings.qualityProfiles';
 export const FETCH_QUALITY_PROFILES = 'settings/qualityProfiles/fetchQualityProfiles';
 export const FETCH_QUALITY_PROFILE_SCHEMA = 'settings/qualityProfiles/fetchQualityProfileSchema';
 export const SAVE_QUALITY_PROFILE = 'settings/qualityProfiles/saveQualityProfile';
+export const SAVE_QUALITY_PROFILE_EDITOR = 'settings/qualityProfiles/saveQualityProfileEditor';
 export const DELETE_QUALITY_PROFILE = 'settings/qualityProfiles/deleteQualityProfile';
 export const SET_QUALITY_PROFILE_VALUE = 'settings/qualityProfiles/setQualityProfileValue';
 export const CLONE_QUALITY_PROFILE = 'settings/qualityProfiles/cloneQualityProfile';
@@ -30,6 +31,7 @@ export const CLONE_QUALITY_PROFILE = 'settings/qualityProfiles/cloneQualityProfi
 export const fetchQualityProfiles = createThunk(FETCH_QUALITY_PROFILES);
 export const fetchQualityProfileSchema = createThunk(FETCH_QUALITY_PROFILE_SCHEMA);
 export const saveQualityProfile = createThunk(SAVE_QUALITY_PROFILE);
+export const saveQualityProfileEditor = createThunk(SAVE_QUALITY_PROFILE_EDITOR);
 export const deleteQualityProfile = createThunk(DELETE_QUALITY_PROFILE);
 
 export const setQualityProfileValue = createAction(SET_QUALITY_PROFILE_VALUE, (payload) => {
@@ -72,6 +74,7 @@ export default {
     [FETCH_QUALITY_PROFILES]: createFetchHandler(section, '/qualityprofile'),
     [FETCH_QUALITY_PROFILE_SCHEMA]: createFetchSchemaHandler(section, '/qualityprofile/schema'),
     [SAVE_QUALITY_PROFILE]: createSaveProviderHandler(section, '/qualityprofile'),
+    [SAVE_QUALITY_PROFILE_EDITOR]: createSaveProviderHandler(section, '/qualityprofile/editor'),
     [DELETE_QUALITY_PROFILE]: createRemoveItemHandler(section, '/qualityprofile')
   },
 

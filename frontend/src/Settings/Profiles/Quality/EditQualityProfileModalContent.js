@@ -16,6 +16,7 @@ import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes, kinds, sizes } from 'Helpers/Props';
 import dimensions from 'Styles/Variables/dimensions';
 import translate from 'Utilities/String/translate';
+import CompositeProfileItems from './CompositeProfileItems';
 import QualityProfileFormatItems from './QualityProfileFormatItems';
 import QualityProfileItems from './QualityProfileItems';
 import styles from './EditQualityProfileModalContent.css';
@@ -116,6 +117,10 @@ class EditQualityProfileModalContent extends Component {
       onSavePress,
       onModalClose,
       onDeleteQualityProfilePress,
+      compositeRows,
+      rootFolders,
+      onCompositeAllowedChange,
+      onCompositeOrderChange,
       ...otherProps
     } = this.props;
 
@@ -133,6 +138,7 @@ class EditQualityProfileModalContent extends Component {
     } = item;
 
     const languageId = language ? language.value.id : 0;
+    const isComposite = !!item.isComposite?.value;
 
     return (
       <ModalContent onModalClose={onModalClose}>
@@ -185,123 +191,155 @@ class EditQualityProfileModalContent extends Component {
                         </FormGroup>
 
                         <FormGroup size={sizes.EXTRA_SMALL}>
-                          <FormLabel size={sizes.SMALL}>
-                            {translate('UpgradesAllowed')}
-                          </FormLabel>
-
+                          <FormLabel size={sizes.SMALL}>{translate('CompositeProfile')}</FormLabel>
                           <FormInputGroup
                             type={inputTypes.CHECK}
-                            name="upgradeAllowed"
-                            {...upgradeAllowed}
-                            helpText={translate('UpgradesAllowedHelpText')}
+                            name="isComposite"
+                            value={isComposite}
+                            helpText={translate('CompositeProfileHelp')}
                             onChange={onInputChange}
                           />
                         </FormGroup>
 
-                        {
-                          upgradeAllowed.value &&
-                            <FormGroup size={sizes.EXTRA_SMALL}>
-                              <FormLabel size={sizes.SMALL}>
-                                {translate('UpgradeUntil')}
-                              </FormLabel>
-
-                              <FormInputGroup
-                                type={inputTypes.SELECT}
-                                name="cutoff"
-                                {...cutoff}
-                                values={qualities}
-                                helpText={translate('UpgradeUntilMovieHelpText')}
-                                onChange={onCutoffChange}
-                              />
-                            </FormGroup>
-                        }
-
-                        {
-                          formatItems.value.length > 0 &&
-                            <FormGroup size={sizes.EXTRA_SMALL}>
-                              <FormLabel size={sizes.SMALL}>
-                                {translate('MinimumCustomFormatScore')}
-                              </FormLabel>
-
-                              <FormInputGroup
-                                type={inputTypes.NUMBER}
-                                name="minFormatScore"
-                                {...minFormatScore}
-                                helpText={translate('MinimumCustomFormatScoreHelpText')}
-                                onChange={onInputChange}
-                              />
-                            </FormGroup>
-                        }
-
-                        {
-                          upgradeAllowed.value && formatItems.value.length > 0 &&
-                            <FormGroup size={sizes.EXTRA_SMALL}>
-                              <FormLabel size={sizes.SMALL}>
-                                {translate('UpgradeUntilCustomFormatScore')}
-                              </FormLabel>
-
-                              <FormInputGroup
-                                type={inputTypes.NUMBER}
-                                name="cutoffFormatScore"
-                                {...cutoffFormatScore}
-                                helpText={translate('UpgradeUntilCustomFormatScoreMovieHelpText')}
-                                onChange={onInputChange}
-                              />
-                            </FormGroup>
-                        }
-
-                        {
-                          upgradeAllowed.value && formatItems.value.length > 0 ?
-                            <FormGroup size={sizes.EXTRA_SMALL}>
-                              <FormLabel size={sizes.SMALL}>
-                                {translate('MinimumCustomFormatScoreIncrement')}
-                              </FormLabel>
-
-                              <FormInputGroup
-                                type={inputTypes.NUMBER}
-                                name="minUpgradeFormatScore"
-                                min={1}
-                                {...minUpgradeFormatScore}
-                                helpText={translate('MinimumCustomFormatScoreIncrementHelpText')}
-                                onChange={onInputChange}
-                              />
-                            </FormGroup> :
-                            null
-                        }
-
-                        <FormGroup size={sizes.EXTRA_SMALL}>
-                          <FormLabel size={sizes.SMALL}>
-                            {translate('Language')}
-                          </FormLabel>
-
+                        {isComposite ? <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>{translate('RootFolder')}</FormLabel>
                           <FormInputGroup
-                            type={inputTypes.LANGUAGE_SELECT}
-                            name="language"
-                            values={languages}
-                            value={languageId}
-                            helpText={translate('LanguageHelpText')}
-                            onChange={onLanguageChange}
+                            type={inputTypes.SELECT}
+                            name="compositeRootFolder"
+                            value={item.compositeRootFolder?.value || rootFolders[0]?.path || ''}
+                            values={rootFolders.map((root) => ({ key: root.path, value: root.path }))}
+                            helpText={translate('CompositeProfileRootHelp')}
+                            onChange={onInputChange}
                           />
-                        </FormGroup>
+                        </FormGroup> : null}
 
-                        <div className={styles.formatItemLarge}>
-                          {getCustomFormatRender(formatItems, otherProps)}
+                        <div hidden={isComposite}>
+
+                          <FormGroup size={sizes.EXTRA_SMALL}>
+                            <FormLabel size={sizes.SMALL}>
+                              {translate('UpgradesAllowed')}
+                            </FormLabel>
+
+                            <FormInputGroup
+                              type={inputTypes.CHECK}
+                              name="upgradeAllowed"
+                              {...upgradeAllowed}
+                              helpText={translate('UpgradesAllowedHelpText')}
+                              onChange={onInputChange}
+                            />
+                          </FormGroup>
+
+                          {
+                            upgradeAllowed.value &&
+                              <FormGroup size={sizes.EXTRA_SMALL}>
+                                <FormLabel size={sizes.SMALL}>
+                                  {translate('UpgradeUntil')}
+                                </FormLabel>
+
+                                <FormInputGroup
+                                  type={inputTypes.SELECT}
+                                  name="cutoff"
+                                  {...cutoff}
+                                  values={qualities}
+                                  helpText={translate('UpgradeUntilMovieHelpText')}
+                                  onChange={onCutoffChange}
+                                />
+                              </FormGroup>
+                          }
+
+                          {
+                            formatItems.value.length > 0 &&
+                              <FormGroup size={sizes.EXTRA_SMALL}>
+                                <FormLabel size={sizes.SMALL}>
+                                  {translate('MinimumCustomFormatScore')}
+                                </FormLabel>
+
+                                <FormInputGroup
+                                  type={inputTypes.NUMBER}
+                                  name="minFormatScore"
+                                  {...minFormatScore}
+                                  helpText={translate('MinimumCustomFormatScoreHelpText')}
+                                  onChange={onInputChange}
+                                />
+                              </FormGroup>
+                          }
+
+                          {
+                            upgradeAllowed.value && formatItems.value.length > 0 &&
+                              <FormGroup size={sizes.EXTRA_SMALL}>
+                                <FormLabel size={sizes.SMALL}>
+                                  {translate('UpgradeUntilCustomFormatScore')}
+                                </FormLabel>
+
+                                <FormInputGroup
+                                  type={inputTypes.NUMBER}
+                                  name="cutoffFormatScore"
+                                  {...cutoffFormatScore}
+                                  helpText={translate('UpgradeUntilCustomFormatScoreMovieHelpText')}
+                                  onChange={onInputChange}
+                                />
+                              </FormGroup>
+                          }
+
+                          {
+                            upgradeAllowed.value && formatItems.value.length > 0 ?
+                              <FormGroup size={sizes.EXTRA_SMALL}>
+                                <FormLabel size={sizes.SMALL}>
+                                  {translate('MinimumCustomFormatScoreIncrement')}
+                                </FormLabel>
+
+                                <FormInputGroup
+                                  type={inputTypes.NUMBER}
+                                  name="minUpgradeFormatScore"
+                                  min={1}
+                                  {...minUpgradeFormatScore}
+                                  helpText={translate('MinimumCustomFormatScoreIncrementHelpText')}
+                                  onChange={onInputChange}
+                                />
+                              </FormGroup> :
+                              null
+                          }
+
+                          <FormGroup size={sizes.EXTRA_SMALL}>
+                            <FormLabel size={sizes.SMALL}>
+                              {translate('Language')}
+                            </FormLabel>
+
+                            <FormInputGroup
+                              type={inputTypes.LANGUAGE_SELECT}
+                              name="language"
+                              values={languages}
+                              value={languageId}
+                              helpText={translate('LanguageHelpText')}
+                              onChange={onLanguageChange}
+                            />
+                          </FormGroup>
+
+                          <div className={styles.formatItemLarge}>
+                            {getCustomFormatRender(formatItems, otherProps)}
+                          </div>
                         </div>
                       </div>
 
                       <div className={styles.formGroupWrapper}>
-                        <QualityProfileItems
-                          editGroups={editGroups}
-                          qualityProfileItems={items.value}
-                          errors={items.errors}
-                          warnings={items.warnings}
-                          {...otherProps}
-                        />
+                        {isComposite ?
+                          <CompositeProfileItems
+                            items={compositeRows}
+                            onAllowedChange={onCompositeAllowedChange}
+                            onOrderChange={onCompositeOrderChange}
+                          /> :
+                          <QualityProfileItems
+                            editGroups={editGroups}
+                            qualityProfileItems={items.value}
+                            errors={items.errors}
+                            warnings={items.warnings}
+                            {...otherProps}
+                          />}
                       </div>
 
-                      <div className={styles.formatItemSmall}>
+                      {isComposite ? null : <div className={styles.formatItemSmall}>
                         {getCustomFormatRender(formatItems, otherProps)}
-                      </div>
+                      </div>}
                     </div>
                   </Form>
 
@@ -345,6 +383,7 @@ class EditQualityProfileModalContent extends Component {
 
             <SpinnerErrorButton
               isSpinning={isSaving}
+              isDisabled={isComposite && compositeRows.filter((row) => row.allowed).length !== 2}
               error={saveError}
               onPress={onSavePress}
             >
@@ -367,6 +406,10 @@ EditQualityProfileModalContent.propTypes = {
   customFormats: PropTypes.arrayOf(PropTypes.object).isRequired,
   languages: PropTypes.arrayOf(PropTypes.object).isRequired,
   item: PropTypes.object.isRequired,
+  compositeRows: PropTypes.arrayOf(PropTypes.object).isRequired,
+  rootFolders: PropTypes.arrayOf(PropTypes.object).isRequired,
+  onCompositeAllowedChange: PropTypes.func.isRequired,
+  onCompositeOrderChange: PropTypes.func.isRequired,
   isInUse: PropTypes.bool.isRequired,
   onInputChange: PropTypes.func.isRequired,
   onCutoffChange: PropTypes.func.isRequired,

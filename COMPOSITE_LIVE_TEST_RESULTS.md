@@ -318,6 +318,45 @@ Evidence: `_temp/quality-global-live-result.json`, `_temp/quality-global-*-tests
 `_temp/quality-global-container.log`, `_temp/quality-global-frontend-build.log` and
 the profiles/definitions before/after snapshots with the same prefix.
 
+## Composite profile editor (2026-11-04)
+
+The profile modal now includes a Composite Profile toggle. Enabled mode replaces the
+ordinary quality/format controls with the configured root folder and a checklist of
+all eligible ordinary profiles. It reuses the existing quality row/drag components;
+top-to-bottom enabled order becomes version priority. Exactly two enabled children are
+required before Save is enabled. It excludes itself and other composites. Version
+labels are initialized from child names with filename-safe, unique fallbacks; existing
+labels and primary identity survive reordering. Cloning creates fresh definition IDs.
+
+New explicit POST/PUT `qualityprofile/editor[/id]` routes save metadata, definitions
+and activation root in one database transaction. New composites can use configured
+sandbox roots already containing movies. The older activation and legacy mutation
+routes retain their restrictions. An assigned composite permits name/priority edits,
+but refuses child rebinding, label/primary changes, mode conversion or root changes.
+Ordinary assigned profiles cannot implicitly become composites. The existing ordinary
+profile save route remains in use for ordinary edits.
+
+Validation passed 113 core profile/runtime/scheduler tests, all 70 v3 API tests and
+16 container checks (one existing skip). New database tests include creation, injected
+failure after parent/first-version insert with full rollback, stable IDs and file
+assignments after reordering, unsafe-conversion rejection without partial rename,
+unused mode reversal, referenced-child protection and repeated-ID rejection. Frontend
+lint/full build and isolated component checks passed; these cover eligible choices,
+drag/toggle handling, priority, stable primary identity, clone IDs and sanitized labels.
+Real-browser drag/layout verification was not performed.
+
+The backend/frontend were deployed. A temporary composite was created, activated in
+the sandbox root, reordered, returned to ordinary mode and deleted through the live API.
+Reordering preserved definition IDs and the SDR primary; legacy parent editing returned
+409. The existing assigned SDR+HDR profile accepted an unchanged explicit editor save
+and rejected mode conversion with 409. Complete comparisons preserved its configuration
+and Fast Five version assignments. The final frontend label-handling update was built
+and copied into the running UI. Movie lookup remained HTTP 200.
+
+Evidence: `_temp/composite-editor-live-result.json`, existing/files before/after
+snapshots with the same prefix, `_temp/composite-editor-*-tests.log`,
+`_temp/composite-editor-container.log` and `_temp/composite-editor-frontend-build.log`.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are

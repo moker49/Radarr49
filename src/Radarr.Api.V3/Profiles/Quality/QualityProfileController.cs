@@ -17,12 +17,14 @@ namespace Radarr.Api.V3.Profiles.Quality
         private readonly IQualityProfileService _qualityProfileService;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
         private readonly ICompositeProfileVersionRepository _compositeVersions;
+        private readonly ICompositeProfileEditorRepository _editor;
 
-        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService, ICompositeProfilePolicy compositeProfilePolicy, ICompositeProfileVersionRepository compositeVersions)
+        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService, ICompositeProfilePolicy compositeProfilePolicy, ICompositeProfileVersionRepository compositeVersions, ICompositeProfileEditorRepository editor)
         {
             _qualityProfileService = qualityProfileService;
             _compositeProfilePolicy = compositeProfilePolicy;
             _compositeVersions = compositeVersions;
+            _editor = editor;
 
             SharedValidator.RuleFor(c => c.Name).NotEmpty();
 
@@ -83,17 +85,46 @@ namespace Radarr.Api.V3.Profiles.Quality
         protected override QualityProfileResource GetResourceById(int id)
         {
             var resource = _qualityProfileService.Get(id).ToResource();
-            resource.IsComposite = _compositeVersions.ForProfile(id).Any();
+            resource.CompositeVersions = _compositeVersions.ForProfile(id).OrderBy(v => v.Priority).ToList();
+            resource.IsComposite = resource.CompositeVersions.Any();
             return resource;
         }
 
         [HttpGet]
         public List<QualityProfileResource> GetAll()
         {
-            var compositeIds = _compositeVersions.All().Select(v => v.CompositeProfileId).ToHashSet();
+            var versions = _compositeVersions.All().ToLookup(v => v.CompositeProfileId);
             var resources = _qualityProfileService.All().ToResource();
-            resources.ForEach(p => p.IsComposite = compositeIds.Contains(p.Id));
+            resources.ForEach(p =>
+            {
+                p.CompositeVersions = versions[p.Id].OrderBy(v => v.Priority).ToList();
+                p.IsComposite = p.CompositeVersions.Any();
+            });
             return resources;
+        }
+
+        [HttpPost("editor")]
+        public QualityProfileResource CreateEditor([FromBody] QualityProfileResource resource)
+        {
+            resource.Id = 0;
+            return SaveEditor(resource);
+        }
+
+        [HttpPut("editor/{id:int}")]
+        public QualityProfileResource UpdateEditor(int id, [FromBody] QualityProfileResource resource)
+        {
+            if (resource.Id != id)
+            {
+                throw new BadRequestException("The profile ID does not match the requested profile.");
+            }
+
+            return SaveEditor(resource);
+        }
+
+        private QualityProfileResource SaveEditor(QualityProfileResource resource)
+        {
+            var id = _editor.Save(resource.ToModel(), resource.IsComposite, resource.CompositeVersions, resource.CompositeRootFolder);
+            return GetResourceById(id);
         }
     }
 }

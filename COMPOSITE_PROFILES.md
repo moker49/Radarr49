@@ -46,6 +46,15 @@ later one. This replaces the earlier configurable aggregate cap of one or two do
 - Composite configuration is available through a separate API. Draft assignment and
   downloads remain blocked; opt-in test activation enables new additions under its bound
   root. Search, tracking, import and naming use explicit version contexts.
+- The profile editor exposes a Composite Profile toggle and a draggable checklist of
+  ordinary child profiles, excluding itself and composite parents. Exactly two enabled
+  children are required; top-to-bottom order sets priority. The editor's explicit save
+  API atomically persists profile metadata and definitions. Its root-folder selection
+  activates new composites beneath a configured existing root, including sandbox roots
+  containing other movies. Existing legacy activation endpoints retain their restrictions.
+  Assigned composites may be renamed/reordered while retaining definition IDs, labels,
+  primary identity and root; rebinding children or switching mode requires explicit
+  conversion. Ordinary legacy profile-edit guards remain unchanged.
 - Ordinary profiles now support per-quality SizeDefinitions in storage, API and the
   Quality settings screen, whose scope selector offers Global and all non-composite
   profiles. Release size rejection and preferred-size ranking use these settings through

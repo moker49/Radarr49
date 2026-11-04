@@ -22,6 +22,8 @@ namespace Radarr.Api.V3.Profiles.Quality
         public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
         public bool? UseGlobalSizeDefinitions { get; set; }
         public bool IsComposite { get; set; }
+        public List<CompositeProfileVersion> CompositeVersions { get; set; }
+        public string CompositeRootFolder { get; set; }
     }
 
     public class QualityProfileQualityItemResource : RestResource
@@ -66,7 +68,8 @@ namespace Radarr.Api.V3.Profiles.Quality
                 FormatItems = model.FormatItems.ConvertAll(ToResource),
                 Language = model.Language,
                 SizeDefinitions = model.SizeDefinitions,
-                UseGlobalSizeDefinitions = model.UseGlobalSizeDefinitions ?? false
+                UseGlobalSizeDefinitions = model.UseGlobalSizeDefinitions ?? false,
+                CompositeRootFolder = model.CompositeTestRoot
             };
         }
 
