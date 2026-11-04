@@ -8,6 +8,11 @@ for configuration, activation and the first controlled test. Existing-movie conv
 managed folder moves and the full composite UI remain unavailable. Earlier validation
 entries below describe their respective stages, rather than current activation status.
 
+The first hosted test has now passed with Bao: both real downloads/imports, an isolated
+SDR replacement, legacy API protections, and a full backend restart plus rescan with
+stable file identities and hashes. See [COMPOSITE_LIVE_TEST_RESULTS.md](COMPOSITE_LIVE_TEST_RESULTS.md)
+for evidence, download-client observations and the remaining unverified cases.
+
 ## Contract
 
 An ordinary quality profile is one implicit movie version. A composite is an existing
