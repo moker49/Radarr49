@@ -52,7 +52,7 @@ namespace NzbDrone.Core.Download.Clients.Sabnzbd
 
             request.AddFormUpload("name", filename, nzbData, "application/x-nzb");
 
-            if (!Json.TryDeserialize<SabnzbdAddResponse>(ProcessRequest(request, settings), out var response))
+            if (!Json.TryDeserialize<SabnzbdAddResponse>(ProcessRequest(request, settings, allowEmptyAddRejection: true), out var response))
             {
                 response = new SabnzbdAddResponse();
                 response.Status = true;
@@ -184,7 +184,7 @@ namespace NzbDrone.Core.Download.Clients.Sabnzbd
             return requestBuilder;
         }
 
-        private string ProcessRequest(HttpRequestBuilder requestBuilder, SabnzbdSettings settings)
+        private string ProcessRequest(HttpRequestBuilder requestBuilder, SabnzbdSettings settings, bool allowEmptyAddRejection = false)
         {
             var httpRequest = requestBuilder.Build();
 
@@ -214,12 +214,12 @@ namespace NzbDrone.Core.Download.Clients.Sabnzbd
                 throw new DownloadClientUnavailableException("Unable to connect to SABnzbd, {0}", ex, ex.Message);
             }
 
-            CheckForError(response);
+            CheckForError(response, allowEmptyAddRejection);
 
             return response.Content;
         }
 
-        private void CheckForError(HttpResponse response)
+        private void CheckForError(HttpResponse response, bool allowEmptyAddRejection)
         {
             if (!Json.TryDeserialize<SabnzbdJsonError>(response.Content, out var result))
             {
@@ -241,6 +241,15 @@ namespace NzbDrone.Core.Download.Clients.Sabnzbd
 
             if (result.Failed)
             {
+                // SAB can reject a duplicate addfile with status:false and no error.
+                // Return that response to the client adapter, which requires a download
+                // ID and reports a definitive release rejection. Other API errors and
+                // transport failures must retain their existing failure handling.
+                if (allowEmptyAddRejection && string.IsNullOrWhiteSpace(result.Error))
+                {
+                    return;
+                }
+
                 throw new DownloadClientException("Error response received from SABnzbd: {0}", result.Error);
             }
         }

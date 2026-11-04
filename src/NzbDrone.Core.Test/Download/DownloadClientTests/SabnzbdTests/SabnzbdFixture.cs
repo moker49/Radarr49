@@ -7,9 +7,11 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Disk;
+using NzbDrone.Common.Http;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.Clients.Sabnzbd;
 using NzbDrone.Core.Download.Clients.Sabnzbd.Responses;
+using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.RemotePathMappings;
 using NzbDrone.Core.Validation;
 using NzbDrone.Test.Common;
@@ -323,6 +325,20 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
             var id = await Subject.Download(remoteMovie, CreateIndexer());
 
             id.Should().NotBeNullOrEmpty();
+        }
+
+        [Test]
+        public void empty_duplicate_rejection_from_real_proxy_should_be_definitive()
+        {
+            Mocker.GetMock<IHttpClient>()
+                .Setup(c => c.Execute(It.IsAny<HttpRequest>()))
+                .Returns<HttpRequest>(request => new HttpResponse(request, new HttpHeader(), "{\"status\":false}"));
+            var proxy = Mocker.Resolve<SabnzbdProxy>();
+            Mocker.GetMock<ISabnzbdProxy>()
+                .Setup(p => p.DownloadNzb(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<SabnzbdSettings>()))
+                .Returns<byte[], string, string, int, SabnzbdSettings>(proxy.DownloadNzb);
+
+            Assert.ThrowsAsync<DownloadClientRejectedReleaseException>(() => Subject.Download(CreateRemoteMovie(), CreateIndexer()));
         }
 
         [Test]

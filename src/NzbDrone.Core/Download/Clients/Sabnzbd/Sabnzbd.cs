@@ -46,7 +46,7 @@ namespace NzbDrone.Core.Download.Clients.Sabnzbd
 
             if (response == null || response.Ids.Empty())
             {
-                throw new DownloadClientRejectedReleaseException(remoteMovie.Release, "SABnzbd rejected the NZB for an unknown reason");
+                throw new DownloadClientRejectedReleaseException(remoteMovie.Release, "SABnzbd rejected the NZB without returning a download ID (possible duplicate).");
             }
 
             return response.Ids.First();

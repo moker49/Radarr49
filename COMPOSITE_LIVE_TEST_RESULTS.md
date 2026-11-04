@@ -221,6 +221,39 @@ request routing. Browser click verification could not be completed: the desktop 
 stopped because it could not establish the active browser URL. No further UI
 automation was attempted; the live deletion was verified through the authorized API.
 
+## SABnzbd duplicate rejection recovery (2026-11-04)
+
+An automatic Fast Five search at 10:00 EST selected the previously downloaded PRoDJi
+release. SABnzbd's log explicitly records `Ignoring duplicate NZB` and purging that
+new attempt. Its addfile response reported false status with no explanatory error.
+The proxy raised a generic client exception before the existing no-download-ID
+rejection handling could run. Reservation 13 therefore became Uncertain, retained
+the SDR slot and caused a VersionDownloadLimit pending Activity entry. This was not
+an active SABnzbd download, although nzb360 displayed it as downloading.
+
+The addfile path now permits that empty-error negative response to reach the
+existing client adapter, which rejects it with DownloadClientRejectedReleaseException.
+The reservation is recorded as definitively Failed and its slot is released, allowing
+the automatic search to continue. Explicit client errors, errors from other API
+methods and ambiguous transport failures retain their existing handling. The rejection
+message now mentions a possible duplicate without claiming every rejection is one.
+
+Validation: 174 focused SABnzbd, download service, version decision and reservation
+tests passed (one existing skip). Coverage includes the real proxy-to-adapter path,
+managed reservation release, no grab event on rejection, accepted download IDs,
+explicit API errors and uncertain timeouts. The backend was built and deployed.
+
+After independently checking SAB's duplicate log and empty live queue, the stale
+pending entry was removed and reservation 13 was resolved through the existing
+confirm-not-submitted API. No database edits or SAB duplicate-setting changes were
+made. A fresh automatic search (command 2302) rejected both PRoDJi candidates with
+Failed reservations 14/15, then submitted the HDC SDR release as reservation 16.
+Both Radarr and SABnzbd reported the exact ID `SABnzbd_nzo_n33ht4gz` downloading.
+HDR retained version 4/file 5. The new SDR download was left running.
+
+Evidence: `_temp/sab-duplicate-tests.log`, `_temp/sab-duplicate-live-result.json`,
+`_temp/sab-duplicate-before.json` and `_temp/sab-duplicate-after.json`.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are

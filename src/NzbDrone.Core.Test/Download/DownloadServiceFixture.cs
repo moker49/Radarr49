@@ -124,6 +124,21 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
+        public void client_release_rejection_should_release_managed_slot_without_grab_event()
+        {
+            _parseResult.MovieVersionId = 201;
+            var client = WithUsenetClient();
+            Mocker.GetMock<IDownloadReservationService>().Setup(s => s.Reserve(_parseResult, It.IsAny<int>())).Returns(new DownloadReservation { Id = 42 });
+            client.Setup(s => s.Download(_parseResult, It.IsAny<IIndexer>())).ThrowsAsync(new DownloadClientRejectedReleaseException(_parseResult.Release, "Possible duplicate"));
+
+            Assert.ThrowsAsync<DownloadClientRejectedReleaseException>(() => Subject.DownloadReport(_parseResult, null));
+
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.DispatchFailed(42, true, "Possible duplicate"), Times.Once());
+            Mocker.GetMock<IDownloadReservationService>().Verify(s => s.Submitted(It.IsAny<int>(), It.IsAny<string>()), Times.Never());
+            VerifyEventNotPublished<MovieGrabbedEvent>();
+        }
+
+        [Test]
         public void ambiguous_client_failure_should_not_be_classified_as_definitive_rejection()
         {
             _parseResult.MovieVersionId = 201;
