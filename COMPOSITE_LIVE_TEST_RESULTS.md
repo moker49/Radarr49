@@ -76,6 +76,21 @@ This run used a normal restart after imports completed, not an import crash simu
 Existing-library conversion, managed folder moves, whole-movie removal and the full
 composite editor remain pending implementation.
 
+## Follow-up: movie lookup after the agent-initiated restart
+
+The backend initially launched by the test inherited the tool sandbox's outbound network
+restrictions. Later new-movie searches returned HTTP 503 with Windows socket error 10013
+for `api.radarr.video:443`. This was an execution-environment issue introduced by that
+restart, rather than a composite-profile or client/API compatibility failure.
+
+The dev backend was gracefully stopped and relaunched outside the tool sandbox using an
+approved elevated tool execution. No source, firewall, API key or media changes were
+needed. Lookup requests for `fast five` and `bao` then returned HTTP 200 with six and
+twenty results, respectively. Bao's SDR/HDR assignments remained file IDs 4 and 3. Future
+agent-initiated backend launches must run outside the restricted tool process if the
+instance needs outbound metadata/indexer access; launching via the user's desktop script
+also avoids this inherited restriction.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are
