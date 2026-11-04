@@ -18,6 +18,8 @@ interface CssExports {
   'releaseGroup': string;
   'size': string;
   'subtitles': string;
+  'unmanaged': string;
+  'unmanagedLabel': string;
   'video': string;
   'videoDynamicRangeType': string;
 }

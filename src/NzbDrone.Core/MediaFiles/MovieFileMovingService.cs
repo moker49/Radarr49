@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnsureThat;
@@ -33,6 +34,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IRootFolderService _rootFolderService;
         private readonly IEventAggregator _eventAggregator;
         private readonly IConfigService _configService;
+        private readonly IMediaFileRepository _files;
         private readonly Logger _logger;
         private readonly IVersionFileDeletionRepository _deletions;
 
@@ -46,7 +48,8 @@ namespace NzbDrone.Core.MediaFiles
                                 IEventAggregator eventAggregator,
                                 IConfigService configService,
                                 IVersionFileDeletionRepository deletions,
-                                Logger logger)
+                                Logger logger,
+                                IMediaFileRepository files)
         {
             _updateMovieFileService = updateMovieFileService;
             _buildFileNames = buildFileNames;
@@ -58,6 +61,7 @@ namespace NzbDrone.Core.MediaFiles
             _eventAggregator = eventAggregator;
             _configService = configService;
             _logger = logger;
+            _files = files;
             _deletions = deletions;
         }
 
@@ -106,6 +110,11 @@ namespace NzbDrone.Core.MediaFiles
         {
             Ensure.That(movieFile, () => movieFile).IsNotNull();
             Ensure.That(movie, () => movie).IsNotNull();
+            if (movieFile.IsUnmanaged || _files.GetFilesWithRelativePath(movie.Id, movie.Path.GetRelativePath(destinationFilePath))?.Any(f => f.IsUnmanaged) == true)
+            {
+                throw new MovieVersionImportException("An unmanaged file will not be renamed or replaced. Delete it explicitly before reusing its path.");
+            }
+
             _deletions.CheckReady(movie.Id, localMovie?.MovieVersionId ?? movie.ManagedVersion?.Id ?? movieFile.MovieVersionId);
             Ensure.That(destinationFilePath, () => destinationFilePath).IsValidPath(PathValidationType.CurrentOs);
 

@@ -17,6 +17,9 @@ namespace Radarr.Api.V3.Movies
 {
     public class MovieResource : RestResource
     {
+        public int? RetainChildProfileId { get; set; }
+        public int? ExistingFileChildProfileId { get; set; }
+
         public MovieResource()
         {
             Monitored = true;

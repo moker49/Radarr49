@@ -6,6 +6,7 @@ import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputButton from 'Components/Form/FormInputButton';
 import FormInputGroup from 'Components/Form/FormInputGroup';
+import FormInputHelpText from 'Components/Form/FormInputHelpText';
 import FormLabel from 'Components/Form/FormLabel';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
@@ -25,7 +26,12 @@ import {
 } from 'Helpers/Props';
 import MoveMovieModal from 'Movie/MoveMovie/MoveMovieModal';
 import useMovie from 'Movie/useMovie';
-import { saveMovie, setMovieValue } from 'Store/Actions/movieActions';
+import {
+  saveMovie,
+  saveMovieProfile,
+  setMovieValue,
+} from 'Store/Actions/movieActions';
+import { fetchQualityProfiles } from 'Store/Actions/settingsActions';
 import selectSettings from 'Store/Selectors/selectSettings';
 import { InputChanged } from 'typings/inputs';
 import translate from 'Utilities/String/translate';
@@ -50,6 +56,7 @@ function EditMovieModalContent({
     monitored,
     minimumAvailability,
     qualityProfileId,
+    movieFileId,
     path,
     tags,
     rootFolderPath: initialRootFolderPath,
@@ -60,6 +67,53 @@ function EditMovieModalContent({
   );
 
   const wasSaving = usePrevious(isSaving);
+  const profiles = useSelector(
+    (state: AppState) => state.settings.qualityProfiles.items
+  );
+  const [selectedChildProfileId, setSelectedChildProfileId] = useState('');
+  const targetProfileId = Number(
+    pendingChanges.qualityProfileId ?? qualityProfileId
+  );
+  const sourceProfile = profiles.find(
+    (profile) => profile.id === qualityProfileId
+  );
+  const targetProfile = profiles.find(
+    (profile) => profile.id === targetProfileId
+  );
+  const profileChanging = targetProfileId !== qualityProfileId;
+  const retainChoice = !!(
+    profileChanging &&
+    sourceProfile?.isComposite &&
+    !targetProfile?.isComposite &&
+    !sourceProfile.compositeVersions?.some(
+      (version) => version.qualityProfileId === targetProfileId
+    )
+  );
+  const assignChoice = !!(
+    profileChanging &&
+    !sourceProfile?.isComposite &&
+    targetProfile?.isComposite &&
+    (movieFileId || 0) > 0 &&
+    !targetProfile.compositeVersions?.some(
+      (version) => version.qualityProfileId === qualityProfileId
+    )
+  );
+  const choiceNeeded = retainChoice || assignChoice;
+  const useProfileEndpoint =
+    !!sourceProfile?.isComposite || !!targetProfile?.isComposite;
+  const choiceProfile = retainChoice ? sourceProfile : targetProfile;
+  const choices = choiceNeeded ? choiceProfile?.compositeVersions || [] : [];
+  const validChoice = choices.some(
+    (version) => version.qualityProfileId === Number(selectedChildProfileId)
+  );
+
+  useEffect(() => {
+    dispatch(fetchQualityProfiles());
+  }, [dispatch]);
+
+  useEffect(() => {
+    setSelectedChildProfileId('');
+  }, [targetProfileId]);
 
   const [isRootFolderModalOpen, setIsRootFolderModalOpen] = useState(false);
 
@@ -124,19 +178,45 @@ function EditMovieModalContent({
   }, []);
 
   const handleSavePress = useCallback(() => {
+    if ((choiceNeeded && !validChoice) || (profileChanging && isPathChanging)) {
+      return;
+    }
+
     if (isPathChanging && !isConfirmMoveModalOpen) {
       setIsConfirmMoveModalOpen(true);
     } else {
       setIsConfirmMoveModalOpen(false);
 
       dispatch(
-        saveMovie({
+        (useProfileEndpoint ? saveMovieProfile : saveMovie)({
           id: movieId,
           moveFiles: false,
+          ...(retainChoice
+            ? { retainChildProfileId: Number(selectedChildProfileId) }
+            : {}),
+          ...(assignChoice
+            ? { existingFileChildProfileId: Number(selectedChildProfileId) }
+            : {}),
         })
       );
     }
-  }, [movieId, isPathChanging, isConfirmMoveModalOpen, dispatch]);
+  }, [
+    movieId,
+    isPathChanging,
+    isConfirmMoveModalOpen,
+    dispatch,
+    choiceNeeded,
+    validChoice,
+    retainChoice,
+    assignChoice,
+    selectedChildProfileId,
+    useProfileEndpoint,
+    profileChanging,
+  ]);
+
+  const handleChildProfileChange = useCallback(({ value }: InputChanged) => {
+    setSelectedChildProfileId(String(value));
+  }, []);
 
   const handleMoveMoviePress = useCallback(() => {
     setIsConfirmMoveModalOpen(false);
@@ -204,6 +284,45 @@ function EditMovieModalContent({
             />
           </FormGroup>
 
+          {profileChanging ? (
+            <FormGroup size={sizes.MEDIUM}>
+              <FormLabel>{translate('ExistingFiles')}</FormLabel>
+              <div>
+                <FormInputHelpText
+                  text={translate('ProfileConversionKeepFilesHelp')}
+                />
+                {choiceNeeded ? (
+                  <FormInputGroup
+                    type={inputTypes.SELECT}
+                    name="conversionChildProfileId"
+                    value={selectedChildProfileId}
+                    values={[
+                      {
+                        key: '',
+                        value: translate(
+                          retainChoice
+                            ? 'ChooseVersionToKeepManaged'
+                            : 'ChooseExistingFileVersion'
+                        ),
+                      },
+                      ...choices.map((version) => ({
+                        key: version.qualityProfileId,
+                        value: version.label,
+                      })),
+                    ]}
+                    onChange={handleChildProfileChange}
+                  />
+                ) : null}
+                {isPathChanging ? (
+                  <FormInputHelpText
+                    text={translate('ProfileConversionSeparateMove')}
+                    isError={true}
+                  />
+                ) : null}
+              </div>
+            </FormGroup>
+          ) : null}
+
           <FormGroup size={sizes.MEDIUM}>
             <FormLabel>{translate('Path')}</FormLabel>
 
@@ -216,6 +335,7 @@ function EditMovieModalContent({
                   key="fileBrowser"
                   kind={kinds.DEFAULT}
                   title={translate('RootFolder')}
+                  isDisabled={profileChanging}
                   onPress={handleRootFolderPress}
                 >
                   <Icon name={icons.ROOT_FOLDER} />
@@ -252,6 +372,10 @@ function EditMovieModalContent({
 
         <SpinnerErrorButton
           error={saveError}
+          isDisabled={
+            (choiceNeeded && !validChoice) ||
+            (profileChanging && !!isPathChanging)
+          }
           isSpinning={isSaving}
           onPress={handleSavePress}
         >

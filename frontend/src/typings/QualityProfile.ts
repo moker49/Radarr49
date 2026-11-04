@@ -17,6 +17,16 @@ export interface ProfileSizeDefinition {
 }
 
 interface QualityProfile {
+  isComposite?: boolean;
+  compositeVersions?: {
+    id: number;
+    qualityProfileId: number;
+    label: string;
+    priority: number;
+    isPrimary: boolean;
+  }[];
+  compositeRootFolder?: string;
+  movieCount?: number;
   name: string;
   upgradeAllowed: boolean;
   cutoff: number;

@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Icon from 'Components/Icon';
+import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
 import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
@@ -88,7 +89,8 @@ class MovieFileEditorRow extends Component {
       indexerFlags,
       languages,
       dateAdded,
-      columns
+      columns,
+      isUnmanaged
     } = this.props;
 
     const {
@@ -101,7 +103,7 @@ class MovieFileEditorRow extends Component {
     const showLanguagePlaceholder = !languages;
 
     return (
-      <TableRow>
+      <TableRow className={isUnmanaged ? styles.unmanaged : undefined}>
         {
           columns.map((column) => {
             const {
@@ -121,6 +123,9 @@ class MovieFileEditorRow extends Component {
                   title={relativePath}
                 >
                   {relativePath}
+                  {isUnmanaged ? <span className={styles.unmanagedLabel} title={translate('UnmanagedFileHelp')}>
+                    <Label kind={kinds.DEFAULT}>{translate('Unmanaged')}</Label>
+                  </span> : null}
                 </TableRowCell>
               );
             }
@@ -327,6 +332,7 @@ class MovieFileEditorRow extends Component {
                   <IconButton
                     title={translate('EditMovieFile')}
                     name={icons.EDIT}
+                    isDisabled={isUnmanaged}
                     onPress={this.onFileEditPress}
                   />
 
@@ -379,6 +385,7 @@ class MovieFileEditorRow extends Component {
 
 MovieFileEditorRow.propTypes = {
   id: PropTypes.number.isRequired,
+  isUnmanaged: PropTypes.bool,
   size: PropTypes.number.isRequired,
   relativePath: PropTypes.string.isRequired,
   quality: PropTypes.object.isRequired,

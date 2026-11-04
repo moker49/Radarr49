@@ -4,6 +4,7 @@ using System.Net;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.RootFolders;
 
@@ -15,6 +16,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         bool EnsureNewMovieAllowed(Movie movie);
         void EnsureDownloadAllowed(Movie movie, int? movieVersionId);
         void EnsureLegacyMutationAllowed(IEnumerable<Movie> movies);
+        void EnsureLegacyDeletionAllowed(IEnumerable<Movie> movies);
         void EnsureLegacyProfileEditAllowed(int profileId);
         void EnsureProfileDeletionAllowed(int profileId);
     }
@@ -26,14 +28,16 @@ namespace NzbDrone.Core.Profiles.Qualities
         private readonly IQualityProfileRepository _profiles;
         private readonly IRootFolderService _roots;
         private readonly IDiskProvider _disk;
+        private readonly IMediaFileRepository _files;
 
-        public CompositeProfilePolicy(ICompositeProfileVersionRepository definitions, IMovieVersionRepository versions, IQualityProfileRepository profiles, IRootFolderService roots, IDiskProvider disk)
+        public CompositeProfilePolicy(ICompositeProfileVersionRepository definitions, IMovieVersionRepository versions, IQualityProfileRepository profiles, IRootFolderService roots, IDiskProvider disk, IMediaFileRepository files)
         {
             _definitions = definitions;
             _versions = versions;
             _profiles = profiles;
             _roots = roots;
             _disk = disk;
+            _files = files;
         }
 
         public bool EnsureNewMovieAllowed(Movie movie)
@@ -99,6 +103,17 @@ namespace NzbDrone.Core.Profiles.Qualities
             if (_definitions.ForProfile(profileId).Any())
             {
                 throw new NzbDroneClientException(HttpStatusCode.Conflict, "Composite profile definitions must be edited through the composite profile API.");
+            }
+        }
+
+        public void EnsureLegacyDeletionAllowed(IEnumerable<Movie> movies)
+        {
+            foreach (var movie in movies)
+            {
+                if (_files.GetFilesByMovie(movie.Id)?.Any(f => f.IsUnmanaged) == true)
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "This movie has retained unmanaged files. Delete those copies explicitly before deleting the movie through the legacy API.");
+                }
             }
         }
 

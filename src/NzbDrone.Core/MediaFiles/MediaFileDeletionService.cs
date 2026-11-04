@@ -1,10 +1,13 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net;
+using Dapper;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging;
@@ -18,6 +21,7 @@ namespace NzbDrone.Core.MediaFiles
     public interface IDeleteMediaFiles
     {
         void DeleteMovieFile(Movie movie, MovieFile movieFile);
+        void DeleteUnmanagedFile(int movieId, int movieFileId);
     }
 
     public class MediaFileDeletionService : IDeleteMediaFiles,
@@ -32,6 +36,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly IMainDatabase _database;
 
         public MediaFileDeletionService(IDiskProvider diskProvider,
                                         IRecycleBinProvider recycleBinProvider,
@@ -40,7 +45,8 @@ namespace NzbDrone.Core.MediaFiles
                                         IConfigService configService,
                                         IEventAggregator eventAggregator,
                                         ICompositeProfilePolicy compositeProfilePolicy,
-                                        Logger logger)
+                                        Logger logger,
+                                        IMainDatabase database)
         {
             _diskProvider = diskProvider;
             _recycleBinProvider = recycleBinProvider;
@@ -50,6 +56,7 @@ namespace NzbDrone.Core.MediaFiles
             _eventAggregator = eventAggregator;
             _logger = logger;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _database = database;
         }
 
         public void DeleteMovieFile(Movie movie, MovieFile movieFile)
@@ -58,7 +65,34 @@ namespace NzbDrone.Core.MediaFiles
             {
                 movie = _movieService.GetMovie(movie.Id) ?? movie;
                 _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+                if (movieFile.IsUnmanaged)
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "Delete retained unmanaged files through the explicit unmanaged-file action.");
+                }
+
                 DeleteMovieFileCore(movie, movieFile);
+            }
+        }
+
+        public void DeleteUnmanagedFile(int movieId, int movieFileId)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movieId))
+            {
+                var movie = _movieService.GetMovie(movieId);
+                var file = _mediaFileService.GetMovie(movieFileId);
+                MovieProfileConversion.Require(file.MovieId == movieId && file.IsUnmanaged && movie.MovieFileId != movieFileId, "The selected file is no longer an unmanaged copy of this movie.");
+                var fullPath = Path.GetFullPath(Path.Combine(movie.Path, file.RelativePath));
+                MovieProfileConversion.Require(!Path.IsPathRooted(file.RelativePath) && Path.GetFullPath(movie.Path).IsParentPath(fullPath), "The file is outside the movie folder.");
+                MovieProfileConversion.Require(!_mediaFileService.GetFilesByMovie(movieId).Any(f => f.Id != movieFileId && Path.GetFullPath(Path.Combine(movie.Path, f.RelativePath)).PathEquals(fullPath)), "Another file shares this path.");
+                using var connection = _database.OpenConnection();
+                MovieProfileConversion.CheckIdle(connection, null, movieId);
+                MovieProfileConversion.Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" WHERE \"MovieFileId\"=@movieFileId AND \"Retired\"=FALSE", new { movieFileId }) == 0, "A managed version owns this file.");
+                if (_diskProvider.FileExists(fullPath))
+                {
+                    MovieProfileConversion.Require(_diskProvider.GetFileSize(fullPath) == file.Size, "The file changed. Rescan before deleting it.");
+                }
+
+                DeleteMovieFileCore(movie, file);
             }
         }
 

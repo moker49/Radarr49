@@ -58,7 +58,7 @@ namespace NzbDrone.Core.MediaFiles
         public List<RenameMovieFilePreview> GetRenamePreviews(List<int> movieIds)
         {
             var movies = _movieService.GetMovies(movieIds);
-            var movieFiles = _mediaFileService.GetFilesByMovies(movieIds).ToLookup(f => f.MovieId);
+            var movieFiles = _mediaFileService.GetFilesByMovies(movieIds).Where(f => !f.IsUnmanaged).ToLookup(f => f.MovieId);
 
             return movies.SelectMany(movie =>
                 {
@@ -161,7 +161,7 @@ namespace NzbDrone.Core.MediaFiles
         public void Execute(RenameFilesCommand message)
         {
             var movie = _movieService.GetMovie(message.MovieId);
-            var movieFiles = _mediaFileService.GetMovies(message.Files);
+            var movieFiles = _mediaFileService.GetMovies(message.Files).Where(f => !f.IsUnmanaged).ToList();
 
             _logger.ProgressInfo("Renaming {0} files for {1}", movieFiles.Count, movie.Title);
             var renamedFiles = RenameFiles(movieFiles, movie);
@@ -177,7 +177,7 @@ namespace NzbDrone.Core.MediaFiles
 
             foreach (var movie in moviesToRename)
             {
-                var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
+                var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id).Where(f => !f.IsUnmanaged).ToList();
                 _logger.ProgressInfo("Renaming movie files for {0}", movie.Title);
                 var renamedFiles = RenameFiles(movieFiles, movie);
                 _logger.ProgressInfo("{0} movie files renamed for {1}", renamedFiles.Count, movie.Title);

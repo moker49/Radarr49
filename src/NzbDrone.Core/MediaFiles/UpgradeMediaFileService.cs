@@ -1,8 +1,10 @@
 using System.IO;
+using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.MediaFiles.MovieImport;
+using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MediaFiles
@@ -20,13 +22,15 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
         private readonly IMovieVersionImportService _versionImports;
+        private readonly IBuildFileNames _names;
 
         public UpgradeMediaFileService(IRecycleBinProvider recycleBinProvider,
                                        IMediaFileService mediaFileService,
                                        IMoveMovieFiles movieFileMover,
                                        IDiskProvider diskProvider,
                                        Logger logger,
-                                       IMovieVersionImportService versionImports)
+                                       IMovieVersionImportService versionImports,
+                                       IBuildFileNames names)
         {
             _recycleBinProvider = recycleBinProvider;
             _mediaFileService = mediaFileService;
@@ -34,6 +38,7 @@ namespace NzbDrone.Core.MediaFiles
             _diskProvider = diskProvider;
             _logger = logger;
             _versionImports = versionImports;
+            _names = names;
         }
 
         public MovieFileMoveResult UpgradeMovieFile(MovieFile movieFile, LocalMovie localMovie, bool copyOnly = false)
@@ -48,6 +53,21 @@ namespace NzbDrone.Core.MediaFiles
             var moveFileResult = new MovieFileMoveResult();
 
             var existingFile = localMovie.Movie.MovieFileId > 0 ? localMovie.Movie.MovieFile : null;
+            if (existingFile?.IsUnmanaged == true || movieFile.IsUnmanaged)
+            {
+                throw new MovieVersionImportException("Unmanaged files cannot be upgraded or replaced.");
+            }
+
+            var unmanaged = _mediaFileService.GetFilesByMovie(localMovie.Movie.Id)?.Where(f => f.IsUnmanaged).ToList();
+            if (unmanaged?.Count > 0)
+            {
+                var name = _names.BuildFileName(localMovie.Movie, movieFile, null, localMovie.CustomFormats);
+                var destination = _names.BuildFilePath(localMovie.Movie, name, Path.GetExtension(localMovie.Path));
+                if (unmanaged.Any(f => Path.Combine(localMovie.Movie.Path, f.RelativePath).PathEquals(destination)))
+                {
+                    throw new MovieVersionImportException("The destination belongs to an unmanaged file. Delete it explicitly before reusing this path.");
+                }
+            }
 
             var rootFolder = _diskProvider.GetParentFolder(localMovie.Movie.Path);
 

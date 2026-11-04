@@ -47,6 +47,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IUpgradableSpecification _qualityUpgradableSpecification;
         private readonly IConfigService _configService;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly IMovieProfileConversionRepository _profileConversions;
 
         public MovieController(IBroadcastSignalRMessage signalRBroadcaster,
                            IMovieService moviesService,
@@ -68,7 +69,8 @@ namespace Radarr.Api.V3.Movies
                            QualityProfileExistsValidator qualityProfileExistsValidator,
                            RootFolderExistsValidator rootFolderExistsValidator,
                            MovieFolderAsRootFolderValidator movieFolderAsRootFolderValidator,
-                           ICompositeProfilePolicy compositeProfilePolicy)
+                           ICompositeProfilePolicy compositeProfilePolicy,
+                           IMovieProfileConversionRepository profileConversions)
             : base(signalRBroadcaster)
         {
             _moviesService = moviesService;
@@ -81,6 +83,7 @@ namespace Radarr.Api.V3.Movies
             _commandQueueManager = commandQueueManager;
             _rootFolderService = rootFolderService;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _profileConversions = profileConversions;
 
             SharedValidator.RuleFor(s => s.Path).Cascade(CascadeMode.Stop)
                 .IsValidPath()
@@ -253,6 +256,19 @@ namespace Radarr.Api.V3.Movies
         public ActionResult<MovieResource> UpdateMovie([FromBody] MovieResource moviesResource, [FromQuery] bool moveFiles = false)
         {
             var movie = _moviesService.GetMovie(moviesResource.Id);
+            if (moviesResource.QualityProfileId != movie.QualityProfileId && _profileConversions.RequiresConversion(new List<Movie> { movie }, moviesResource.QualityProfileId))
+            {
+                if (moveFiles)
+                {
+                    throw new BadRequestException("Save profile changes separately from folder moves.");
+                }
+
+                var changed = moviesResource.ToModel(movie);
+                _moviesService.UpdateTags(changed);
+                var converted = _profileConversions.UpdateProfiles(new List<Movie> { changed }).Single();
+                return Accepted(MapToResource(converted));
+            }
+
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
             if (moviesResource.QualityProfileId != movie.QualityProfileId)
             {
@@ -282,10 +298,26 @@ namespace Radarr.Api.V3.Movies
             return Accepted(moviesResource.Id);
         }
 
+        [HttpPut("profile/{id:int}")]
+        public ActionResult<MovieResource> UpdateProfileWithSelection(int id, [FromBody] MovieResource resource)
+        {
+            if (id != resource.Id)
+            {
+                throw new BadRequestException("The movie ID does not match the requested movie.");
+            }
+
+            var movie = _moviesService.GetMovie(id);
+            var changed = resource.ToModel(movie);
+            _moviesService.UpdateTags(changed);
+            var updated = _profileConversions.UpdateProfiles(new List<Movie> { changed }, resource.RetainChildProfileId, resource.ExistingFileChildProfileId).Single();
+            return Accepted(MapToResource(updated));
+        }
+
         [RestDeleteById]
         public void DeleteMovie(int id, bool deleteFiles = false, bool addImportExclusion = false)
         {
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { _moviesService.GetMovie(id) });
+            _compositeProfilePolicy.EnsureLegacyDeletionAllowed(new[] { _moviesService.GetMovie(id) });
             _moviesService.DeleteMovie(id, deleteFiles, addImportExclusion);
         }
 

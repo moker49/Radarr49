@@ -13,6 +13,7 @@ using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.Profiles.Qualities;
 using Radarr.Http;
+using Radarr.Http.REST;
 
 namespace Radarr.Api.V3.Movies
 {
@@ -27,6 +28,7 @@ namespace Radarr.Api.V3.Movies
         private readonly MovieEditorValidator _movieEditorValidator;
         private readonly IUpgradableSpecification _upgradableSpecification;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly IMovieProfileConversionRepository _profileConversions;
 
         public MovieEditorController(IMovieService movieService,
             IMovieTranslationService movieTranslationService,
@@ -35,7 +37,8 @@ namespace Radarr.Api.V3.Movies
             IManageCommandQueue commandQueueManager,
             MovieEditorValidator movieEditorValidator,
             IUpgradableSpecification upgradableSpecification,
-            ICompositeProfilePolicy compositeProfilePolicy)
+            ICompositeProfilePolicy compositeProfilePolicy,
+            IMovieProfileConversionRepository profileConversions)
         {
             _movieService = movieService;
             _movieTranslationService = movieTranslationService;
@@ -45,16 +48,26 @@ namespace Radarr.Api.V3.Movies
             _movieEditorValidator = movieEditorValidator;
             _upgradableSpecification = upgradableSpecification;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _profileConversions = profileConversions;
         }
 
         [HttpPut]
         public IActionResult SaveAll([FromBody] MovieEditorResource resource)
         {
             var moviesToUpdate = _movieService.GetMovies(resource.MovieIds);
-            _compositeProfilePolicy.EnsureLegacyMutationAllowed(moviesToUpdate);
-            if (resource.QualityProfileId.HasValue)
+            var convert = resource.QualityProfileId.HasValue && moviesToUpdate.Any(m => m.QualityProfileId != resource.QualityProfileId) && _profileConversions.RequiresConversion(moviesToUpdate, resource.QualityProfileId.Value);
+            if (convert && (resource.MoveFiles || resource.RootFolderPath.IsNotNullOrWhiteSpace()))
             {
-                _compositeProfilePolicy.EnsureAssignable(resource.QualityProfileId.Value);
+                throw new BadRequestException("Save profile changes separately from folder moves.");
+            }
+
+            if (!convert)
+            {
+                _compositeProfilePolicy.EnsureLegacyMutationAllowed(moviesToUpdate);
+                if (resource.QualityProfileId.HasValue)
+                {
+                    _compositeProfilePolicy.EnsureAssignable(resource.QualityProfileId.Value);
+                }
             }
 
             var moviesToMove = new List<BulkMoveMovie>();
@@ -128,7 +141,12 @@ namespace Radarr.Api.V3.Movies
             var translations = _movieTranslationService.GetAllTranslationsForLanguage(configLanguage);
             var tdict = translations.ToDictionaryIgnoreDuplicates(x => x.MovieMetadataId);
 
-            var updatedMovies = _movieService.UpdateMovie(moviesToUpdate, !resource.MoveFiles);
+            if (convert)
+            {
+                moviesToUpdate.ForEach(m => _movieService.UpdateTags(m));
+            }
+
+            var updatedMovies = convert ? _profileConversions.UpdateProfiles(moviesToUpdate) : _movieService.UpdateMovie(moviesToUpdate, !resource.MoveFiles);
 
             var moviesResources = new List<MovieResource>(updatedMovies.Count);
 
@@ -149,6 +167,7 @@ namespace Radarr.Api.V3.Movies
         public object DeleteMovies([FromBody] MovieEditorResource resource)
         {
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(_movieService.GetMovies(resource.MovieIds));
+            _compositeProfilePolicy.EnsureLegacyDeletionAllowed(_movieService.GetMovies(resource.MovieIds));
             _movieService.DeleteMovies(resource.MovieIds, resource.DeleteFiles, resource.AddImportExclusion);
 
             return new { };

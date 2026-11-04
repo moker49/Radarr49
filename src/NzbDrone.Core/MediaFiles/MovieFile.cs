@@ -14,6 +14,8 @@ namespace NzbDrone.Core.MediaFiles
     {
         public int MovieId { get; set; }
         public int? MovieVersionId { get; set; }
+        public bool IsUnmanaged { get; set; }
+        public int? ManagementProfileId { get; set; }
         public string RelativePath { get; set; }
         public string Path { get; set; }
         public long Size { get; set; }

@@ -22,7 +22,7 @@ namespace NzbDrone.Core.Movies
 
         public List<MovieVersion> ForMovie(int movieId)
         {
-            return Query(v => v.MovieId == movieId);
+            return Query(v => v.MovieId == movieId && v.Retired == false);
         }
 
         public void AssignComposite(Movie movie, int profileId, List<MovieVersion> versions, int? primaryFileId)

@@ -1,5 +1,34 @@
 # Composite profile live test — 2026-11-03
 
+## Profile conversions and unmanaged copies — November 4, 2026
+
+Deployed backend 10.0.0.22193 and the matching frontend. Migration 253 completed, with a
+consistent pre-migration database backup at `_temp/profile-conversion-before-migration.db`.
+
+Fast Five passed a live composite-to-SDR conversion, rescan and conversion back. HDR stayed
+registered and unmanaged during the rescan. An ambiguous legacy conversion to a temporary
+ordinary profile returned 409 even with an injected retention choice. The explicit UI
+endpoint successfully retained HDR instead; the ambiguous reverse legacy request also
+returned 409, and explicit assignment restored both copies. Version IDs 3/4 and file IDs
+9/5 were restored exactly. Both paths, sizes and modification times remained unchanged.
+Legacy deletion of the unmanaged copy and explicit unmanaged deletion targeting the managed
+copy both returned 409. No actual library file was deleted. The temporary profile was
+removed, Fast Five returned to profile 7, the queue stayed empty and lookup returned 200.
+
+Validation: 1,791 core tests passed (six existing skips; the previously identified unrelated
+broken-report case excluded), 73 API tests passed, and 16 container checks passed (one
+existing skip). Frontend lint and full webpack/type checks passed. Isolated component/action
+checks covered exact and ambiguous movie conversions, assigned-profile retention choices,
+save guards, the unmanaged row appearance and file-deletion routing. Real-browser visual
+verification was not performed. Database fixtures cover profile-wide disabling/rebinding,
+atomic rollback, active-operation guards, overwrite/rename protection and explicit deletion
+of a selected unmanaged copy without touching its managed sibling.
+
+Evidence: `_temp/profile-conversion-live-result.json`, `_temp/profile-conversion-before.json`,
+`_temp/profile-conversion-regression.log`, `_temp/profile-conversion-api-tests.log`,
+`_temp/profile-conversion-container.log` and `_temp/profile-conversion-frontend-build.log`.
+The earlier sections below record previous milestones and policies.
+
 Concurrency policy was subsequently changed to one independent active download per
 movie/version; SDR and HDR may now download simultaneously. The earlier sequential
 observations below describe the policy in effect during those tests.

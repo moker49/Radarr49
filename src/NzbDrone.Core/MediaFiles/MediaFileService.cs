@@ -104,6 +104,7 @@ namespace NzbDrone.Core.MediaFiles
             lock (MovieVersionImportSynchronization.ForMovie(movieFile.MovieId))
             {
                 _deletions.CheckReady(movieFile.MovieId, movieFile.MovieVersionId);
+                PreserveManagement(movieFile);
                 _mediaFileRepository.Update(movieFile);
             }
         }
@@ -123,6 +124,7 @@ namespace NzbDrone.Core.MediaFiles
                 foreach (var file in movieFiles)
                 {
                     _deletions.CheckReady(file.MovieId, file.MovieVersionId);
+                    PreserveManagement(file);
                 }
 
                 _mediaFileRepository.UpdateMany(movieFiles);
@@ -133,6 +135,16 @@ namespace NzbDrone.Core.MediaFiles
                 {
                     Monitor.Exit(locks[i]);
                 }
+            }
+        }
+
+        private void PreserveManagement(MovieFile file)
+        {
+            var stored = _mediaFileRepository.Find(file.Id);
+            if (stored != null)
+            {
+                file.IsUnmanaged = stored.IsUnmanaged;
+                file.ManagementProfileId = stored.ManagementProfileId;
             }
         }
 

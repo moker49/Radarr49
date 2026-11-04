@@ -15,6 +15,7 @@ namespace Radarr.Api.V3.MovieFiles
     {
         public int MovieId { get; set; }
         public int? MovieVersionId { get; set; }
+        public bool IsUnmanaged { get; set; }
         public string RelativePath { get; set; }
         public string Path { get; set; }
         public long Size { get; set; }
@@ -48,6 +49,7 @@ namespace Radarr.Api.V3.MovieFiles
 
                 MovieId = model.MovieId,
                 MovieVersionId = model.MovieVersionId,
+                IsUnmanaged = model.IsUnmanaged,
                 RelativePath = model.RelativePath,
 
                 // Path
@@ -77,6 +79,7 @@ namespace Radarr.Api.V3.MovieFiles
 
                 MovieId = model.MovieId,
                 MovieVersionId = model.MovieVersionId,
+                IsUnmanaged = model.IsUnmanaged,
                 RelativePath = model.RelativePath,
                 Path = Path.Combine(movie.Path, model.RelativePath),
                 Size = model.Size,
@@ -87,7 +90,7 @@ namespace Radarr.Api.V3.MovieFiles
                 Edition = model.Edition,
                 ReleaseGroup = model.ReleaseGroup,
                 MediaInfo = model.MediaInfo.ToResource(model.SceneName),
-                QualityCutoffNotMet = upgradableSpecification?.QualityCutoffNotMet(movie.QualityProfile, model.Quality) ?? false,
+                QualityCutoffNotMet = !model.IsUnmanaged && (upgradableSpecification?.QualityCutoffNotMet(movie.QualityProfile, model.Quality) ?? false),
                 OriginalFilePath = model.OriginalFilePath,
                 IndexerFlags = (int)model.IndexerFlags
             };

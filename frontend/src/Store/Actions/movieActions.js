@@ -406,6 +406,8 @@ export const saveMovie = createThunk(SAVE_MOVIE, (payload) => {
   return newPayload;
 });
 
+export const saveMovieProfile = createThunk('movies/saveMovieProfile');
+
 export const deleteMovie = createThunk(DELETE_MOVIE, (payload) => {
   return {
     ...payload,
@@ -447,6 +449,7 @@ export const actionHandlers = handleThunks({
 
   [FETCH_MOVIES]: createFetchHandler(section, '/movie'),
   [SAVE_MOVIE]: createSaveProviderHandler(section, '/movie', { getAjaxOptions: getSaveAjaxOptions }),
+  'movies/saveMovieProfile': createSaveProviderHandler(section, '/movie/profile'),
   [DELETE_MOVIE]: (getState, payload, dispatch) => {
     createRemoveItemHandler(section, '/movie')(getState, payload, dispatch);
 

@@ -1,12 +1,20 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Dapper;
 using FizzWare.NBuilder;
+using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Disk;
 using NzbDrone.Core.Datastore;
+using NzbDrone.Core.Download;
 using NzbDrone.Core.Exceptions;
+using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Profiles.Qualities;
+using NzbDrone.Core.Qualities;
+using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.Profiles
@@ -16,6 +24,7 @@ namespace NzbDrone.Core.Test.Profiles
     {
         private QualityProfile _sdr;
         private QualityProfile _hdr;
+        private string _root;
 
         private static QualityProfile Profile(string name)
         {
@@ -27,6 +36,10 @@ namespace NzbDrone.Core.Test.Profiles
         {
             _sdr = Db.Insert(Profile("SDR"));
             _hdr = Db.Insert(Profile("HDR"));
+            _root = Path.GetFullPath("C:/ProfileConversionMovies");
+            Mocker.GetMock<IRootFolderService>().Setup(r => r.All()).Returns(new List<RootFolder> { new RootFolder { Path = _root } });
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FolderExists(_root)).Returns(true);
+            Mocker.GetMock<IMovieRepository>().Setup(r => r.Get(It.IsAny<int>())).Returns<int>(id => Db.All<Movie>().Single(m => m.Id == id));
         }
 
         private List<CompositeProfileVersion> Definitions()
@@ -42,6 +55,77 @@ namespace NzbDrone.Core.Test.Profiles
         {
             using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
             return connection.Query<CompositeProfileVersion>("SELECT * FROM \"CompositeProfileVersions\" WHERE \"CompositeProfileId\"=@id ORDER BY \"Priority\"", new { id }).ToList();
+        }
+
+        private Movie AssignMovie(QualityProfile parent)
+        {
+            Subject.Save(parent, true, Definitions(), _root);
+            var metadata = Db.Insert(new MovieMetadata { TmdbId = 100, Title = "Movie", CleanTitle = "movie", SortTitle = "movie", Year = 2000 });
+            var movie = Builder<Movie>.CreateNew().With(m => m.Id = 0).With(m => m.MovieMetadataId = metadata.Id).With(m => m.QualityProfileId = parent.Id).With(m => m.MovieFileId = 0).With(m => m.Path = Path.Combine(_root, "Movie")).Build();
+            Db.Insert(movie);
+            foreach (var definition in Read(parent.Id))
+            {
+                var file = Db.Insert(new MovieFile { MovieId = movie.Id, RelativePath = $"Movie - {definition.Label}.mkv", Size = 10, Quality = new QualityModel(), Languages = new List<Language>() });
+                Db.Insert(new MovieVersion { MovieId = movie.Id, CompositeProfileVersionId = definition.Id, MovieFileId = file.Id, Monitored = true });
+                if (definition.IsPrimary)
+                {
+                    movie.MovieFileId = file.Id;
+                }
+            }
+
+            Db.Update(movie);
+            return movie;
+        }
+
+        [Test]
+        public void disabling_used_composite_with_a_choice_should_keep_files_and_retire_the_other_version()
+        {
+            var parent = Profile("Parent");
+            var movie = AssignMovie(parent);
+            var ids = Db.All<MovieFile>().Select(f => f.Id).ToArray();
+
+            Subject.Save(parent, false, null, null, _sdr.Id);
+
+            Assert.That(Read(parent.Id), Is.Empty);
+            Assert.That(Db.All<Movie>().Single().MovieFileId, Is.EqualTo(movie.MovieFileId));
+            Assert.That(Db.All<MovieFile>().Select(f => f.Id), Is.EquivalentTo(ids));
+            Assert.That(Db.All<MovieFile>().Count(f => f.IsUnmanaged), Is.EqualTo(1));
+            Assert.That(Db.All<MovieVersion>().All(v => v.Retired), Is.True);
+        }
+
+        [Test]
+        public void replacing_used_child_should_reuse_its_slot_and_file()
+        {
+            var parent = Profile("Parent");
+            AssignMovie(parent);
+            var definitions = Read(parent.Id);
+            var slot = definitions[0].Id;
+            var fileId = Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == slot).MovieFileId;
+            var replacement = Db.Insert(Profile("New SDR settings"));
+            definitions[0] = new CompositeProfileVersion { QualityProfileId = replacement.Id, Label = "New SDR settings", Priority = 0, IsPrimary = true };
+
+            Subject.Save(parent, true, definitions, _root);
+
+            Assert.That(Read(parent.Id).Single(d => d.Id == slot).QualityProfileId, Is.EqualTo(replacement.Id));
+            Assert.That(Read(parent.Id).Single(d => d.Id == slot).Label, Is.EqualTo("SDR"));
+            Assert.That(Db.All<MovieVersion>().Single(v => !v.Retired && v.CompositeProfileVersionId == slot).MovieFileId, Is.EqualTo(fileId));
+            Assert.That(Db.All<MovieFile>().All(f => !f.IsUnmanaged), Is.True);
+        }
+
+        [Test]
+        public void active_download_must_block_file_conversion_but_allow_priority_only_edits()
+        {
+            var parent = Profile("Parent");
+            var movie = AssignMovie(parent);
+            var version = Db.All<MovieVersion>().First();
+            Db.Insert(new DownloadReservation { MovieId = movie.Id, MovieVersionId = version.Id, DownloadClientId = 1, SourceTitle = "Active", ReleaseKeys = new List<string> { "test" }, State = DownloadReservationState.Submitted });
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.Save(parent, false, null, null, _sdr.Id));
+            var definitions = Read(parent.Id);
+            definitions[0].Priority = 1;
+            definitions[1].Priority = 0;
+            Assert.DoesNotThrow(() => Subject.Save(parent, true, definitions, _root));
+            Assert.That(Db.All<MovieFile>().All(f => !f.IsUnmanaged), Is.True);
         }
 
         [Test]

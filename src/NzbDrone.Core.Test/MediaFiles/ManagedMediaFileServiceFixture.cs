@@ -24,6 +24,16 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void ordinary_metadata_updates_must_not_clear_unmanaged_ownership()
+        {
+            Mocker.GetMock<IMediaFileRepository>().Setup(r => r.Find(_file.Id)).Returns(new MovieFile { Id = _file.Id, IsUnmanaged = true, ManagementProfileId = 5 });
+
+            Subject.Update(_file);
+
+            Mocker.GetMock<IMediaFileRepository>().Verify(r => r.Update(It.Is<MovieFile>(f => f.IsUnmanaged && f.ManagementProfileId == 5)), Times.Once());
+        }
+
+        [Test]
         public void explicit_monitor_choice_should_override_global_unmonitor_setting_and_publish_owned_identity()
         {
             Mocker.GetMock<IConfigService>().SetupGet(v => v.AutoUnmonitorPreviouslyDownloadedMovies).Returns(true);

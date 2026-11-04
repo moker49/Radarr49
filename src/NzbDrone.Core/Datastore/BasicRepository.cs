@@ -258,6 +258,11 @@ namespace NzbDrone.Core.Datastore
             return model;
         }
 
+        protected void Update(IDbConnection connection, IDbTransaction transaction, TModel model)
+        {
+            UpdateFields(connection, transaction, model, _properties);
+        }
+
         public void UpdateMany(IList<TModel> models)
         {
             if (models.Any(x => x.Id == 0))

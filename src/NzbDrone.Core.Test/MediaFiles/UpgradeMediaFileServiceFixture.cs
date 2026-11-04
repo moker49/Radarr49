@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using FizzWare.NBuilder;
 using FluentAssertions;
@@ -7,6 +8,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
@@ -53,6 +55,21 @@ namespace NzbDrone.Core.Test.MediaFiles
                     Id = 1,
                     RelativePath = @"A.Movie.2019.avi",
                 };
+        }
+
+        [Test]
+        public void unmanaged_destination_must_be_rejected_before_recycling_the_current_file()
+        {
+            GivenSingleMovieWithSingleMovieFile();
+            var destination = Path.Combine(_localMovie.Movie.Path, "Retained.mkv");
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetFilesByMovie(_localMovie.Movie.Id)).Returns(new List<MovieFile> { new MovieFile { Id = 20, RelativePath = "Retained.mkv", IsUnmanaged = true } });
+            Mocker.GetMock<IBuildFileNames>().Setup(n => n.BuildFileName(_localMovie.Movie, _movieFile, null, _localMovie.CustomFormats)).Returns("Retained");
+            Mocker.GetMock<IBuildFileNames>().Setup(n => n.BuildFilePath(_localMovie.Movie, "Retained", It.IsAny<string>())).Returns(destination);
+
+            Assert.Throws<MovieVersionImportException>(() => Subject.UpgradeMovieFile(_movieFile, _localMovie));
+
+            Mocker.GetMock<IRecycleBinProvider>().Verify(r => r.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(s => s.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
         }
 
         [Test]

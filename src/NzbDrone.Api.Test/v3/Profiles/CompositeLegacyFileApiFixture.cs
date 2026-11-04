@@ -45,6 +45,18 @@ namespace NzbDrone.Api.Test.v3.Profiles
         }
 
         [Test]
+        public void retained_unmanaged_file_must_not_be_deleted_through_legacy_routes()
+        {
+            _movies[1].QualityProfileId = 1;
+            _files[1].IsUnmanaged = true;
+
+            Assert.Throws<NzbDroneClientException>(() => Subject.DeleteMovieFile(102));
+            Assert.Throws<NzbDroneClientException>(() => Subject.DeleteMovieFiles(new MovieFileListResource { MovieFileIds = new List<int> { 101, 102 } }));
+
+            Mocker.GetMock<IDeleteMediaFiles>().Verify(s => s.DeleteMovieFile(It.IsAny<Movie>(), It.IsAny<MovieFile>()), Times.Never());
+        }
+
+        [Test]
         public void mixed_bulk_delete_must_not_delete_any_file()
         {
             Assert.Throws<NzbDroneClientException>(() => Subject.DeleteMovieFiles(new MovieFileListResource { MovieFileIds = new List<int> { 101, 102 } }));

@@ -48,6 +48,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
                 .Build();
 
             _remoteMovie = Builder<RemoteMovie>.CreateNew()
+                .With(r => r.MovieVersionId = null)
                 .With(r => r.Movie = _movie)
                 .With(r => r.ParsedMovieInfo = new ParsedMovieInfo { Quality = new QualityModel(Quality.DVD), Languages = new List<Language> { Language.Spanish } })
                 .With(r => r.CustomFormats = new List<CustomFormat>())
@@ -147,6 +148,16 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
 
             Mocker.GetMock<IPendingReleaseService>()
                 .Verify(s => s.GetPendingQueue(), Times.Once);
+        }
+
+        [TestCase(201, false)]
+        [TestCase(202, true)]
+        public void pending_versions_should_only_delay_the_same_version(int pendingVersionId, bool accepted)
+        {
+            _remoteMovie.MovieVersionId = 201;
+            GivenPendingQueue(new[] { new RemoteMovie { Movie = _movie, MovieVersionId = pendingVersionId } });
+
+            Subject.IsSatisfiedBy(_remoteMovie, _information).Accepted.Should().Be(accepted);
         }
     }
 }

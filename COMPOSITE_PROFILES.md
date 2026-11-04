@@ -2,11 +2,11 @@
 
 ## Live-test milestone
 
-Opt-in activation and ordinary API additions are now implemented for **new movies only**,
-bound to a configured dedicated test root. See [COMPOSITE_LIVE_TEST.md](COMPOSITE_LIVE_TEST.md)
-for configuration, activation and the first controlled test. Existing-movie conversion,
-managed folder moves and the full composite UI remain unavailable. Earlier validation
-entries below describe their respective stages, rather than current activation status.
+Composite profile editing, ordinary API additions and existing-movie conversions are
+implemented. Composites remain bound to a configured root; profile conversion and folder
+moves must be saved separately. See [COMPOSITE_LIVE_TEST.md](COMPOSITE_LIVE_TEST.md)
+for the initial test workflow. Earlier validation entries below describe their respective
+stages rather than current capability.
 
 The first hosted test has now passed with Bao: both real downloads/imports, an isolated
 SDR replacement, legacy API protections, and a full backend restart plus rescan with
@@ -23,7 +23,37 @@ Child profiles own their size settings. Composite names do not determine behavio
 Existing movies are not rewritten. MovieVersionService adapts their existing profile
 and file into a single runtime version without persisting anything. Composite movies
 require explicit MovieVersions assignments; their legacy MovieFileId is never guessed
-to belong to a child. New additions create both assignments atomically; existing-movie conversion remains unexposed.
+to belong to a child. New additions and explicit existing-movie conversions create or
+restore assignments atomically.
+
+## Profile conversion and retained files — November 4, 2026
+
+Profile changes preserve registered files and their paths. Composite-to-ordinary changes
+automatically retain the child matching the destination profile ID. Ambiguous legacy
+requests return HTTP 409 without writes, even if they supply UI-only selection fields.
+The movie editor can explicitly choose which copy remains managed through
+`PUT /api/v3/movie/profile/{id}` using `retainChildProfileId`, or assign an existing
+ordinary file to a destination child using `existingFileChildProfileId`.
+
+Other copies become persistently unmanaged. Rescans do not reclaim them. Returning to a
+composite can reclaim a single retained copy whose recorded management profile matches
+the child; multiple candidates are left unmanaged. Retired version rows preserve history
+and can be reactivated with their original IDs while the definitions still exist.
+
+Assigned profiles can replace a child while retaining its slot, label and file, or disable
+composite mode with a required retention choice and affected-movie count. Priority-only
+edits preserve ownership. Active downloads and unfinished file operations block ownership
+conversions; multi-movie conversions roll back together. Old pending search candidates
+are cleared on conversion. Completed download history remains imported.
+
+Unmanaged file rows have a faint red tint, label and explanation. Automatic rename,
+upgrade and destination overwrite are blocked. Explicit deletion uses
+`DELETE /api/v3/movie/{movieId}/unmanagedfile/{movieFileId}`; legacy file/movie deletion
+cannot remove retained copies. A retained file occupying a future import destination must
+be explicitly resolved before that import can proceed.
+
+Migration 253 adds file ownership markers and retired-version state; existing files stay
+managed by default. This adds bookkeeping and does not rewrite media or ordinary profiles.
 
 Legacy discovery and add APIs will retain qualityProfileId. Legacy destructive endpoints
 must reject composite-managed targets, including bulk requests. New explicit APIs will

@@ -185,7 +185,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         private void EnsureUnused(int profileId, List<CompositeProfileVersion> existing)
         {
             if (_movies.All().Any(m => m.QualityProfileId == profileId) ||
-                _versions.All().Any(v => existing.Any(d => d.Id == v.CompositeProfileVersionId)))
+                _versions.All().Any(v => !v.Retired && existing.Any(d => d.Id == v.CompositeProfileVersionId)))
             {
                 throw new NzbDroneClientException(HttpStatusCode.Conflict, "An assigned profile cannot be reconfigured without an explicit version conversion.");
             }

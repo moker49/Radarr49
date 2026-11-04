@@ -7,6 +7,7 @@ namespace NzbDrone.Core.Movies
         public int MovieId { get; set; }
         public int CompositeProfileVersionId { get; set; }
         public bool Monitored { get; set; }
+        public bool Retired { get; set; }
         public int? MovieFileId { get; set; }
     }
 }

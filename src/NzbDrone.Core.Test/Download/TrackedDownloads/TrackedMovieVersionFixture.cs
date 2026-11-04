@@ -38,6 +38,22 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
         }
 
         [Test]
+        public void imported_job_should_stay_imported_after_its_version_was_retired_by_conversion()
+        {
+            Mocker.GetMock<IDownloadHistoryService>().Setup(s => s.GetLatestDownloadHistoryItem(_item.DownloadId))
+                .Returns(new DownloadHistory { MovieId = 1, MovieVersionId = 201, EventType = DownloadHistoryEventType.DownloadImported });
+            Mocker.GetMock<IMovieVersionService>().Setup(s => s.Resolve(It.IsAny<Movie>())).Returns(new List<ResolvedMovieVersion>
+            {
+                new ResolvedMovieVersion { MovieId = 1, QualityProfile = new NzbDrone.Core.Profiles.Qualities.QualityProfile() }
+            });
+
+            var tracked = Subject.TrackDownload(_client, _item);
+
+            Assert.That(tracked.State, Is.EqualTo(TrackedDownloadState.Imported));
+            Mocker.GetMock<IMovieVersionService>().Verify(s => s.ForVersion(It.IsAny<Movie>(), It.IsAny<int>()), Times.Never());
+        }
+
+        [Test]
         public void restart_should_restore_version_id_from_persisted_grab()
         {
             var tracked = Subject.TrackDownload(_client, _item);

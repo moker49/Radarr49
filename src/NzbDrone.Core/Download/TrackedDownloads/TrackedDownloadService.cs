@@ -376,6 +376,12 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     throw new InvalidOperationException("The originally assigned movie could not be restored.");
                 }
 
+                if (trackedDownload.State == TrackedDownloadState.Imported && _movieVersions.Resolve(trackedDownload.RemoteMovie.Movie)?.All(v => v.Id != ids[0]) == true)
+                {
+                    // Conversion retires ownership without turning completed jobs back into imports.
+                    return false;
+                }
+
                 trackedDownload.RemoteMovie.Movie = _movieVersions.ForVersion(trackedDownload.RemoteMovie.Movie, ids[0]);
                 trackedDownload.RemoteMovie.MovieVersionId = ids[0];
                 return true;

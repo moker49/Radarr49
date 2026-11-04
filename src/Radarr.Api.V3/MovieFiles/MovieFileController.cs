@@ -26,6 +26,7 @@ namespace Radarr.Api.V3.MovieFiles
     [V3ApiController]
     public class MovieFileController : RestControllerWithSignalR<MovieFileResource, MovieFile>,
                                  IHandle<MovieFileAddedEvent>,
+                                 IHandle<MovieFileUpdatedEvent>,
                                  IHandle<MovieFileDeletedEvent>
     {
         private readonly IMediaFileService _mediaFileService;
@@ -181,6 +182,11 @@ namespace Radarr.Api.V3.MovieFiles
                 throw new NzbDroneClientException(HttpStatusCode.NotFound, "Movie file not found");
             }
 
+            if (movieFile.IsUnmanaged)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Use the explicit unmanaged-file delete action.");
+            }
+
             var movie = _movieService.GetMovie(movieFile.MovieId);
 
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
@@ -199,6 +205,11 @@ namespace Radarr.Api.V3.MovieFiles
 
             var movieFiles = _mediaFileService.GetMovies(resource.MovieFileIds);
             var movies = _movieService.GetMovies(movieFiles.Select(f => f.MovieId).Distinct()).ToDictionary(m => m.Id);
+            if (movieFiles.Any(f => f.IsUnmanaged))
+            {
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Unmanaged files must be deleted explicitly, one selected file at a time.");
+            }
+
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(movies.Values);
 
             foreach (var movieFile in movieFiles)
@@ -261,6 +272,12 @@ namespace Radarr.Api.V3.MovieFiles
 
         [NonAction]
         public void Handle(MovieFileAddedEvent message)
+        {
+            BroadcastResourceChange(ModelAction.Updated, message.MovieFile.Id);
+        }
+
+        [NonAction]
+        public void Handle(MovieFileUpdatedEvent message)
         {
             BroadcastResourceChange(ModelAction.Updated, message.MovieFile.Id);
         }

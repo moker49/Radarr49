@@ -1,3 +1,13 @@
+.unmanaged {
+  composes: row from '~Components/Table/TableRow.css';
+
+  background-color: rgba(240, 80, 80, 0.07);
+}
+
+.unmanagedLabel {
+  margin-left: 8px;
+}
+
 .relativePath {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 

@@ -98,7 +98,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         {
             if (connection.Execute("UPDATE \"QualityProfiles\" SET \"Name\" = \"Name\" WHERE \"Id\" = @profileId", new { profileId }, transaction) != 1 ||
                 connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"Movies\" WHERE \"QualityProfileId\" = @profileId", new { profileId }, transaction) != 0 ||
-                connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"CompositeProfileVersions\" d ON v.\"CompositeProfileVersionId\" = d.\"Id\" WHERE d.\"CompositeProfileId\" = @profileId", new { profileId }, transaction) != 0)
+                connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"MovieVersions\" v JOIN \"CompositeProfileVersions\" d ON v.\"CompositeProfileVersionId\" = d.\"Id\" WHERE d.\"CompositeProfileId\" = @profileId AND v.\"Retired\"=FALSE", new { profileId }, transaction) != 0)
             {
                 throw new NzbDroneClientException(HttpStatusCode.Conflict, "The composite profile is missing or already assigned.");
             }

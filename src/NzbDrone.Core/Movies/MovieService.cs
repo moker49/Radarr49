@@ -260,6 +260,7 @@ namespace NzbDrone.Core.Movies
         {
             var movie = _movieRepository.Get(movieId);
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(new[] { movie });
+            _compositeProfilePolicy.EnsureLegacyDeletionAllowed(new[] { movie });
 
             _movieRepository.Delete(movieId);
             _eventAggregator.PublishEvent(new MoviesDeletedEvent(new List<Movie> { movie }, deleteFiles, addImportListExclusion));
@@ -278,6 +279,7 @@ namespace NzbDrone.Core.Movies
         {
             var moviesToDelete = _movieRepository.Get(movieIds).ToList();
             _compositeProfilePolicy.EnsureLegacyMutationAllowed(moviesToDelete);
+            _compositeProfilePolicy.EnsureLegacyDeletionAllowed(moviesToDelete);
 
             _movieRepository.DeleteMany(movieIds);
 

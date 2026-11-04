@@ -159,7 +159,8 @@ class EditQualityProfileModalContentConnector extends Component {
       dropQualityIndex: null,
       dropPosition: null,
       editGroups: false,
-      compositeRows: this.getCompositeRows(props)
+      compositeRows: this.getCompositeRows(props),
+      retainChildProfileId: 0
     };
   }
 
@@ -189,6 +190,10 @@ class EditQualityProfileModalContentConnector extends Component {
 
   onCompositeAllowedChange = (id, allowed) => {
     this.setState({ compositeRows: this.state.compositeRows.map((row) => (row.id === id ? { ...row, allowed } : row)) });
+  };
+
+  onRetainChildProfileChange = ({ value }) => {
+    this.setState({ retainChildProfileId: Number(value) });
   };
 
   onCompositeOrderChange = (compositeRows) => {
@@ -282,6 +287,7 @@ class EditQualityProfileModalContentConnector extends Component {
         id: this.props.id,
         isComposite: enabled,
         compositeVersions: enabled ? compositeVersions : [],
+        retainChildProfileId: this.state.retainChildProfileId || null,
         compositeRootFolder: this.props.item.compositeRootFolder?.value || this.props.rootFolders[0]?.path || null
       });
     } else {
@@ -564,6 +570,7 @@ class EditQualityProfileModalContentConnector extends Component {
         onToggleEditGroupsMode={this.onToggleEditGroupsMode}
         onCompositeAllowedChange={this.onCompositeAllowedChange}
         onCompositeOrderChange={this.onCompositeOrderChange}
+        onRetainChildProfileChange={this.onRetainChildProfileChange}
       />
     );
   }

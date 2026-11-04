@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Test.MediaFiles
                                      .Build();
 
             _movieFiles = Builder<MovieFile>.CreateListOfSize(2)
+                .All().With(f => f.IsUnmanaged = false)
                                                 .All()
                                                 .With(e => e.MovieId = _movie.Id)
                                                 .Build()
