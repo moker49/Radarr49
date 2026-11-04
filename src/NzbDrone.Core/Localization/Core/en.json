@@ -1528,6 +1528,8 @@
   "ProcessingFolders": "Processing Folders",
   "Profiles": "Profiles",
   "ProfileSizeSettings": "Profile Size Settings",
+  "SizeSettingsFor": "Size Settings For",
+  "QualitySizeSettingsSaveError": "Unable to save profile size settings.",
   "ProfileSizeSettingsHelp": "Set size limits per quality for this profile in MB/min. Unchecked qualities use global settings. Empty minimum means no minimum; empty preferred favors larger releases; empty or zero maximum is unlimited.",
   "UseProfileSizeSettings": "Use profile size settings",
   "ProfileMinimumSize": "Minimum (MB/min)",

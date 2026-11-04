@@ -16,11 +16,13 @@ namespace Radarr.Api.V3.Profiles.Quality
     {
         private readonly IQualityProfileService _qualityProfileService;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly ICompositeProfileVersionRepository _compositeVersions;
 
-        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService, ICompositeProfilePolicy compositeProfilePolicy)
+        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService, ICompositeProfilePolicy compositeProfilePolicy, ICompositeProfileVersionRepository compositeVersions)
         {
             _qualityProfileService = qualityProfileService;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _compositeVersions = compositeVersions;
 
             SharedValidator.RuleFor(c => c.Name).NotEmpty();
 
@@ -80,13 +82,18 @@ namespace Radarr.Api.V3.Profiles.Quality
 
         protected override QualityProfileResource GetResourceById(int id)
         {
-            return _qualityProfileService.Get(id).ToResource();
+            var resource = _qualityProfileService.Get(id).ToResource();
+            resource.IsComposite = _compositeVersions.ForProfile(id).Any();
+            return resource;
         }
 
         [HttpGet]
         public List<QualityProfileResource> GetAll()
         {
-            return _qualityProfileService.All().ToResource();
+            var compositeIds = _compositeVersions.All().Select(v => v.CompositeProfileId).ToHashSet();
+            var resources = _qualityProfileService.All().ToResource();
+            resources.ForEach(p => p.IsComposite = compositeIds.Contains(p.Id));
+            return resources;
         }
     }
 }

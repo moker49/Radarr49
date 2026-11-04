@@ -46,8 +46,9 @@ later one. This replaces the earlier configurable aggregate cap of one or two do
 - Composite configuration is available through a separate API. Draft assignment and
   downloads remain blocked; opt-in test activation enables new additions under its bound
   root. Search, tracking, import and naming use explicit version contexts.
-- Ordinary profiles now support per-quality SizeDefinitions in storage, API and profile
-  editor. Release size rejection and preferred-size ranking use these settings through
+- Ordinary profiles now support per-quality SizeDefinitions in storage, API and the
+  Quality settings screen, whose scope selector offers Global and all non-composite
+  profiles. Release size rejection and preferred-size ranking use these settings through
   one shared resolver. Unconfigured qualities retain global defaults. Legacy updates
   omitting the field preserve settings; an explicit empty list resets to global defaults.
 - Legacy movie and movie-file edit/delete routes, including bulk routes, preflight through

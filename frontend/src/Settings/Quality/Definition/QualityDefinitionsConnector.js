@@ -46,6 +46,7 @@ class QualityDefinitionsConnector extends Component {
 
     dispatchFetchQualityDefinitions();
     onChildMounted(dispatchSaveQualityDefinitions);
+    this.props.onChildStateChange({ isSaving: this.props.isSaving, hasPendingChanges: this.props.hasPendingChanges });
   }
 
   componentDidUpdate(prevProps) {

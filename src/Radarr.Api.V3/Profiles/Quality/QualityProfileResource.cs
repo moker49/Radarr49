@@ -20,6 +20,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         public List<ProfileFormatItemResource> FormatItems { get; set; }
         public Language Language { get; set; }
         public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
+        public bool IsComposite { get; set; }
     }
 
     public class QualityProfileQualityItemResource : RestResource

@@ -254,6 +254,33 @@ HDR retained version 4/file 5. The new SDR download was left running.
 Evidence: `_temp/sab-duplicate-tests.log`, `_temp/sab-duplicate-live-result.json`,
 `_temp/sab-duplicate-before.json` and `_temp/sab-duplicate-after.json`.
 
+## Quality screen size-setting scope selector (2026-11-04)
+
+Profile-specific size controls now live under Settings > Quality rather than in
+the profile modal. The Size Settings For dropdown offers Global and all ordinary
+profiles, including composite child profiles. Composite parent profiles are excluded
+using an additive read-only `isComposite` field on profile API responses. Both draft
+and active composites are identified by their persisted version definitions.
+
+Global retains its existing quality-definition editor and reset command. Profile mode
+edits the existing per-quality overrides through the existing profile save API;
+unchecked qualities continue to inherit global values. Switching with unsaved edits
+uses the existing discard/cancel dialog, switching is disabled during a save, and
+the global reset control is hidden in profile mode. Storage and saved size values
+are unchanged; no migration is involved.
+
+Validation: frontend lint and full webpack/type checks passed, all 69 v3 API tests
+passed, and 16 dependency-container checks passed (one existing skip). An isolated
+frontend check covered selector options, save callback routing, discard/cancel,
+save-in-flight switching and reset isolation. The backend/frontend were deployed
+to the running sandbox. Live API verification classified SDR/HDR as ordinary and
+SDR+HDR as composite; complete before/after comparisons preserved all saved profile
+fields and all global quality definitions. Movie lookup remained HTTP 200.
+
+Evidence: `_temp/quality-size-*-before.json`, `_temp/quality-size-*-after.json`,
+`_temp/quality-size-scope-api-tests.log`, `_temp/quality-size-container.log` and
+`_temp/quality-size-frontend-build.log`.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are
