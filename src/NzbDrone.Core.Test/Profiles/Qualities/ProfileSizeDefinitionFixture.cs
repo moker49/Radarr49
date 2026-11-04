@@ -35,6 +35,26 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
         }
 
         [Test]
+        public void global_preference_should_ignore_custom_values_and_allow_restoring_them()
+        {
+            var global = new QualityDefinition(Quality.WEBDL1080p) { MinSize = 1, PreferredSize = 10, MaxSize = 20 };
+            var profile = new QualityProfile
+            {
+                UseGlobalSizeDefinitions = true,
+                SizeDefinitions = new List<ProfileSizeDefinition>
+                {
+                    new ProfileSizeDefinition { QualityId = Quality.WEBDL1080p.Id, MinSize = 2, PreferredSize = 5, MaxSize = 8 }
+                }
+            };
+
+            Assert.That(profile.GetSizeDefinition(Quality.WEBDL1080p, global), Is.SameAs(global));
+            global.PreferredSize = 12;
+            Assert.That(profile.GetSizeDefinition(Quality.WEBDL1080p, global).PreferredSize, Is.EqualTo(12));
+            profile.UseGlobalSizeDefinitions = false;
+            Assert.That(profile.GetSizeDefinition(Quality.WEBDL1080p, global).PreferredSize, Is.EqualTo(5));
+        }
+
+        [Test]
         public void unconfigured_quality_should_keep_global_settings()
         {
             var global = new QualityDefinition(Quality.WEBDL1080p) { PreferredSize = 10 };

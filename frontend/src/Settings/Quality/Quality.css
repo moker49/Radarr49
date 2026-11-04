@@ -1,0 +1,12 @@
+.scopeControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.profileControls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}

@@ -15,6 +15,8 @@ class QualityDefinitions extends Component {
     const {
       items,
       advancedSettings,
+      showTitles = true,
+      definitionComponent: DefinitionComponent = QualityDefinitionConnector,
       ...otherProps
     } = this.props;
 
@@ -29,7 +31,7 @@ class QualityDefinitions extends Component {
               {translate('Quality')}
             </div>
             <div className={styles.title}>
-              {translate('Title')}
+              {showTitles ? translate('Title') : null}
             </div>
             <div className={styles.sizeLimit}>
               {translate('SizeLimit')}
@@ -48,10 +50,11 @@ class QualityDefinitions extends Component {
             {
               items.map((item) => {
                 return (
-                  <QualityDefinitionConnector
+                  <DefinitionComponent
                     key={item.id}
                     {...item}
                     advancedSettings={advancedSettings}
+                    showTitle={showTitles}
                   />
                 );
               })
@@ -74,7 +77,9 @@ QualityDefinitions.propTypes = {
   error: PropTypes.object,
   defaultProfile: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
-  advancedSettings: PropTypes.bool.isRequired
+  advancedSettings: PropTypes.bool.isRequired,
+  showTitles: PropTypes.bool,
+  definitionComponent: PropTypes.elementType
 };
 
 export default QualityDefinitions;

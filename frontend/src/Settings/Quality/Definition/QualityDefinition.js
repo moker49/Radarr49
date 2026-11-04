@@ -55,6 +55,12 @@ class QualityDefinition extends Component {
     };
   }
 
+  componentDidUpdate(prevProps) {
+    if (prevProps.minSize !== this.props.minSize || prevProps.preferredSize !== this.props.preferredSize || prevProps.maxSize !== this.props.maxSize) {
+      this.onAfterSliderChange();
+    }
+  }
+
   //
   // Control
 
@@ -80,6 +86,9 @@ class QualityDefinition extends Component {
   // Listeners
 
   onSliderChange = ([sliderMinSize, sliderPreferredSize, sliderMaxSize]) => {
+    if (this.props.isDisabled) {
+      return;
+    }
     this.setState({
       sliderMinSize,
       sliderMaxSize,
@@ -108,6 +117,9 @@ class QualityDefinition extends Component {
   };
 
   onMinSizeChange = ({ value }) => {
+    if (this.props.isDisabled) {
+      return;
+    }
     const minSize = getValue(value);
 
     this.setState({
@@ -122,10 +134,13 @@ class QualityDefinition extends Component {
   };
 
   onPreferredSizeChange = ({ value }) => {
+    if (this.props.isDisabled) {
+      return;
+    }
     const preferredSize = value === (MAX - 3) ? null : getValue(value);
 
     this.setState({
-      sliderPreferredSize: getSliderValue(preferredSize, slider.preferred)
+      sliderPreferredSize: getSliderValue(preferredSize, (slider.max - 3))
     });
 
     this.props.onSizeChange({
@@ -136,6 +151,9 @@ class QualityDefinition extends Component {
   };
 
   onMaxSizeChange = ({ value }) => {
+    if (this.props.isDisabled) {
+      return;
+    }
     const maxSize = value === MAX ? null : getValue(value);
 
     this.setState({
@@ -161,6 +179,8 @@ class QualityDefinition extends Component {
       maxSize,
       preferredSize,
       advancedSettings,
+      showTitle = true,
+      isDisabled = false,
       onTitleChange
     } = this.props;
 
@@ -186,15 +206,17 @@ class QualityDefinition extends Component {
         </div>
 
         <div className={styles.title}>
-          <TextInput
-            name={`${id}.${title}`}
-            value={title}
-            onChange={onTitleChange}
-          />
+          {showTitle ?
+            <TextInput
+              name={`${id}.${title}`}
+              value={title}
+              onChange={onTitleChange}
+            /> : null}
         </div>
 
         <div className={styles.sizeLimit}>
           <ReactSlider
+            disabled={isDisabled}
             className={styles.slider}
             min={slider.min}
             max={slider.max}
@@ -269,6 +291,7 @@ class QualityDefinition extends Component {
                 {translate('Min')}
 
                 <NumberInput
+                  isDisabled={isDisabled}
                   className={styles.sizeInput}
                   name={`${id}.min`}
                   value={minSize || MIN}
@@ -284,6 +307,7 @@ class QualityDefinition extends Component {
                 {translate('Preferred')}
 
                 <NumberInput
+                  isDisabled={isDisabled}
                   className={styles.sizeInput}
                   name={`${id}.min`}
                   value={preferredSize || MAX - MIN_DISTANCE}
@@ -299,6 +323,7 @@ class QualityDefinition extends Component {
                 {translate('Max')}
 
                 <NumberInput
+                  isDisabled={isDisabled}
                   className={styles.sizeInput}
                   name={`${id}.max`}
                   value={maxSize || MAX}
@@ -324,8 +349,11 @@ QualityDefinition.propTypes = {
   maxSize: PropTypes.number,
   preferredSize: PropTypes.number,
   advancedSettings: PropTypes.bool.isRequired,
-  onTitleChange: PropTypes.func.isRequired,
+  showTitle: PropTypes.bool,
+  isDisabled: PropTypes.bool,
+  onTitleChange: PropTypes.func,
   onSizeChange: PropTypes.func.isRequired
 };
 
 export default QualityDefinition;
+

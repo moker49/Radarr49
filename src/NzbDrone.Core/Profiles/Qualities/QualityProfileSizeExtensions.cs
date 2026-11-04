@@ -7,7 +7,7 @@ namespace NzbDrone.Core.Profiles.Qualities
     {
         public static QualityDefinition GetSizeDefinition(this QualityProfile profile, Quality quality, QualityDefinition globalDefinition)
         {
-            var definition = profile?.SizeDefinitions?.SingleOrDefault(x => x.QualityId == quality.Id);
+            var definition = profile?.UseGlobalSizeDefinitions == true ? null : profile?.SizeDefinitions?.SingleOrDefault(x => x.QualityId == quality.Id);
             if (definition == null)
             {
                 return globalDefinition;

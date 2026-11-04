@@ -281,6 +281,43 @@ Evidence: `_temp/quality-size-*-before.json`, `_temp/quality-size-*-after.json`,
 `_temp/quality-size-scope-api-tests.log`, `_temp/quality-size-container.log` and
 `_temp/quality-size-frontend-build.log`.
 
+## Shared Quality controls and global preference (2026-11-04)
+
+Global and ordinary-profile modes now share the same QualityDefinitions table and
+QualityDefinition rows, preserving quality order, column spacing, sliders, size labels
+and advanced numeric inputs. Profile mode hides title textboxes and the title heading
+while keeping their column spacing. Rows resynchronize slider positions when incoming
+values change, including global-mode toggles and copying.
+
+The profile controls beside the selector include Use global values and Copy global
+values. Global mode displays current global values, disables editing and ignores
+custom overrides in the shared backend size resolver. Custom overrides are retained
+for switching back. Copy replaces all existing overrides with a snapshot of the saved
+global definitions; subsequent profile edits remain independent. Copy is disabled
+while global mode is enabled. Both operations use the existing Save Changes workflow.
+
+Migration 252 adds the nullable UseGlobalSizeDefinitions preference. Existing profiles
+retain their behavior. Legacy API updates that omit the preference preserve its stored
+value; explicit false disables it. A consistent SQLite backup was taken before the
+live migration at `_temp/quality-global-before-migration.db`.
+
+Validation passed 94 core profile/size/ranking tests, 69 v3 API tests, 16 container
+checks (one existing skip), the full frontend build and isolated frontend behavior
+checks. These cover persisted toggle roundtrips, runtime override bypass/restoration,
+legacy omission, explicit false, shared rows, hidden titles, disabled editing and
+copy snapshots. Frontend lint has no errors and one conditional-style warning.
+
+The tested backend/frontend were deployed. A temporary ordinary profile verified
+toggle persistence with custom values retained, legacy omission preservation and a
+30-quality global copy through the live API. It was deleted after validation. Complete
+before/after comparisons confirmed that existing profiles and global quality definitions
+were unchanged. Movie lookup remained HTTP 200. Browser layout/click verification was
+not performed; the shared components and their handlers were checked in isolation.
+
+Evidence: `_temp/quality-global-live-result.json`, `_temp/quality-global-*-tests.log`,
+`_temp/quality-global-container.log`, `_temp/quality-global-frontend-build.log` and
+the profiles/definitions before/after snapshots with the same prefix.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are

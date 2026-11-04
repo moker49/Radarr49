@@ -32,12 +32,14 @@ namespace NzbDrone.Core.Test.Profiles
             {
                 new ProfileSizeDefinition { QualityId = Quality.Bluray1080p.Id, MinSize = 5, PreferredSize = 10, MaxSize = null }
             };
+            profile.UseGlobalSizeDefinitions = true;
 
             Subject.Insert(profile);
 
             StoredModel.Name.Should().Be(profile.Name);
             StoredModel.Cutoff.Should().Be(profile.Cutoff);
             StoredModel.SizeDefinitions.Should().BeEquivalentTo(profile.SizeDefinitions);
+            StoredModel.UseGlobalSizeDefinitions.Should().BeTrue();
 
             StoredModel.Items.Should().Equal(profile.Items, (a, b) => a.Quality == b.Quality && a.Allowed == b.Allowed);
         }

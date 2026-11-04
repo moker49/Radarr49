@@ -70,6 +70,7 @@ namespace NzbDrone.Core.Profiles.Qualities
                 // An explicit empty list resets all qualities to the global defaults.
                 var stored = _profileRepository.Get(profile.Id);
                 profile.SizeDefinitions ??= stored?.SizeDefinitions;
+                profile.UseGlobalSizeDefinitions ??= stored?.UseGlobalSizeDefinitions;
                 profile.MaximumConcurrentDownloads ??= stored?.MaximumConcurrentDownloads;
                 profile.CompositeTestRoot = stored?.CompositeTestRoot;
                 ValidateSizeDefinitions(profile);

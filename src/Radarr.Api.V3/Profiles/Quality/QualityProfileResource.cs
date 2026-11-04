@@ -20,6 +20,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         public List<ProfileFormatItemResource> FormatItems { get; set; }
         public Language Language { get; set; }
         public List<ProfileSizeDefinition> SizeDefinitions { get; set; }
+        public bool? UseGlobalSizeDefinitions { get; set; }
         public bool IsComposite { get; set; }
     }
 
@@ -64,7 +65,8 @@ namespace Radarr.Api.V3.Profiles.Quality
                 MinUpgradeFormatScore = model.MinUpgradeFormatScore,
                 FormatItems = model.FormatItems.ConvertAll(ToResource),
                 Language = model.Language,
-                SizeDefinitions = model.SizeDefinitions
+                SizeDefinitions = model.SizeDefinitions,
+                UseGlobalSizeDefinitions = model.UseGlobalSizeDefinitions ?? false
             };
         }
 
@@ -114,7 +116,8 @@ namespace Radarr.Api.V3.Profiles.Quality
                 MinUpgradeFormatScore = resource.MinUpgradeFormatScore,
                 FormatItems = resource.FormatItems.ConvertAll(ToModel),
                 Language = resource.Language,
-                SizeDefinitions = resource.SizeDefinitions
+                SizeDefinitions = resource.SizeDefinitions,
+                UseGlobalSizeDefinitions = resource.UseGlobalSizeDefinitions
             };
         }
 

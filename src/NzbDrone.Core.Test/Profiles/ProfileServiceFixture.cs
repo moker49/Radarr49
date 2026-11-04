@@ -28,11 +28,26 @@ namespace NzbDrone.Core.Test.Profiles
                 new ProfileSizeDefinition { QualityId = 1, MinSize = 1, PreferredSize = 5, MaxSize = 10 }
             };
             Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(10))
-                .Returns(new QualityProfile { Id = 10, SizeDefinitions = definitions });
+                .Returns(new QualityProfile { Id = 10, SizeDefinitions = definitions, UseGlobalSizeDefinitions = true });
 
             Subject.Update(new QualityProfile { Id = 10 });
 
-            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.SizeDefinitions == definitions)));
+            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.SizeDefinitions == definitions && p.UseGlobalSizeDefinitions == true)));
+        }
+
+        [Test]
+        public void explicit_false_should_disable_global_preference_without_discarding_custom_sizes()
+        {
+            var definitions = new List<ProfileSizeDefinition>
+            {
+                new ProfileSizeDefinition { QualityId = 1, MinSize = 1, PreferredSize = 5, MaxSize = 10 }
+            };
+            Mocker.GetMock<IQualityProfileRepository>().Setup(s => s.Get(10))
+                .Returns(new QualityProfile { Id = 10, SizeDefinitions = definitions, UseGlobalSizeDefinitions = true });
+
+            Subject.Update(new QualityProfile { Id = 10, UseGlobalSizeDefinitions = false });
+
+            Mocker.GetMock<IQualityProfileRepository>().Verify(s => s.Update(It.Is<QualityProfile>(p => p.SizeDefinitions == definitions && p.UseGlobalSizeDefinitions == false)));
         }
 
         [Test]

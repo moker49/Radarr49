@@ -15,6 +15,7 @@ namespace NzbDrone.Api.Test.v3.Profiles
             var profile = new QualityProfile
             {
                 Items = new List<QualityProfileQualityItem>(),
+                UseGlobalSizeDefinitions = true,
                 SizeDefinitions = new List<ProfileSizeDefinition>
                 {
                     new ProfileSizeDefinition { QualityId = Quality.WEBDL1080p.Id, MinSize = 2, PreferredSize = 5, MaxSize = null }
@@ -25,6 +26,7 @@ namespace NzbDrone.Api.Test.v3.Profiles
             var restored = resource.ToModel();
 
             Assert.That(restored.SizeDefinitions.Count, Is.EqualTo(1));
+            Assert.That(restored.UseGlobalSizeDefinitions, Is.True);
             Assert.That(restored.SizeDefinitions[0].QualityId, Is.EqualTo(Quality.WEBDL1080p.Id));
             Assert.That(restored.SizeDefinitions[0].MinSize, Is.EqualTo(2));
             Assert.That(restored.SizeDefinitions[0].PreferredSize, Is.EqualTo(5));
@@ -41,6 +43,7 @@ namespace NzbDrone.Api.Test.v3.Profiles
             };
 
             Assert.That(resource.ToModel().SizeDefinitions, Is.Null);
+            Assert.That(resource.ToModel().UseGlobalSizeDefinitions, Is.Null);
         }
     }
 }

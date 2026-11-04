@@ -3,6 +3,7 @@ import React, { Component, Fragment } from 'react';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
+import Button from 'Components/Link/Button';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
 import PageSectionContent from 'Components/Page/PageSectionContent';
@@ -15,6 +16,7 @@ import translate from 'Utilities/String/translate';
 import QualityDefinitionsConnector from './Definition/QualityDefinitionsConnector';
 import QualityProfileSizeDefinitionsConnector from './Definition/QualityProfileSizeDefinitionsConnector';
 import ResetQualityDefinitionsModal from './Reset/ResetQualityDefinitionsModal';
+import styles from './Quality.css';
 
 class Quality extends Component {
 
@@ -25,12 +27,14 @@ class Quality extends Component {
     super(props, context);
 
     this._saveCallback = null;
+    this._profileControls = null;
 
     this.state = {
       isSaving: false,
       hasPendingChanges: false,
       selectedProfileId: 0,
       nextProfileId: null,
+      useGlobalValues: false,
       isConfirmQualityDefinitionResetModalOpen: false
     };
   }
@@ -38,8 +42,9 @@ class Quality extends Component {
   //
   // Listeners
 
-  onChildMounted = (saveCallback) => {
+  onChildMounted = (saveCallback, profileControls = null) => {
     this._saveCallback = saveCallback;
+    this._profileControls = profileControls;
   };
 
   onChildStateChange = (payload) => {
@@ -75,6 +80,7 @@ class Quality extends Component {
 
   selectProfile = (selectedProfileId) => {
     this._saveCallback = null;
+    this._profileControls = null;
     this.setState({ selectedProfileId, nextProfileId: null, hasPendingChanges: false, isSaving: false });
   };
 
@@ -86,6 +92,14 @@ class Quality extends Component {
     this.setState({ nextProfileId: null });
   };
 
+  onUseGlobalChange = (change) => {
+    this._profileControls?.onUseGlobalChange(change);
+  };
+
+  onCopyGlobalPress = () => {
+    this._profileControls?.onCopyGlobal();
+  };
+
   //
   // Render
 
@@ -94,7 +108,8 @@ class Quality extends Component {
       isSaving,
       hasPendingChanges,
       selectedProfileId,
-      nextProfileId
+      nextProfileId,
+      useGlobalValues
     } = this.state;
     const { profiles, isFetching, isPopulated, error, isResettingQualityDefinitions } = this.props;
 
@@ -126,20 +141,36 @@ class Quality extends Component {
             error={error}
             errorMessage={translate('QualityProfilesLoadError')}
           >
-            <FormGroup>
-              <FormLabel>{translate('SizeSettingsFor')}</FormLabel>
-              <FormInputGroup
-                type={inputTypes.SELECT}
-                name="sizeSettingsProfile"
-                value={selectedProfileId}
-                values={[
-                  { key: 0, value: translate('Global') },
-                  ...profiles.map((profile) => ({ key: profile.id, value: profile.name }))
-                ]}
-                isDisabled={isSaving || isResettingQualityDefinitions}
-                onChange={this.onProfileChange}
-              />
-            </FormGroup>
+            <div className={styles.scopeControls}>
+              <FormGroup>
+                <FormLabel>{translate('SizeSettingsFor')}</FormLabel>
+                <FormInputGroup
+                  type={inputTypes.SELECT}
+                  name="sizeSettingsProfile"
+                  value={selectedProfileId}
+                  values={[
+                    { key: 0, value: translate('Global') },
+                    ...profiles.map((profile) => ({ key: profile.id, value: profile.name }))
+                  ]}
+                  isDisabled={isSaving || isResettingQualityDefinitions}
+                  onChange={this.onProfileChange}
+                />
+              </FormGroup>
+
+              {selectedProfileId !== 0 ? <div className={styles.profileControls}>
+                <FormInputGroup
+                  type={inputTypes.CHECK}
+                  name="useGlobalSizeDefinitions"
+                  value={useGlobalValues}
+                  helpText={translate('UseGlobalValues')}
+                  isDisabled={isSaving}
+                  onChange={this.onUseGlobalChange}
+                />
+                <Button isDisabled={isSaving || useGlobalValues} onPress={this.onCopyGlobalPress}>
+                  {translate('CopyGlobalValues')}
+                </Button>
+              </div> : null}
+            </div>
 
             {selectedProfileId === 0 ?
               <QualityDefinitionsConnector

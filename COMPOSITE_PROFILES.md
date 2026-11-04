@@ -51,6 +51,9 @@ later one. This replaces the earlier configurable aggregate cap of one or two do
   profiles. Release size rejection and preferred-size ranking use these settings through
   one shared resolver. Unconfigured qualities retain global defaults. Legacy updates
   omitting the field preserve settings; an explicit empty list resets to global defaults.
+  Global/profile views share the same rows and sliders, with profile title edits hidden.
+  A saved Use global values toggle ignores retained overrides; Copy global values replaces
+  them with a snapshot. Legacy updates preserve an omitted global preference.
 - Legacy movie and movie-file edit/delete routes, including bulk routes, preflight through
   a shared policy. Mixed bulk requests fail before any mutation. Definition references
   and persisted movie-version assignments both protect a movie. Ordinary operations remain
