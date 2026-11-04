@@ -672,6 +672,7 @@
   "File": "File",
   "FileBrowser": "File Browser",
   "FileBrowserPlaceholderText": "Start typing or select a path below",
+  "FailedToDeleteMovieFile": "Failed to delete the movie file.",
   "FileManagement": "File Management",
   "FileNameTokens": "File Name Tokens",
   "FileNames": "File Names",

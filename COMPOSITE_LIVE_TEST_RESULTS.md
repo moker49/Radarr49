@@ -164,6 +164,63 @@ were left in place. Live evidence is in `_temp/per-version-concurrency-live-prof
 `_temp/per-version-concurrency-live-reservations.json` and
 `_temp/per-version-concurrency-live-client.json`; test logs use the same prefix.
 
+## Fast Five large-file import observation
+
+The SDR-designated import (operation 5, reservation 9) completed normally after about
+8 minutes 49 seconds. Its 36,471,548,990-byte file had already been installed and registered
+as file ID 6 while Activity still displayed Importing. Observation showed journal progress
+through CleaningOldExtras, RemovingSource and EventsPending to Completed, with no recovery
+error. The worker was consuming CPU during verification. Cleanup and completion perform
+multiple full-file SHA-256 passes, including checks at cleanup phase boundaries; these are
+expensive for a large movie and currently have no useful Activity progress indicator.
+No resume override, restart or file mutation was needed. Activity subsequently became empty.
+HDR retained file ID 5 and its expected size. Evidence is in
+`_temp/fast-five-sdr-import/completed-journal.json` and `media-info.json`.
+
+This inspection also exposed an unresolved content-classification issue: both Fast Five
+files report HDR10 in their parsed media info. The SDR-designated FLAME release lacked an
+HDR marker in its release title, and the configured SDR Custom Format merely negates an
+HDR/DV title regex. It therefore scored as SDR despite actually containing HDR10. The two
+managed file assignments and import lifecycle are working, but these title-only profile
+rules do not guarantee an actual SDR/HDR pair. Reliable enforcement needs validation of
+the downloaded file's dynamic range; this has not yet been implemented. The files and
+profile rules were left as observed during this diagnostic run.
+
+## Import performance and single-file deletion fixes (2026-11-04)
+
+The large-file import delay was repeated full-video SHA-256 verification, rather than
+a stuck import. Empty sidecar and cleanup phases now advance without rereading the
+video; checks remain before physical cleanup and final completion. SHA-256 uses a
+pooled 1 MiB buffer, and debug logs report bytes and elapsed hashing time. A read-only
+benchmark on the current 9,342,901,748-byte Fast Five SDR file averaged 8.235 seconds
+with the previous stream hashing and 4.401 seconds with the new buffer, producing
+identical digests. This measures hashing only; a complete new import has not yet been
+timed. Evidence: `_temp/import-hash-benchmark.json`.
+
+The movie file dialog previously sent managed file deletions to the intentionally
+blocked legacy endpoint. File resources now expose their persisted `movieVersionId`,
+and the dialog routes an individual managed file deletion to its exact version/file
+endpoint. Ordinary files retain their existing route. Deletion errors are displayed
+in the dialog. When no explicit monitoring override is supplied, the server reads
+the saved Unmonitor Deleted Movies setting; this does not depend on whether the
+browser has visited Media Management settings.
+
+Live sandbox test: Fast Five SDR version 3/file 8 (9,342,901,748 bytes) was deleted
+with HTTP 204 and a Completed deletion journal. SDR remained monitored. HDR version
+4/file 5 retained its path, size and last-write timestamp. A legacy delete of the
+same SDR file returned HTTP 409 before the version-specific deletion. The movie
+lookup endpoint returned HTTP 200 after deployment. Evidence:
+`_temp/import-delete-live-result.json` and the before snapshots with the same prefix.
+
+Validation: 1,370 broader core regression tests passed (five existing skips),
+including the import-specific regression coverage; the previously reproduced
+unrelated broken-report case remains excluded. All 68 v3 API tests passed, as did
+16 container checks (one existing skip), frontend lint and the full frontend build.
+An isolated check of the actual frontend action verifies SDR, HDR and ordinary file
+request routing. Browser click verification could not be completed: the desktop tool
+stopped because it could not establish the active browser URL. No further UI
+automation was attempted; the live deletion was verified through the authorized API.
+
 ## Evidence
 
 Sanitized API snapshots, history, final journals, reservations and hash comparisons are

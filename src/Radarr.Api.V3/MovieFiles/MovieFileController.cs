@@ -34,6 +34,7 @@ namespace Radarr.Api.V3.MovieFiles
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IUpgradableSpecification _upgradableSpecification;
         private readonly ICompositeProfilePolicy _compositeProfilePolicy;
+        private readonly IMovieVersionRepository _versions;
 
         public MovieFileController(IBroadcastSignalRMessage signalRBroadcaster,
                                IMediaFileService mediaFileService,
@@ -41,7 +42,8 @@ namespace Radarr.Api.V3.MovieFiles
                                IMovieService movieService,
                                ICustomFormatCalculationService formatCalculator,
                                IUpgradableSpecification upgradableSpecification,
-                               ICompositeProfilePolicy compositeProfilePolicy)
+                               ICompositeProfilePolicy compositeProfilePolicy,
+                               IMovieVersionRepository versions)
             : base(signalRBroadcaster)
         {
             _mediaFileService = mediaFileService;
@@ -50,6 +52,7 @@ namespace Radarr.Api.V3.MovieFiles
             _formatCalculator = formatCalculator;
             _upgradableSpecification = upgradableSpecification;
             _compositeProfilePolicy = compositeProfilePolicy;
+            _versions = versions;
         }
 
         protected override MovieFileResource GetResourceById(int id)
@@ -58,6 +61,7 @@ namespace Radarr.Api.V3.MovieFiles
             var movie = _movieService.GetMovie(movieFile.MovieId);
 
             var resource = movieFile.ToResource(movie, _upgradableSpecification, _formatCalculator);
+            resource.MovieVersionId = _versions.ForMovie(movie.Id).SingleOrDefault(v => v.MovieFileId == movieFile.Id)?.Id;
 
             return resource;
         }
@@ -80,10 +84,17 @@ namespace Radarr.Api.V3.MovieFiles
                 return new List<MovieFileResource>();
             }
 
-            return movieFiles.GroupBy(e => e.MovieId)
-                .SelectMany(f => f.ToList()
-                    .ConvertAll(e => e.ToResource(_movieService.GetMovie(f.Key), _upgradableSpecification, _formatCalculator)))
-                .ToList();
+            return movieFiles.GroupBy(e => e.MovieId).SelectMany(group =>
+            {
+                var movie = _movieService.GetMovie(group.Key);
+                var versions = _versions.ForMovie(group.Key);
+                return group.Select(file =>
+                {
+                    var resource = file.ToResource(movie, _upgradableSpecification, _formatCalculator);
+                    resource.MovieVersionId = versions.SingleOrDefault(v => v.MovieFileId == file.Id)?.Id;
+                    return resource;
+                });
+            }).ToList();
         }
 
         [RestPutById]

@@ -68,10 +68,16 @@ namespace NzbDrone.Core.MediaFiles
                 Require(movie.Path == operation.MoviePath, "The movie folder changed. Sidecar paths will not be adopted.");
                 var root = _roots.GetBestRootFolderPath(movie.Path);
                 Require(!string.IsNullOrWhiteSpace(root) && _disk.FolderExists(root) && Path.GetFullPath(root).IsParentPath(Path.GetFullPath(movie.Path)), "The configured movie root is unavailable.");
-                Require(Matches(Owned(movie.Path, operation.DestinationRelativePath), operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The installed video changed. Sidecars will not be modified.");
-                if (operation.Snapshot.PreviousExisted)
+
+                // With no incoming sidecars this phase only advances database state.
+                // Cleanup/completion still verify the video before physical actions.
+                if (operation.Snapshot.IncomingExtras.Any())
                 {
-                    Require(Matches(Private(movie.Path, operation.BackupRelativePath), operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous video backup changed. Sidecars will not be modified.");
+                    Require(Matches(Owned(movie.Path, operation.DestinationRelativePath), operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The installed video changed. Sidecars will not be modified.");
+                    if (operation.Snapshot.PreviousExisted)
+                    {
+                        Require(Matches(Private(movie.Path, operation.BackupRelativePath), operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous video backup changed. Sidecars will not be modified.");
+                    }
                 }
 
                 _operations.BeginExtras(operationId);

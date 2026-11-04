@@ -73,6 +73,37 @@ namespace NzbDrone.Core.Test.MediaFiles
         }
 
         [Test]
+        public void empty_cleanup_phases_must_not_rehash_the_entire_video()
+        {
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            connection.Execute("UPDATE \"MovieVersions\" SET \"MovieFileId\" = NULL WHERE \"Id\" = @Id", _sdr);
+            connection.Execute("UPDATE \"Movies\" SET \"MovieFileId\" = 0 WHERE \"Id\" = @Id", _movie);
+            connection.Execute("DELETE FROM \"MovieFiles\" WHERE \"Id\" = @Id", _old);
+            _disk.Remove(Full(_old.RelativePath));
+            var op = ReadyForCleanup(false);
+            Mocker.GetMock<IVersionImportFileVerifier>().Invocations.Clear();
+
+            RunCleanup(op);
+
+            AssertCleanupFinished(op);
+            Mocker.GetMock<IVersionImportFileVerifier>().Verify(v => v.Hash(Full(op.DestinationRelativePath)), Times.Once());
+            Mocker.GetMock<IVersionImportFileVerifier>().Verify(v => v.Hash(_source), Times.Exactly(2));
+        }
+
+        [Test]
+        public void no_sidecars_must_not_trigger_video_hashing_during_the_sidecar_phase()
+        {
+            var op = Prepare();
+            Subject.Resume(_movie.Id, op.Id);
+            Mocker.GetMock<IVersionImportFileVerifier>().Invocations.Clear();
+
+            ResumeSidecars(op);
+
+            Assert.That(_operations.Get(op.Id).State, Is.EqualTo(VersionFileImportState.CleaningOldExtras));
+            Mocker.GetMock<IVersionImportFileVerifier>().Verify(v => v.Hash(It.IsAny<string>()), Times.Never());
+        }
+
+        [Test]
         public void cleanup_should_retire_obsolete_extras_and_backups_without_touching_replacements()
         {
             var obsolete = ObsoleteSubtitle();

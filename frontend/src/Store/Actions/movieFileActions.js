@@ -175,7 +175,12 @@ export const actionHandlers = handleThunks({
     } = payload;
 
     const movieSection = _.last(movieEntity.split('.'));
-    const deletePromise = deleteMovieFileHelper(getState, payload, dispatch);
+    const file = getState().movieFiles.items.find((item) => item.id === movieFileId);
+    const isManaged = file?.movieVersionId != null;
+    const removeHandler = isManaged ?
+      createRemoveItemHandler(section, `/movie/${file.movieId}/versions/${file.movieVersionId}/file`) :
+      deleteMovieFileHelper;
+    const deletePromise = removeHandler(getState, payload, dispatch);
 
     deletePromise.done(() => {
       const movies = getState().movies.items;

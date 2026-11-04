@@ -1,8 +1,10 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
-import { sortDirections } from 'Helpers/Props';
+import { kinds, sortDirections } from 'Helpers/Props';
+import getErrorMessage from 'Utilities/Object/getErrorMessage';
 import translate from 'Utilities/String/translate';
 import MovieFileEditorRow from './MovieFileEditorRow';
 import styles from './MovieFileEditorTableContent.css';
@@ -15,6 +17,7 @@ class MovieFileEditorTableContent extends Component {
   render() {
     const {
       items,
+      error,
       columns,
       sortKey,
       sortDirection,
@@ -24,6 +27,13 @@ class MovieFileEditorTableContent extends Component {
 
     return (
       <div>
+        {
+          error ?
+            <Alert kind={kinds.DANGER}>
+              {getErrorMessage(error, translate('FailedToDeleteMovieFile'))}
+            </Alert> :
+            null
+        }
         {
           !items.length &&
             <div className={styles.blankpad}>
@@ -64,6 +74,7 @@ class MovieFileEditorTableContent extends Component {
 
 MovieFileEditorTableContent.propTypes = {
   movieId: PropTypes.number,
+  error: PropTypes.object,
   isDeleting: PropTypes.bool.isRequired,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   columns: PropTypes.arrayOf(PropTypes.object).isRequired,

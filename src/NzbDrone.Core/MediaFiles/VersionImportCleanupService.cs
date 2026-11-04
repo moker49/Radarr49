@@ -78,9 +78,13 @@ namespace NzbDrone.Core.MediaFiles
                 operation = _operations.Get(operationId);
                 while (operation.State is VersionFileImportState.CleaningOldExtras or VersionFileImportState.RecyclingBackup or VersionFileImportState.RemovingSource)
                 {
-                    // Bound full-video hashing to phase boundaries instead of repeating
-                    // it for every sidecar; the movie mutation lock spans the whole run.
-                    VerifyInstalled(movie, operation);
+                    // Empty/already-finished phases cannot touch files. Verify once
+                    // before a phase with work, retaining all destructive-action guards.
+                    if (operation.Snapshot.Cleanup.Any(item => item.State != VersionImportCleanupState.Finished && VersionImportCleanupPlan.Phase(item.Kind) == operation.State))
+                    {
+                        VerifyInstalled(movie, operation);
+                    }
+
                     for (var index = 0; index < operation.Snapshot.Cleanup.Count; index++)
                     {
                         var item = operation.Snapshot.Cleanup[index];

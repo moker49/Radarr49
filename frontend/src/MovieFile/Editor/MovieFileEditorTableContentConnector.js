@@ -33,7 +33,7 @@ function createMapStateToProps() {
         sortDirection: movieFiles.sortDirection,
         isDeleting: movieFiles.isDeleting,
         isSaving: movieFiles.isSaving,
-        error: null,
+        error: movieFiles.deleteError || movieFiles.error,
         languages,
         qualities
       };

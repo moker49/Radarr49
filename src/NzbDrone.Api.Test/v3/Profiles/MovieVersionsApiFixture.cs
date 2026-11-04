@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Profiles.Qualities;
@@ -56,18 +57,28 @@ namespace NzbDrone.Api.Test.v3.Profiles
             Assert.That(versions.All(v => !v.IsImplicit), Is.True);
         }
 
-        [Test]
-        public void version_file_delete_should_forward_exact_identity_and_default_unmonitor_choice()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void version_file_delete_should_forward_exact_identity_and_configured_unmonitor_choice(bool unmonitor)
         {
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.AutoUnmonitorPreviouslyDownloadedMovies).Returns(unmonitor);
             Assert.That(Subject.DeleteFile(1, 7, 11), Is.InstanceOf<NoContentResult>());
-            Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 7, 11, true), Times.Once());
+            Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 7, 11, unmonitor), Times.Once());
         }
 
         [Test]
         public void version_file_delete_should_allow_preserving_monitoring_explicitly()
         {
+            Mocker.GetMock<IConfigService>().SetupGet(v => v.AutoUnmonitorPreviouslyDownloadedMovies).Returns(true);
             Subject.DeleteFile(1, 8, 12, false);
             Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 8, 12, false), Times.Once());
+        }
+
+        [Test]
+        public void version_file_delete_should_allow_unmonitoring_explicitly()
+        {
+            Subject.DeleteFile(1, 8, 12, true);
+            Mocker.GetMock<IMovieVersionFileDeletionService>().Verify(v => v.Delete(1, 8, 12, true), Times.Once());
         }
 
         [Test]
