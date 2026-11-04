@@ -18,7 +18,7 @@ nullable activation-root column and does not convert existing movies.
    definitions; legacy profile edits are blocked afterward. Its child definitions govern
    release decisions. Record all three IDs from GET `/api/v3/qualityprofile`.
 4. Configure working indexers/download clients as usual. Choose a movie not already in this
-   instance. Start with concurrency 1.
+   instance. Each version permits one active download independently.
 
 ## Configure and activate
 
@@ -34,7 +34,6 @@ $hdrId = 2
 $testRoot = 'C:\RadarrCompositeTest'
 
 $body = @{
-    maximumConcurrentDownloads = 1
     versions = @(
         @{ id = 0; qualityProfileId = $sdrId; label = 'SDR'; priority = 0; isPrimary = $true }
         @{ id = 0; qualityProfileId = $hdrId; label = 'HDR'; priority = 1; isPrimary = $false }
@@ -96,12 +95,12 @@ Invoke-RestMethod "$api/command" -Method Post -Headers $headers `
 ```
 
 1. Inspect candidates/queue: prefer SDR when both have eligible candidates. If SDR has no
-   eligible result, HDR can proceed. Concurrency 1 permits one active managed download for
-   this movie. The versions API, queue/history version IDs and download reservation API
+   eligible result, HDR can proceed. SDR and HDR can download at the same time, with at
+   most one active download for each movie/version. The versions API, queue/history version IDs and download reservation API
    provide the authoritative version state; the old movie page shows the primary summary.
-2. After the first import completes, run another search if the second version has not yet
-   been acquired by RSS. A single search with concurrency 1 does not promise an automatic
-   follow-up search after completion. Missing copies rank ahead of upgrades.
+2. When both versions have eligible candidates, one search can submit both, in preference
+   order. A queued SDR job must not block a distinct HDR job. If one version has no eligible
+   result, another search or RSS can acquire it later. Missing copies rank ahead of upgrades.
 3. Verify both physical files share the movie directory and have its exact basename plus
    ` - SDR.mkv` and ` - HDR.mkv` (extension follows the source). Check each file's actual
    dynamic range and bitrate, plus its matching version/profile/history identity.

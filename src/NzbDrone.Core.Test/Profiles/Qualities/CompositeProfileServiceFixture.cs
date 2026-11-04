@@ -85,7 +85,7 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
             var result = Subject.Save(10, definitions);
 
             Assert.That(result.Select(v => v.CompositeProfileId), Is.EqualTo(new[] { 10, 10 }));
-            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 1), Times.Once());
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 2), Times.Once());
         }
 
         [Test]
@@ -209,6 +209,16 @@ namespace NzbDrone.Core.Test.Profiles.Qualities
             Subject.Save(10, Definitions(), 2);
 
             Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 2), Times.Once());
+        }
+
+        [Test]
+        public void legacy_limit_one_should_report_and_persist_independent_version_slots()
+        {
+            Subject.Save(10, Definitions(), 1);
+            Mocker.GetMock<ICompositeProfileVersionRepository>().Verify(s => s.SaveDefinitions(10, It.IsAny<List<CompositeProfileVersion>>(), 2), Times.Once());
+            _stored.AddRange(Definitions());
+            _stored.ForEach(v => v.CompositeProfileId = 10);
+            Assert.That(Subject.GetMaximumConcurrentDownloads(10), Is.EqualTo(2));
         }
 
         [TestCase(0)]

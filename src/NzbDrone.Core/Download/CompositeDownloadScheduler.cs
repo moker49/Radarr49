@@ -4,7 +4,6 @@ using System.Linq;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Queue;
 
 namespace NzbDrone.Core.Download
@@ -17,12 +16,10 @@ namespace NzbDrone.Core.Download
     public class CompositeDownloadScheduler : ICompositeDownloadScheduler
     {
         private readonly IQueueService _queue;
-        private readonly IQualityProfileService _profiles;
 
-        public CompositeDownloadScheduler(IQueueService queue, IQualityProfileService profiles)
+        public CompositeDownloadScheduler(IQueueService queue)
         {
             _queue = queue;
-            _profiles = profiles;
         }
 
         public bool CanGrab(RemoteMovie movie, List<DownloadDecision> grabbed)
@@ -38,13 +35,13 @@ namespace NzbDrone.Core.Download
                 }
             }
 
-            if (active.Any(q => q.MovieVersionId == movie.MovieVersionId || SameRelease(q.Release, movie.Release)))
+            if (active.Any(q => !q.MovieVersionId.HasValue || q.MovieVersionId == movie.MovieVersionId || SameRelease(q.Release, movie.Release)))
             {
                 return false;
             }
 
-            var limit = _profiles.Get(movie.Movie.QualityProfileId).MaximumConcurrentDownloads ?? 1;
-            return active.Count < Math.Clamp(limit, 1, 2);
+            // Each explicit version owns its slot; other versions can download concurrently.
+            return true;
         }
 
         internal static bool SameRelease(ReleaseInfo left, ReleaseInfo right)

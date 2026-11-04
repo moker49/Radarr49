@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Exceptions;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
@@ -20,6 +21,8 @@ namespace NzbDrone.Core.Download
         List<DownloadReservation> ForMovie(int movieId);
         void ConfirmNotSubmitted(int movieId, int reservationId, string note);
         void BindDownload(int movieId, int reservationId, string downloadId, string note);
+        void RemoveFromClient(TrackedDownload tracked);
+        void ConfirmRemoved(int movieId, int reservationId, string downloadId, string note);
     }
 
     public class DownloadReservationService : IDownloadReservationService,
@@ -30,16 +33,22 @@ namespace NzbDrone.Core.Download
         private readonly ITrackedDownloadService _trackedDownloads;
         private readonly IMovieRepository _movies;
         private readonly IMovieVersionService _versions;
+        private readonly IProvideDownloadClient _clients;
+        private readonly IVersionFileDeletionRepository _fileOperations;
 
         public DownloadReservationService(IDownloadReservationRepository repository,
                                           ITrackedDownloadService trackedDownloads,
                                           IMovieRepository movies,
-                                          IMovieVersionService versions)
+                                          IMovieVersionService versions,
+                                          IProvideDownloadClient clients,
+                                          IVersionFileDeletionRepository fileOperations)
         {
             _repository = repository;
             _trackedDownloads = trackedDownloads;
             _movies = movies;
             _versions = versions;
+            _clients = clients;
+            _fileOperations = fileOperations;
         }
 
         public DownloadReservation Reserve(RemoteMovie movie, int downloadClientId)
@@ -140,6 +149,81 @@ namespace NzbDrone.Core.Download
             }
 
             _trackedDownloads.StopTracking(downloadId);
+        }
+
+        public void RemoveFromClient(TrackedDownload tracked)
+        {
+            if (tracked.DownloadReservationId is not > 0 || tracked.MovieVersionId is not > 0)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Managed removal requires the exact version and reservation identity.");
+            }
+
+            var row = _repository.Get(tracked.DownloadReservationId.Value);
+            lock (MovieVersionImportSynchronization.ForMovie(row.MovieId))
+            {
+                row = _repository.Get(row.Id);
+                if (row.MovieVersionId != tracked.MovieVersionId || row.DownloadClientId != tracked.DownloadClient ||
+                    !string.Equals(row.DownloadId, tracked.DownloadItem.DownloadId, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(row.DownloadId) ||
+                    row.State is not (DownloadReservationState.Submitted or DownloadReservationState.Uncertain or DownloadReservationState.Failed or DownloadReservationState.Imported))
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "The tracked download does not match its bound reservation.");
+                }
+
+                _fileOperations.CheckReady(row.MovieId, row.MovieVersionId);
+                var client = _clients.Get(row.DownloadClientId) ?? throw new NzbDroneClientException(HttpStatusCode.Conflict, "The reserved download client is unavailable.");
+
+                // A failed/ambiguous client call must retain the slot. A crash after a
+                // successful removal can be reconciled through ConfirmRemoved.
+                client.RemoveItem(tracked.DownloadItem, true);
+                if (row.State != DownloadReservationState.Imported)
+                {
+                    MarkRemoved(row, "Download explicitly removed from its client through the activity API.");
+                }
+            }
+        }
+
+        public void ConfirmRemoved(int movieId, int reservationId, string downloadId, string note)
+        {
+            var row = CheckResolution(movieId, reservationId, note);
+            lock (MovieVersionImportSynchronization.ForMovie(movieId))
+            {
+                row = CheckResolution(movieId, reservationId, note);
+                if (string.IsNullOrWhiteSpace(downloadId) || !string.Equals(row.DownloadId, downloadId, StringComparison.OrdinalIgnoreCase) ||
+                    row.State is not (DownloadReservationState.Submitted or DownloadReservationState.Uncertain or DownloadReservationState.Failed))
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "Confirm the exact bound download ID of a removed, unimported reservation.");
+                }
+
+                _fileOperations.CheckReady(movieId, row.MovieVersionId);
+                var client = _clients.Get(row.DownloadClientId) ?? throw new NzbDroneClientException(HttpStatusCode.Conflict, "The reserved download client is unavailable.");
+
+                // Enumerate fully: client errors, unavailable history or incomplete
+                // enumeration must not be interpreted as proof that the job is gone.
+                var items = client.GetItems()?.ToList() ?? throw new NzbDroneClientException(HttpStatusCode.Conflict, "Could not inspect the reserved download client's queue/history.");
+                if (items.Any(i => string.Equals(i.DownloadId, downloadId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.Conflict, "The bound job still exists in the download client's queue/history.");
+                }
+
+                MarkRemoved(row, note);
+                var tracked = _trackedDownloads.Find(row.DownloadId);
+                if (tracked?.DownloadClient == row.DownloadClientId && tracked.DownloadReservationId == row.Id)
+                {
+                    _trackedDownloads.StopTracking(row.DownloadId);
+                }
+            }
+        }
+
+        private void MarkRemoved(DownloadReservation row, string note)
+        {
+            try
+            {
+                _repository.MarkRemoved(row.Id, row.DownloadClientId, row.DownloadId, note);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, ex.Message);
+            }
         }
 
         public void Handle(MovieFileImportedEvent message)

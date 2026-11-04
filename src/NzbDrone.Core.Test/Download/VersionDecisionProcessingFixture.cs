@@ -46,16 +46,15 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
-        public async Task should_prefer_sdr_and_defer_hdr_when_both_are_available()
+        public async Task should_dispatch_sdr_first_and_hdr_in_the_same_search()
         {
             var sdr = Release(201, 0);
             var hdr = Release(202, 1);
 
             var result = await Subject.ProcessDecisions(new List<DownloadDecision> { new DownloadDecision(hdr), new DownloadDecision(sdr) });
 
-            Assert.That(result.Grabbed.Single().RemoteMovie.MovieVersionId, Is.EqualTo(201));
-            Assert.That(result.Pending.Single().RemoteMovie.MovieVersionId, Is.EqualTo(202));
-            Mocker.GetMock<IPendingReleaseService>().Verify(s => s.AddMany(It.Is<List<Tuple<DownloadDecision, PendingReleaseReason>>>(items => items.Single().Item2 == PendingReleaseReason.VersionDownloadLimit)), Times.Once());
+            Assert.That(result.Grabbed.Select(d => d.RemoteMovie.MovieVersionId), Is.EqualTo(new int?[] { 201, 202 }));
+            Assert.That(result.Pending, Is.Empty);
         }
 
         [Test]
@@ -86,7 +85,7 @@ namespace NzbDrone.Core.Test.Download
                 new DownloadDecision(Release(201, 0, true)), new DownloadDecision(Release(202, 1))
             });
 
-            Assert.That(result.Grabbed.Single().RemoteMovie.MovieVersionId, Is.EqualTo(202));
+            Assert.That(result.Grabbed.Select(d => d.RemoteMovie.MovieVersionId), Is.EqualTo(new int?[] { 202, 201 }));
         }
 
         [Test]

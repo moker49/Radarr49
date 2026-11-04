@@ -15,7 +15,7 @@ namespace NzbDrone.Core.Profiles.Qualities
     public interface ICompositeProfileService
     {
         List<CompositeProfileVersion> Get(int profileId);
-        List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1);
+        List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 2);
         int GetMaximumConcurrentDownloads(int profileId);
         string GetTestRoot(int profileId);
         void SetTestRoot(int profileId, string rootFolderPath);
@@ -54,7 +54,9 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public int GetMaximumConcurrentDownloads(int profileId)
         {
-            return _profiles.Get(profileId).MaximumConcurrentDownloads ?? 1;
+            _profiles.Get(profileId);
+            var count = _definitions.ForProfile(profileId).Count;
+            return count == 0 ? 1 : count;
         }
 
         public string GetTestRoot(int profileId)
@@ -98,7 +100,7 @@ namespace NzbDrone.Core.Profiles.Qualities
             }
         }
 
-        public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 1)
+        public List<CompositeProfileVersion> Save(int profileId, List<CompositeProfileVersion> definitions, int maximumConcurrentDownloads = 2)
         {
             lock (CompositeProfileSynchronization.SyncRoot)
             {
@@ -156,7 +158,9 @@ namespace NzbDrone.Core.Profiles.Qualities
                 IsPrimary = v.IsPrimary
             }).ToList();
 
-            _definitions.SaveDefinitions(profileId, models, maximumConcurrentDownloads);
+            // Retain the old aggregate field for API/storage compatibility. Scheduling
+            // now enforces one slot per version, independently of its previous value.
+            _definitions.SaveDefinitions(profileId, models, models.Count);
             return models.OrderBy(v => v.Priority).ToList();
         }
 

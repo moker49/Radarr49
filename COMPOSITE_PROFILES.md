@@ -32,6 +32,9 @@ manage versions. The designated primary version supplies legacy singular file su
 Default naming: exact movie folder name followed by ` - SDR` or ` - HDR` and extension.
 Prefer the earlier version when candidates exist for both; allow the later version when
 the earlier one is unavailable. Primary selection is independent of download ordering.
+Each movie/version has one active download slot. Different versions may download
+concurrently; the earlier version's completion is not a prerequisite for dispatching the
+later one. This replaces the earlier configurable aggregate cap of one or two downloads.
 
 ## Current foundation
 
@@ -79,9 +82,12 @@ the earlier one is unavailable. Primary selection is independent of download ord
   cannot strip that identity. Release and queue resources expose MovieVersionId.
 - Prefer-first ordering prioritizes missing copies before further upgrades and honors the
   configured version order within those groups. Unavailable or delayed SDR does not block
-  eligible HDR. Draft configuration accepts maximumConcurrentDownloads of 1 (default) or 2.
+  eligible HDR. Each version now has one independent active slot, so SDR and HDR can
+  download together even on an existing profile that stored the old aggregate limit of 1.
   The scheduler respects active queue items, same-version occupancy and grabs within the
-  batch; it detects duplicate URLs/GUIDs/torrent hashes while they are active.
+  batch; it detects duplicate URLs/GUIDs/torrent hashes while they are active. Unresolved
+  submissions retain only their own version's slot. Unscoped/ambiguous existing client
+  jobs remain conservatively blocking until reconciled.
 - Durable DownloadReservations now serialize slot acquisition using the owning movie's
   database row/write lock. Active-version and bound-client-ID uniqueness also have database
   indexes. Both automatic and interactive dispatch go through the central download service:
@@ -354,8 +360,11 @@ The separate endpoint is `/api/v3/qualityprofile/{profileId}/composite`:
   `qualityProfileId`, `label`, `priority` (0 or 1), and `isPrimary`.
   The route supplies the parent profile ID. Subsequent saves must retain both definition
   IDs returned by the API. Definition order in the JSON does not determine priority.
-  The body also accepts `maximumConcurrentDownloads`: 1 for sequential downloads (the
-  default), or 2 to allow both versions concurrently once acquisition is enabled.
+  `maximumConcurrentDownloadsPerVersion` is read-only and reports 1. The legacy
+  `maximumConcurrentDownloads` field remains accepted for compatibility (values 1 or 2),
+  but no longer limits scheduling. Responses report the effective total number of version
+  slots (2 for the current two-child composite). Existing stored aggregate values are
+  ignored by both scheduling and reservation enforcement; no data conversion is required.
 - DELETE removes an unused draft's definitions, leaving the ordinary parent profile intact.
 
 POST `.../activate` accepts `{ "rootFolderPath": "C:\\CompositeTest" }`. The root must
@@ -708,6 +717,21 @@ release an unresolved, unbound attempt. It cannot clear an already bound submiss
 POST `.../{reservationId}/bind-download` accepts a `downloadId` and verification `note`.
 The client job must already be tracked and match the reserved release. Both operations
 validate route ownership; no legacy DELETE endpoint can release reservations.
+
+POST `.../{reservationId}/confirm-removed` accepts the exact bound `downloadId` and a
+verification `note` for an already removed client job. It requires a successful fresh
+inspection of the reserved client's configured queue/history view and rejects an ID
+still present there, an unavailable client, wrong ownership/identity, an imported
+reservation, or an active file operation. Mere disappearance from cached tracking never
+releases a reservation automatically. An operator must verify the job was actually
+removed before using this recovery endpoint.
+
+Activity single/bulk removal with `removeFromClient=true` now routes managed downloads
+through the reservation service. It checks version/client/reservation identity and file
+operation readiness before removing the job. Only a successful client removal releases
+the unimported reservation; imported-file ownership is preserved. A client error or a
+crash before recording completion retains the slot for explicit reconciliation. Ignore-only
+actions do not claim that a client job has stopped. No existing database data is rewritten.
 
 ## New-movie activation validation
 

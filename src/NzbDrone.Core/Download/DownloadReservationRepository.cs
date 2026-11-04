@@ -19,6 +19,7 @@ namespace NzbDrone.Core.Download
         void ConfirmNotSubmitted(int id, string note);
         void MarkImported(int id, int movieVersionId, int fileId);
         void MarkFailed(int id, string note);
+        void MarkRemoved(int id, int clientId, string downloadId, string note);
     }
 
     public class DownloadReservationRepository : BasicRepository<DownloadReservation>, IDownloadReservationRepository
@@ -75,12 +76,6 @@ namespace NzbDrone.Core.Download
             var unreserved = activeDownloads.Where(q => !active.Any(r => r.DownloadClientId == q.DownloadClientId &&
                 !string.IsNullOrWhiteSpace(r.DownloadId) && string.Equals(r.DownloadId, q.DownloadId, StringComparison.OrdinalIgnoreCase))).ToList();
             if (unreserved.Any(q => !q.MovieVersionId.HasValue || q.MovieVersionId == intent.MovieVersionId || q.ReleaseKeys.Intersect(intent.ReleaseKeys).Any()))
-            {
-                return null;
-            }
-
-            var limit = connection.ExecuteScalar<int?>("SELECT p.\"MaximumConcurrentDownloads\" FROM \"QualityProfiles\" p JOIN \"Movies\" m ON m.\"QualityProfileId\" = p.\"Id\" WHERE m.\"Id\" = @MovieId", intent, transaction) ?? 1;
-            if (active.Count + unreserved.Count >= Math.Clamp(limit, 1, 2))
             {
                 return null;
             }
@@ -185,6 +180,30 @@ namespace NzbDrone.Core.Download
             Require(OwnsFile(connection, transaction, row), "Imported file is not owned by this managed version.");
             row.State = DownloadReservationState.Imported;
             Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void MarkRemoved(int id, int clientId, string downloadId, string note)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = LoadForChange(connection, transaction, id);
+            Require(row.DownloadClientId == clientId && !string.IsNullOrWhiteSpace(downloadId) &&
+                string.Equals(row.DownloadId, downloadId, StringComparison.OrdinalIgnoreCase),
+                "Removed download does not match the reservation's bound client job.");
+            Require(
+                row.State is DownloadReservationState.Submitted or DownloadReservationState.Uncertain or DownloadReservationState.Failed,
+                "Only a submitted or unresolved bound download can be confirmed removed.");
+            Require(connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileImports\" WHERE \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"State\" BETWEEN 0 AND 10", row, transaction) == 0 &&
+                connection.ExecuteScalar<int>("SELECT COUNT(*) FROM \"VersionFileDeletions\" WHERE \"MovieId\" = @MovieId AND \"MovieVersionId\" = @MovieVersionId AND \"State\" BETWEEN 0 AND 4", row, transaction) == 0,
+                "Finish or reconcile the active file operation before releasing this download.");
+            if (row.State != DownloadReservationState.Failed)
+            {
+                row.State = DownloadReservationState.Failed;
+                row.Note = AppendNote(row.Note, note);
+                Save(connection, transaction, row);
+            }
+
             transaction.Commit();
         }
 

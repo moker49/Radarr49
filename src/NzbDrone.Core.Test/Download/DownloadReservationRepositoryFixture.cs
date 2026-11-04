@@ -86,6 +86,63 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
+        public void confirmed_removal_should_release_only_its_own_version_and_allow_a_new_search()
+        {
+            AllowTwo();
+            var sdr = Reserve(_sdr);
+            var hdr = Reserve(_hdr);
+            Subject.BeginDispatch(sdr.Id);
+            Subject.BindDownload(sdr.Id, "sdr-job", null);
+            Subject.BeginDispatch(hdr.Id);
+            Subject.BindDownload(hdr.Id, "hdr-job", null);
+
+            Subject.MarkRemoved(sdr.Id, 7, "sdr-job", "User removed the client job");
+            Subject.MarkRemoved(sdr.Id, 7, "sdr-job", "Repeated confirmation");
+
+            Assert.That(Subject.Get(sdr.Id).State, Is.EqualTo(DownloadReservationState.Failed));
+            Assert.That(Subject.Get(hdr.Id).State, Is.EqualTo(DownloadReservationState.Submitted));
+            Assert.That(Reserve(_sdr), Is.Not.Null);
+        }
+
+        [TestCase(8, "job")]
+        [TestCase(7, "wrong-job")]
+        public void wrong_removal_identity_must_keep_slot(int clientId, string downloadId)
+        {
+            var row = Reserve(_sdr);
+            Subject.BeginDispatch(row.Id);
+            Subject.BindDownload(row.Id, "job", null);
+            Assert.Throws<InvalidOperationException>(() => Subject.MarkRemoved(row.Id, clientId, downloadId, "Checked"));
+            Assert.That(Subject.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Submitted));
+            Assert.That(Reserve(_sdr), Is.Null);
+            Assert.That(Reserve(_hdr), Is.Not.Null);
+        }
+
+        [Test]
+        public void imported_reservation_cannot_be_cleared_as_removed()
+        {
+            var row = Reserve(_sdr);
+            using var connection = Mocker.Resolve<IMainDatabase>().OpenConnection();
+            connection.Execute("UPDATE \"DownloadReservations\" SET \"State\" = 3, \"DownloadId\" = 'job' WHERE \"Id\" = @Id", row);
+            Assert.Throws<InvalidOperationException>(() => Subject.MarkRemoved(row.Id, 7, "job", "Checked"));
+            Assert.That(Subject.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Imported));
+        }
+
+        [Test]
+        public void in_flight_import_must_prevent_removal_from_releasing_slot()
+        {
+            var row = Reserve(_sdr);
+            Subject.BeginDispatch(row.Id);
+            Subject.BindDownload(row.Id, "job", null);
+            Db.Insert(new VersionFileImport
+            {
+                MovieId = _movie.Id, MovieVersionId = _sdr.Id, MoviePath = _movie.Path, SourcePath = "source.mkv",
+                DestinationRelativePath = "SDR.mkv", StagingRelativePath = "staging.mkv", State = VersionFileImportState.Prepared, Snapshot = new VersionFileImportSnapshot()
+            });
+            Assert.Throws<InvalidOperationException>(() => Subject.MarkRemoved(row.Id, 7, "job", "Checked"));
+            Assert.That(Subject.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Submitted));
+        }
+
+        [Test]
         public void should_persist_intent_before_dispatch()
         {
             var row = Reserve(_sdr);
@@ -118,11 +175,12 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
-        public void default_limit_should_block_other_version()
+        public void legacy_limit_of_one_should_not_block_other_version()
         {
             Reserve(_sdr);
 
-            Assert.That(Reserve(_hdr), Is.Null);
+            Assert.That(Reserve(_sdr), Is.Null);
+            Assert.That(Reserve(_hdr), Is.Not.Null);
         }
 
         [Test]
@@ -186,7 +244,8 @@ namespace NzbDrone.Core.Test.Download
             var restarted = new DownloadReservationRepository(Mocker.Resolve<IMainDatabase>(), Mocker.GetMock<IEventAggregator>().Object);
 
             Assert.That(restarted.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Uncertain));
-            Assert.That(restarted.TryReserve(Intent(_hdr), new List<ActiveVersionDownload>()), Is.Null);
+            Assert.That(restarted.TryReserve(Intent(_sdr), new List<ActiveVersionDownload>()), Is.Null);
+            Assert.That(restarted.TryReserve(Intent(_hdr), new List<ActiveVersionDownload>()), Is.Not.Null);
         }
 
         [Test]
@@ -221,7 +280,8 @@ namespace NzbDrone.Core.Test.Download
             Subject.BindDownload(row.Id, null, null);
 
             Assert.That(Subject.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Uncertain));
-            Assert.That(Reserve(_hdr), Is.Null);
+            Assert.That(Reserve(_sdr), Is.Null);
+            Assert.That(Reserve(_hdr), Is.Not.Null);
         }
 
         [Test]
@@ -292,19 +352,20 @@ namespace NzbDrone.Core.Test.Download
             Assert.That(Subject.Get(row.Id).State, Is.EqualTo(DownloadReservationState.Submitted));
         }
 
-        [Test]
-        public async Task concurrent_searches_must_not_overbook_one_download_slot()
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task concurrent_searches_allow_different_versions_but_not_duplicate_same_version(bool sameVersion)
         {
             var repository = Subject;
             var first = Intent(_sdr);
-            var second = Intent(_hdr);
+            var second = Intent(sameVersion ? _sdr : _hdr);
 
             var results = await Task.WhenAll(
                 Task.Run(() => repository.TryReserve(first, new List<ActiveVersionDownload>())),
                 Task.Run(() => repository.TryReserve(second, new List<ActiveVersionDownload>())));
 
-            Assert.That(results.Count(r => r != null), Is.EqualTo(1));
-            Assert.That(Subject.ForMovie(_movie.Id).Count(r => r.IsActive), Is.EqualTo(1));
+            Assert.That(results.Count(r => r != null), Is.EqualTo(sameVersion ? 1 : 2));
+            Assert.That(Subject.ForMovie(_movie.Id).Count(r => r.IsActive), Is.EqualTo(sameVersion ? 1 : 2));
         }
     }
 }

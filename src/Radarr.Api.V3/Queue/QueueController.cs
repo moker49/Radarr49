@@ -36,6 +36,7 @@ namespace Radarr.Api.V3.Queue
         private readonly IIgnoredDownloadService _ignoredDownloadService;
         private readonly IProvideDownloadClient _downloadClientProvider;
         private readonly IBlocklistService _blocklistService;
+        private readonly IDownloadReservationService _reservations;
 
         public QueueController(IBroadcastSignalRMessage broadcastSignalRMessage,
                            IQueueService queueService,
@@ -45,7 +46,8 @@ namespace Radarr.Api.V3.Queue
                            IFailedDownloadService failedDownloadService,
                            IIgnoredDownloadService ignoredDownloadService,
                            IProvideDownloadClient downloadClientProvider,
-                           IBlocklistService blocklistService)
+                           IBlocklistService blocklistService,
+                           IDownloadReservationService reservations)
             : base(broadcastSignalRMessage)
         {
             _queueService = queueService;
@@ -55,6 +57,7 @@ namespace Radarr.Api.V3.Queue
             _ignoredDownloadService = ignoredDownloadService;
             _downloadClientProvider = downloadClientProvider;
             _blocklistService = blocklistService;
+            _reservations = reservations;
 
             _qualityComparer = new QualityModelComparer(qualityProfileService.GetDefaultProfile(string.Empty));
         }
@@ -327,7 +330,14 @@ namespace Radarr.Api.V3.Queue
                     throw new BadRequestException();
                 }
 
-                downloadClient.RemoveItem(trackedDownload.DownloadItem, true);
+                if (trackedDownload.MovieVersionId.HasValue || trackedDownload.DownloadReservationId.HasValue)
+                {
+                    _reservations.RemoveFromClient(trackedDownload);
+                }
+                else
+                {
+                    downloadClient.RemoveItem(trackedDownload.DownloadItem, true);
+                }
             }
             else if (changeCategory)
             {

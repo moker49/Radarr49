@@ -26,8 +26,9 @@ namespace Radarr.Api.V3.Profiles.Quality
         [HttpPut]
         public CompositeProfileResource Save(int profileId, [FromBody] CompositeProfileResource resource)
         {
-            var limit = resource?.MaximumConcurrentDownloads ?? 1;
-            return new CompositeProfileResource { ProfileId = profileId, Versions = _composites.Save(profileId, resource?.Versions, limit), MaximumConcurrentDownloads = limit };
+            var limit = resource?.MaximumConcurrentDownloads ?? 2;
+            var versions = _composites.Save(profileId, resource?.Versions, limit);
+            return new CompositeProfileResource { ProfileId = profileId, Versions = versions, MaximumConcurrentDownloads = versions.Count };
         }
 
         [HttpPost("activate")]
@@ -63,7 +64,10 @@ namespace Radarr.Api.V3.Profiles.Quality
         public bool IsDraft => string.IsNullOrWhiteSpace(TestRootFolderPath);
         public string TestRootFolderPath { get; set; }
         public List<CompositeProfileVersion> Versions { get; set; }
-        public int MaximumConcurrentDownloads { get; set; } = 1;
+
+        // Legacy aggregate field: responses report the effective number of version slots.
+        public int MaximumConcurrentDownloads { get; set; } = 2;
+        public int MaximumConcurrentDownloadsPerVersion => 1;
     }
 
     public class CompositeActivationResource

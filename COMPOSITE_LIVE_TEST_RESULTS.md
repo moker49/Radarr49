@@ -1,5 +1,9 @@
 # Composite profile live test — 2026-11-03
 
+Concurrency policy was subsequently changed to one independent active download per
+movie/version; SDR and HDR may now download simultaneously. The earlier sequential
+observations below describe the policy in effect during those tests.
+
 The first real download/import lifecycle passed using Bao (2018), TMDB 514754,
 in the existing sandbox instance and `C:\Media\Movies`. No separate media root was used.
 Radarr remains running with both copies available.
@@ -90,6 +94,75 @@ twenty results, respectively. Bao's SDR/HDR assignments remained file IDs 4 and 
 agent-initiated backend launches must run outside the restricted tool process if the
 instance needs outbound metadata/indexer access; launching via the user's desktop script
 also avoids this inherited restriction.
+
+The earlier network failures also left both indexers in a persisted failure cooldown.
+Fast Five's subsequent release searches therefore reported zero active indexers even
+after metadata lookup recovered. POST `/api/v3/indexer/testall` successfully tested both
+providers and cleared their failure state through the normal status service. Interactive
+release search for Fast Five then returned 170 results, including 94 approved decisions,
+across version IDs 3 and 4. The sanitized search summary is saved in
+`_temp/composite-live-test/fast-five-release-search-check.json`.
+
+## Follow-up: cancelling a managed download
+
+Fast Five's cancelled SDR job retained Submitted reservation 7 after activity removal.
+The next search displayed SDR/HDR candidates with status versionDownloadLimit, but those
+rows had no download/client IDs and were not SABnzbd jobs. The old reservation occupied
+the movie's single allowed download slot.
+
+The backend now records successful managed client removals against the exact bound
+reservation for both single and bulk Activity deletion. It checks file-operation readiness
+before touching the client and retains the slot on removal failures. Imported reservation
+ownership is preserved. An additive confirm-removed recovery endpoint handles previously
+orphaned bound attempts after explicit verification and fresh client inspection; it does
+not automatically treat missing cached downloads as cancelled.
+
+Validation: 862 download/queue tests passed (two existing skips; the previously reproduced
+broken-report baseline failure excluded), 64 v3 API tests and 16 container checks passed
+(one existing skip). Regression coverage includes another version retaining its reservation,
+slot reuse after cancellation, client errors, exact client/download identity, active imports,
+imported ownership, route ownership and single/bulk queue dispatch. Logs are
+`_temp/reservation-removal-*-tests.log` and `_temp/reservation-removal-regression.log`.
+
+The fix was built and deployed to the running dev backend, launched outside the tool's
+network sandbox. SAB's queue/history confirmed the original job was absent; its reservation
+was reconciled through the new API and two stale waiting entries were removed. A fresh
+SDR test job (reservation 8) was submitted. Confirm-removed returned HTTP 409 while the
+job was present, then ordinary Activity deletion removed it and immediately released its
+reservation. No manual database edits were used.
+
+Final checks: Activity empty, no active Fast Five reservations, both Fast Five versions
+still have no files, movie lookup HTTP 200 and interactive release search returns 170
+results. Evidence is under `_temp/reservation-cancellation-test/`. At the time of this cancellation test, the profile allowed
+one active version download at a time, so the second activity candidate could be waiting
+rather than an additional active SABnzbd job. The subsequent per-version concurrency change
+removes that aggregate cap.
+
+## Per-version concurrency update
+
+The aggregate movie cap is now retired. Each movie/version owns one active slot, so SDR
+and HDR can be submitted concurrently; a second request for the same version remains
+blocked. Preference order still submits SDR first when both are eligible, and missing
+versions rank ahead of upgrades. Uncertainty blocks its own version while duplicate
+release identity and ambiguous unscoped client jobs remain conservatively protected.
+Existing stored limits of one do not require a migration or profile reconfiguration.
+
+The composite API reports maximumConcurrentDownloadsPerVersion 1 and an effective
+maximumConcurrentDownloads of 2 for the two-child composite. The old aggregate input
+is accepted for compatibility but no longer controls dispatch. Validation passed 888
+core download/queue/profile tests (two existing skips and the same broken-report exclusion),
+65 v3 API tests and 16 container checks (one existing skip). Tests include simultaneous
+reservations for distinct versions, duplicate concurrent requests for the same version,
+old stored limits of one, uncertain submissions and same-batch dispatch/preference order.
+
+The tested backend was deployed and restarted outside the restricted tool process.
+Fast Five already had SDR reservation 9 in progress and HDR waiting. A new scoped movie
+search submitted the existing HDR candidate as reservation 10 while SDR remained active.
+Both bound IDs were verified directly in SABnzbd's queue, one for each version. Client
+transfer order remains subject to SABnzbd's own queue/priority behavior. Both user downloads
+were left in place. Live evidence is in `_temp/per-version-concurrency-live-profile.json`,
+`_temp/per-version-concurrency-live-reservations.json` and
+`_temp/per-version-concurrency-live-client.json`; test logs use the same prefix.
 
 ## Evidence
 

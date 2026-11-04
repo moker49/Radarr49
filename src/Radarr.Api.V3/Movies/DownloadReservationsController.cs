@@ -43,6 +43,13 @@ namespace Radarr.Api.V3.Movies
             return NoContent();
         }
 
+        [HttpPost("{reservationId:int}/confirm-removed")]
+        public IActionResult ConfirmRemoved(int movieId, int reservationId, [FromBody] ReservationResolutionResource resource)
+        {
+            _reservations.ConfirmRemoved(movieId, reservationId, resource?.DownloadId, resource?.Note);
+            return NoContent();
+        }
+
         [HttpPost("{reservationId:int}/bind-download")]
         public IActionResult BindDownload(int movieId, int reservationId, [FromBody] ReservationResolutionResource resource)
         {

@@ -13,6 +13,7 @@ using NzbDrone.Common.Composition.Extensions;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Common.Options;
+using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Datastore.Extensions;
 using NzbDrone.Core.Download;
@@ -60,6 +61,12 @@ namespace NzbDrone.App.Test
             container.RegisterInstance<IOptions<UpdateOptions>>(new Mock<IOptions<UpdateOptions>>().Object);
             container.RegisterInstance<IOptions<LogOptions>>(new Mock<IOptions<LogOptions>>().Object);
 
+            // Queue construction reads custom formats for its quality comparer. Keep
+            // the real services while supplying data at the dummy database boundary.
+            var formats = new Mock<ICustomFormatRepository>();
+            formats.Setup(r => r.All()).Returns(new List<CustomFormat>());
+            container.RegisterInstance<ICustomFormatRepository>(formats.Object);
+
             _container = container.GetServiceProvider();
         }
 
@@ -78,6 +85,7 @@ namespace NzbDrone.App.Test
         [TestCase(typeof(MovieVersionsController))]
         [TestCase(typeof(CompositeProfileController))]
         [TestCase(typeof(ManualImportController))]
+        [TestCase(typeof(Radarr.Api.V3.Queue.QueueController))]
         public void should_resolve_movie_and_composite_services_without_dependency_cycles(System.Type serviceType)
         {
             _container.GetRequiredService(serviceType).Should().NotBeNull();

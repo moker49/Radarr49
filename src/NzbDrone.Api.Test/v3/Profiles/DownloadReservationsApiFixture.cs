@@ -33,6 +33,18 @@ namespace NzbDrone.Api.Test.v3.Profiles
         }
 
         [Test]
+        public void confirm_removed_route_requires_verification_note()
+        {
+            Assert.Throws<NzbDroneClientException>(() => Subject.ConfirmRemoved(1, 42, new ReservationResolutionResource { DownloadId = "job" }));
+        }
+
+        [Test]
+        public void confirm_removed_route_cannot_clear_another_movies_reservation()
+        {
+            Assert.Throws<NzbDroneClientException>(() => Subject.ConfirmRemoved(2, 42, new ReservationResolutionResource { DownloadId = "job", Note = "Checked" }));
+        }
+
+        [Test]
         public void should_expose_unresolved_version_and_client_identity()
         {
             var resource = Subject.Get(1).Single();
