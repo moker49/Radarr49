@@ -25,6 +25,7 @@ namespace NzbDrone.Core.Profiles.Qualities
     {
         int Save(QualityProfile profile, bool enabled, List<CompositeProfileVersion> versions, string rootFolder, int? retainChildProfileId = null);
         Dictionary<int, int> GetMovieCounts();
+        Dictionary<int, List<int>> GetExistingFileProfileIds();
     }
 
     public class CompositeProfileEditorRepository : BasicRepository<QualityProfile>, ICompositeProfileEditorRepository
@@ -61,6 +62,19 @@ namespace NzbDrone.Core.Profiles.Qualities
         {
             using var connection = _database.OpenConnection();
             return connection.Query<ProfileMovieCount>("SELECT \"QualityProfileId\" AS \"ProfileId\", COUNT(*) AS \"MovieCount\" FROM \"Movies\" GROUP BY \"QualityProfileId\"").ToDictionary(r => r.ProfileId, r => r.MovieCount);
+        }
+
+        public Dictionary<int, List<int>> GetExistingFileProfileIds()
+        {
+            using var connection = _database.OpenConnection();
+            return connection.Query<ProfileFileIdentity>("SELECT DISTINCT m.\"QualityProfileId\" AS \"ProfileId\", COALESCE(f.\"ManagementProfileId\", m.\"QualityProfileId\") AS \"FileProfileId\" FROM \"Movies\" m JOIN \"MovieFiles\" f ON f.\"Id\"=m.\"MovieFileId\" AND f.\"MovieId\"=m.\"Id\"")
+                .GroupBy(r => r.ProfileId).ToDictionary(g => g.Key, g => g.Select(r => r.FileProfileId).ToList());
+        }
+
+        private sealed class ProfileFileIdentity
+        {
+            public int ProfileId { get; set; }
+            public int FileProfileId { get; set; }
         }
 
         private sealed class ProfileMovieCount

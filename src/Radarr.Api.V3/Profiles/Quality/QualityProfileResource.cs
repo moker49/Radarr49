@@ -26,6 +26,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         public string CompositeRootFolder { get; set; }
         public int? RetainChildProfileId { get; set; }
         public int MovieCount { get; set; }
+        public List<int> ExistingFileProfileIds { get; set; }
     }
 
     public class QualityProfileQualityItemResource : RestResource

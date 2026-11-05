@@ -88,6 +88,7 @@ namespace Radarr.Api.V3.Profiles.Quality
             resource.CompositeVersions = _compositeVersions.ForProfile(id).OrderBy(v => v.Priority).ToList();
             resource.IsComposite = resource.CompositeVersions.Any();
             resource.MovieCount = _editor.GetMovieCounts()?.GetValueOrDefault(id) ?? 0;
+            resource.ExistingFileProfileIds = _editor.GetExistingFileProfileIds()?.GetValueOrDefault(id) ?? new List<int>();
             return resource;
         }
 
@@ -97,11 +98,13 @@ namespace Radarr.Api.V3.Profiles.Quality
             var versions = _compositeVersions.All().ToLookup(v => v.CompositeProfileId);
             var resources = _qualityProfileService.All().ToResource();
             var counts = _editor.GetMovieCounts();
+            var identities = _editor.GetExistingFileProfileIds();
             resources.ForEach(p =>
             {
                 p.CompositeVersions = versions[p.Id].OrderBy(v => v.Priority).ToList();
                 p.IsComposite = p.CompositeVersions.Any();
                 p.MovieCount = counts?.GetValueOrDefault(p.Id) ?? 0;
+                p.ExistingFileProfileIds = identities?.GetValueOrDefault(p.Id) ?? new List<int>();
             });
             return resources;
         }

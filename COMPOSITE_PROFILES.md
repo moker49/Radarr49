@@ -40,6 +40,15 @@ composite can reclaim a single retained copy whose recorded management profile m
 the child; multiple candidates are left unmanaged. Retired version rows preserve history
 and can be reactivated with their original IDs while the definitions still exist.
 
+Files retain their recorded child profile identity while managed by an unrelated ordinary
+profile. Returning to a composite first matches that identity, then falls back to the
+current ordinary profile when it matches a child. Explicit assignment is needed only for
+unmatched files; a fallback selection never overrides a known child match. The movie API
+exposes `movieFile.managementProfileId`, and profile resources expose distinct
+`existingFileProfileIds` for the assigned movies' current files. Both editors use these
+identities to avoid redundant assignment prompts. Missing copies leave empty child slots.
+Prior conversions that already overwrote identity may require one final explicit selection.
+
 Assigned profiles can replace a child while retaining its slot, label and file, or disable
 composite mode with a required retention choice and affected-movie count. Priority-only
 edits preserve ownership. Active downloads and unfinished file operations block ownership

@@ -4,7 +4,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
-import { fetchQualityProfileSchema, saveQualityProfile, saveQualityProfileEditor, setQualityProfileValue } from 'Store/Actions/settingsActions';
+import { fetchQualityProfiles, fetchQualityProfileSchema, saveQualityProfile, saveQualityProfileEditor, setQualityProfileValue } from 'Store/Actions/settingsActions';
 import createProfileInUseSelector from 'Store/Selectors/createProfileInUseSelector';
 import createProviderSettingsSelector from 'Store/Selectors/createProviderSettingsSelector';
 import EditQualityProfileModalContent from './EditQualityProfileModalContent';
@@ -139,6 +139,7 @@ function createMapStateToProps() {
 }
 
 const mapDispatchToProps = {
+  fetchQualityProfiles,
   fetchQualityProfileSchema,
   setQualityProfileValue,
   saveQualityProfile,
@@ -166,6 +167,7 @@ class EditQualityProfileModalContentConnector extends Component {
 
   componentDidMount() {
     this.props.fetchRootFolders();
+    this.props.fetchQualityProfiles();
     if (!this.props.id && !this.props.isPopulated) {
       this.props.fetchQualityProfileSchema();
     }
@@ -589,6 +591,7 @@ EditQualityProfileModalContentConnector.propTypes = {
   saveQualityProfile: PropTypes.func.isRequired,
   saveQualityProfileEditor: PropTypes.func.isRequired,
   fetchRootFolders: PropTypes.func.isRequired,
+  fetchQualityProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.arrayOf(PropTypes.object).isRequired,
   rootFolders: PropTypes.arrayOf(PropTypes.object).isRequired,
   onModalClose: PropTypes.func.isRequired

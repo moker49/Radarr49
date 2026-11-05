@@ -8,6 +8,7 @@ export interface MovieFile extends ModelBase {
   movieId: number;
   movieVersionId?: number;
   isUnmanaged?: boolean;
+  managementProfileId?: number;
   relativePath: string;
   path: string;
   size: number;

@@ -140,10 +140,66 @@ namespace NzbDrone.Core.Test.MoviesTests
         public void simple_to_composite_without_a_matching_child_should_require_an_explicit_choice()
         {
             Change(_other.Id, _sdr.Id);
+            var file = Db.All<MovieFile>().Single(f => f.Id == _sdrFile.Id);
+            file.ManagementProfileId = null;
+            Db.Update(file);
             Assert.That(() => Change(_composite.Id), Throws.TypeOf<NzbDrone.Core.Exceptions.NzbDroneClientException>());
             Assert.That(Db.All<Movie>().Single().QualityProfileId, Is.EqualTo(_other.Id));
 
             Assert.That(Change(_composite.Id, assign: _sdr.Id).MovieFileId, Is.EqualTo(_sdrFile.Id));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void unrelated_simple_profile_should_preserve_child_identity_and_restore_without_a_choice(bool retainHdr)
+        {
+            var child = retainHdr ? _hdr : _sdr;
+            var retainedFile = retainHdr ? _hdrFile : _sdrFile;
+            var ids = Db.All<MovieVersion>().Select(v => v.Id).ToArray();
+            Change(_other.Id, child.Id);
+
+            Assert.That(Db.All<MovieFile>().Single(f => f.Id == retainedFile.Id).ManagementProfileId, Is.EqualTo(child.Id));
+            Change(_other.Id);
+            Change(_composite.Id);
+
+            Assert.That(Db.All<MovieFile>().All(f => !f.IsUnmanaged), Is.True);
+            Assert.That(Db.All<MovieVersion>().Where(v => !v.Retired).Select(v => v.Id), Is.EquivalentTo(ids));
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[0].Id).MovieFileId, Is.EqualTo(_sdrFile.Id));
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[1].Id).MovieFileId, Is.EqualTo(_hdrFile.Id));
+        }
+
+        [Test]
+        public void remembered_identity_should_take_precedence_over_a_different_matching_simple_profile()
+        {
+            Change(_sdr.Id, _hdr.Id);
+
+            Change(_composite.Id);
+
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[1].Id).MovieFileId, Is.EqualTo(_hdrFile.Id));
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[0].Id).MovieFileId, Is.EqualTo(_sdrFile.Id));
+        }
+
+        [Test]
+        public void fallback_assignment_should_not_override_a_remembered_child()
+        {
+            Change(_other.Id, _hdr.Id);
+
+            Change(_composite.Id, assign: _sdr.Id);
+
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[1].Id).MovieFileId, Is.EqualTo(_hdrFile.Id));
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[0].Id).MovieFileId, Is.EqualTo(_sdrFile.Id));
+        }
+
+        [Test]
+        public void missing_retained_copy_should_leave_that_child_empty()
+        {
+            Change(_other.Id, _hdr.Id);
+            Db.Delete(_sdrFile);
+
+            Change(_composite.Id);
+
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[0].Id).MovieFileId, Is.Null);
+            Assert.That(Db.All<MovieVersion>().Single(v => v.CompositeProfileVersionId == _definitions[1].Id).MovieFileId, Is.EqualTo(_hdrFile.Id));
         }
 
         [Test]

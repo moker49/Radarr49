@@ -19,8 +19,8 @@ namespace NzbDrone.Api.Test.v3.Profiles
         {
             var files = new List<MovieFile>
             {
-                new MovieFile { Id = 7, MovieId = 1, RelativePath = "SDR.mkv" },
-                new MovieFile { Id = 8, MovieId = 1, RelativePath = "HDR.mkv" },
+                new MovieFile { Id = 7, MovieId = 1, RelativePath = "SDR.mkv", ManagementProfileId = 4 },
+                new MovieFile { Id = 8, MovieId = 1, RelativePath = "HDR.mkv", ManagementProfileId = 5 },
                 new MovieFile { Id = 9, MovieId = 1, RelativePath = "Unassigned.mkv" }
             };
             Mocker.GetMock<IMediaFileService>().Setup(s => s.GetFilesByMovies(It.IsAny<IEnumerable<int>>())).Returns(files);
@@ -35,6 +35,7 @@ namespace NzbDrone.Api.Test.v3.Profiles
             var resources = Subject.GetMovieFiles(new List<int> { 1 }, new List<int>());
 
             Assert.That(resources.Select(f => f.MovieVersionId), Is.EqualTo(new int?[] { 201, 202, null }));
+            Assert.That(resources.Select(f => f.ManagementProfileId), Is.EqualTo(new int?[] { 4, 5, null }));
             Mocker.GetMock<IMovieVersionRepository>().Verify(s => s.ForMovie(1), Times.Once());
         }
     }

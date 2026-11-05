@@ -27,6 +27,7 @@ interface QualityProfile {
   }[];
   compositeRootFolder?: string;
   movieCount?: number;
+  existingFileProfileIds?: number[];
   name: string;
   upgradeAllowed: boolean;
   cutoff: number;

@@ -39,11 +39,12 @@ namespace NzbDrone.Core.Movies
 
             if (source.Count == 0 && movie.MovieFileId > 0)
             {
-                files.Single(f => f.Id == movie.MovieFileId).ManagementProfileId = movie.QualityProfileId;
+                files.Single(f => f.Id == movie.MovieFileId).ManagementProfileId ??= movie.QualityProfileId;
             }
 
             var assignments = new Dictionary<int, int?>();
             var monitoring = new Dictionary<int, bool>();
+            var existingFileProfileId = existingFileChildProfileId ?? movie.QualityProfileId;
             int? simpleFile = null;
             if (destination.Count == 0)
             {
@@ -63,7 +64,13 @@ namespace NzbDrone.Core.Movies
                 new CompositeProfileValidator().ValidateAndThrow(destination);
                 if (source.Count == 0 && movie.MovieFileId > 0)
                 {
-                    Require(destination.Any(d => d.QualityProfileId == (existingFileChildProfileId ?? movie.QualityProfileId)), "The existing file has no exact destination-profile match. Choose its destination version in the UI.");
+                    var identity = files.Single(f => f.Id == movie.MovieFileId).ManagementProfileId;
+                    if (destination.Any(d => d.QualityProfileId == identity))
+                    {
+                        existingFileProfileId = identity.Value;
+                    }
+
+                    Require(destination.Any(d => d.QualityProfileId == existingFileProfileId), "The existing file has no exact destination-profile match. Choose its destination version in the UI.");
                 }
 
                 foreach (var definition in destination)
@@ -71,7 +78,7 @@ namespace NzbDrone.Core.Movies
                     var oldDefinition = source.SingleOrDefault(d => d.Id == definition.Id) ?? source.SingleOrDefault(d => d.QualityProfileId == definition.QualityProfileId);
                     var oldVersion = oldDefinition == null ? null : active.Single(v => v.CompositeProfileVersionId == oldDefinition.Id);
                     var fileId = oldVersion?.MovieFileId;
-                    if (source.Count == 0 && movie.MovieFileId > 0 && definition.QualityProfileId == (existingFileChildProfileId ?? movie.QualityProfileId))
+                    if (source.Count == 0 && movie.MovieFileId > 0 && definition.QualityProfileId == existingFileProfileId)
                     {
                         fileId = movie.MovieFileId;
                     }
@@ -97,9 +104,9 @@ namespace NzbDrone.Core.Movies
             foreach (var file in files)
             {
                 file.IsUnmanaged = !selected.Contains(file.Id);
-                if (!file.IsUnmanaged)
+                if (!file.IsUnmanaged && destination.Count > 0)
                 {
-                    file.ManagementProfileId = destination.Count == 0 ? targetProfileId : destination.Single(d => assignments[d.Id] == file.Id).QualityProfileId;
+                    file.ManagementProfileId = destination.Single(d => assignments[d.Id] == file.Id).QualityProfileId;
                 }
 
                 connection.Execute("UPDATE \"MovieFiles\" SET \"IsUnmanaged\"=@IsUnmanaged, \"ManagementProfileId\"=@ManagementProfileId WHERE \"Id\"=@Id AND \"MovieId\"=@MovieId", file, transaction);

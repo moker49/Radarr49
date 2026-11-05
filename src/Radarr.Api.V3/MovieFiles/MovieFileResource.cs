@@ -16,6 +16,7 @@ namespace Radarr.Api.V3.MovieFiles
         public int MovieId { get; set; }
         public int? MovieVersionId { get; set; }
         public bool IsUnmanaged { get; set; }
+        public int? ManagementProfileId { get; set; }
         public string RelativePath { get; set; }
         public string Path { get; set; }
         public long Size { get; set; }
@@ -50,6 +51,7 @@ namespace Radarr.Api.V3.MovieFiles
                 MovieId = model.MovieId,
                 MovieVersionId = model.MovieVersionId,
                 IsUnmanaged = model.IsUnmanaged,
+                ManagementProfileId = model.ManagementProfileId,
                 RelativePath = model.RelativePath,
 
                 // Path
@@ -80,6 +82,7 @@ namespace Radarr.Api.V3.MovieFiles
                 MovieId = model.MovieId,
                 MovieVersionId = model.MovieVersionId,
                 IsUnmanaged = model.IsUnmanaged,
+                ManagementProfileId = model.ManagementProfileId,
                 RelativePath = model.RelativePath,
                 Path = Path.Combine(movie.Path, model.RelativePath),
                 Size = model.Size,

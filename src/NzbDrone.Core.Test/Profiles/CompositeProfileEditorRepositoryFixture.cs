@@ -94,6 +94,24 @@ namespace NzbDrone.Core.Test.Profiles
         }
 
         [Test]
+        public void re_enabling_composite_should_match_files_without_repeating_the_retention_choice()
+        {
+            var parent = Profile("Parent");
+            var movie = AssignMovie(parent);
+            var files = Db.All<MovieFile>();
+            var hdrFile = files.Single(f => f.RelativePath.Contains("HDR"));
+            Subject.Save(parent, false, null, null, _hdr.Id);
+
+            Assert.That(Subject.GetExistingFileProfileIds()[parent.Id], Is.EqualTo(new[] { _hdr.Id }));
+            Subject.Save(parent, true, Definitions(), _root);
+
+            var definitions = Read(parent.Id);
+            Assert.That(Db.All<MovieFile>().All(f => !f.IsUnmanaged), Is.True);
+            Assert.That(Db.All<MovieVersion>().Single(v => !v.Retired && v.CompositeProfileVersionId == definitions.Single(d => d.QualityProfileId == _hdr.Id).Id).MovieFileId, Is.EqualTo(hdrFile.Id));
+            Assert.That(Db.All<Movie>().Single().MovieFileId, Is.EqualTo(movie.MovieFileId));
+        }
+
+        [Test]
         public void replacing_used_child_should_reuse_its_slot_and_file()
         {
             var parent = Profile("Parent");

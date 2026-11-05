@@ -1,5 +1,42 @@
 # Composite profile live test — 2026-11-03
 
+## Profile-editor prompt timing follow-up — November 4, 2026
+
+The profile editor was checking for unmatched files before two children had been selected,
+so enabling composite mode prematurely displayed the assignment dropdown. It now waits
+until two children are selected. Opening the editor also refreshes profile ownership
+metadata. Genuine unmatched-file prompts use assignment wording instead of retention wording.
+Component checks cover zero, one and two selected children, matched/unmatched file identities,
+save guards and refresh-on-open. Lint/full frontend build passed; the tested frontend was
+copied to the running instance and its main bundle hash verified. No backend restart or
+library changes were needed. Evidence: `_temp/profile-choice-timing-frontend-build.log`.
+
+## Automatic child matching follow-up — November 4, 2026
+
+Deployed backend 10.0.0.34825 and matching frontend. File child identities now survive
+conversion to unrelated ordinary profiles. Both movie and profile editors suppress the
+assignment prompt when every existing managed file can be matched to a selected child.
+Unmatched files still need a selection; missing child copies do not.
+
+28 conversion/profile repository tests and all 73 v3 API tests passed, along with frontend
+lint, a full webpack/type build and isolated component checks. New cases cover SDR/HDR
+round-trips through unrelated profiles, remembered identity taking precedence over a
+different ordinary profile or fallback choice, missing retained copies, profile mode
+off/on without a repeated choice, and API identity exposure.
+
+The live Fast Five test used a temporary composite, retained HDR under its original
+ordinary profile, then returned to the temporary composite through the legacy movie API
+without selection. HDR matched child 5 and retained SDR matched child 4. The temporary
+profile was disabled and removed. Fast Five was restored to its pre-test ordinary profile
+7 and managed HDR file 5; SDR file 9 remained unmanaged. Both files' names, sizes and
+modification times were preserved, and the queue stayed empty. This also restored HDR's
+known child marker after the previous build had overwritten it. Other files converted
+under the previous build may still need one final selection. No new migration was needed.
+
+Evidence: `_temp/child-identity-live-result.json`, `_temp/child-identity-before.json`,
+`_temp/child-identity-before.db`, `_temp/child-identity-core-tests.log`,
+`_temp/child-identity-api-tests.log` and `_temp/child-identity-frontend-build.log`.
+
 ## Profile conversions and unmanaged copies — November 4, 2026
 
 Deployed backend 10.0.0.22193 and the matching frontend. Migration 253 completed, with a

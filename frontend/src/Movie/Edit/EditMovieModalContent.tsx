@@ -57,6 +57,7 @@ function EditMovieModalContent({
     minimumAvailability,
     qualityProfileId,
     movieFileId,
+    movieFile,
     path,
     tags,
     rootFolderPath: initialRootFolderPath,
@@ -95,7 +96,9 @@ function EditMovieModalContent({
     targetProfile?.isComposite &&
     (movieFileId || 0) > 0 &&
     !targetProfile.compositeVersions?.some(
-      (version) => version.qualityProfileId === qualityProfileId
+      (version) =>
+        version.qualityProfileId === movieFile?.managementProfileId ||
+        version.qualityProfileId === qualityProfileId
     )
   );
   const choiceNeeded = retainChoice || assignChoice;

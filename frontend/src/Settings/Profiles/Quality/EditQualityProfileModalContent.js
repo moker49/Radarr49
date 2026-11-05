@@ -145,6 +145,7 @@ class EditQualityProfileModalContent extends Component {
     const original = profiles.find((profile) => profile.id === this.props.id);
     const conversion = (original?.movieCount || 0) > 0 && !!original?.isComposite !== isComposite;
     const conversionChoices = isComposite ? compositeRows.filter((row) => row.allowed).map((row) => ({ key: row.id, value: row.name })) : (original?.compositeVersions || []).map((version) => ({ key: version.qualityProfileId, value: version.label }));
+    const choiceNeeded = conversion && (!isComposite || (conversionChoices.length === 2 && (original.existingFileProfileIds || [this.props.id]).some((profileId) => !conversionChoices.some((choice) => choice.key === profileId))));
     const validConversionChoice = conversionChoices.some((choice) => choice.key === retainChildProfileId);
 
     return (
@@ -208,6 +209,18 @@ class EditQualityProfileModalContent extends Component {
                           />
                         </FormGroup>
 
+                        {choiceNeeded ? <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>{translate(isComposite ? 'ExistingFiles' : 'KeepManagedVersion')}</FormLabel>
+                          <FormInputGroup
+                            type={inputTypes.SELECT}
+                            name="retainChildProfileId"
+                            value={retainChildProfileId}
+                            values={[{ key: 0, value: translate(isComposite ? 'ChooseExistingFileVersion' : 'ChooseVersionToKeepManaged') }, ...conversionChoices]}
+                            helpText={translate('ProfileConversionPreview', { count: original.movieCount })}
+                            onChange={onRetainChildProfileChange}
+                          />
+                        </FormGroup> : null}
+
                         {isComposite ? <FormGroup size={sizes.EXTRA_SMALL}>
                           <FormLabel size={sizes.SMALL}>{translate('RootFolder')}</FormLabel>
                           <FormInputGroup
@@ -221,8 +234,6 @@ class EditQualityProfileModalContent extends Component {
                         </FormGroup> : null}
 
                         <div hidden={isComposite}>
-                          {conversion && !isComposite ? <Alert kind={kinds.INFO}>{translate('ProfileConversionPreview', { count: original.movieCount })}</Alert> : null}
-
                           <FormGroup size={sizes.EXTRA_SMALL}>
                             <FormLabel size={sizes.SMALL}>
                               {translate('UpgradesAllowed')}
@@ -330,17 +341,6 @@ class EditQualityProfileModalContent extends Component {
                       </div>
 
                       <div className={styles.formGroupWrapper}>
-                        {conversion ? <FormGroup size={sizes.EXTRA_SMALL}>
-                          <FormLabel size={sizes.SMALL}>{translate(isComposite ? 'ExistingFiles' : 'KeepManagedVersion')}</FormLabel>
-                          <FormInputGroup
-                            type={inputTypes.SELECT}
-                            name="retainChildProfileId"
-                            value={retainChildProfileId}
-                            values={[{ key: 0, value: translate('ChooseVersionToKeepManaged') }, ...conversionChoices]}
-                            helpText={translate('ProfileConversionPreview', { count: original.movieCount })}
-                            onChange={onRetainChildProfileChange}
-                          />
-                        </FormGroup> : null}
                         {isComposite ?
                           <CompositeProfileItems
                             items={compositeRows}
@@ -402,7 +402,7 @@ class EditQualityProfileModalContent extends Component {
 
             <SpinnerErrorButton
               isSpinning={isSaving}
-              isDisabled={(isComposite && compositeRows.filter((row) => row.allowed).length !== 2) || (conversion && !validConversionChoice)}
+              isDisabled={(isComposite && compositeRows.filter((row) => row.allowed).length !== 2) || (choiceNeeded && !validConversionChoice)}
               error={saveError}
               onPress={onSavePress}
             >
