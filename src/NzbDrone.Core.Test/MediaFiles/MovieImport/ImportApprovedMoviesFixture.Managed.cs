@@ -16,6 +16,20 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
 {
     public partial class ImportApprovedMoviesFixture
     {
+        [Test]
+        public void single_file_audit_registration_must_not_reclaim_an_unmanaged_copy()
+        {
+            var local = _approvedDecisions[0].LocalMovie;
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetFilesWithRelativePath(local.Movie.Id, It.IsAny<string>()))
+                .Returns(new List<MovieFile> { new MovieFile { Id = 90, MovieId = local.Movie.Id, IsUnmanaged = true } });
+
+            var result = Subject.Import(_approvedDecisions, false);
+
+            Assert.That(result[0].Result, Is.EqualTo(ImportResultType.Skipped));
+            Mocker.GetMock<IMediaFileService>().Verify(s => s.Delete(It.IsAny<MovieFile>(), It.IsAny<DeleteMediaFileReason>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(s => s.Add(It.IsAny<MovieFile>()), Times.Never());
+        }
+
         [TestCase(ImportMode.Auto, true, false)]
         [TestCase(ImportMode.Auto, false, true)]
         [TestCase(ImportMode.Copy, true, true)]

@@ -43,6 +43,11 @@ namespace NzbDrone.Core.MediaFiles
 
         private bool ChangeFileDate(MovieFile movieFile, Movie movie)
         {
+            if (movieFile.IsUnmanaged)
+            {
+                return false;
+            }
+
             var movieFilePath = Path.Combine(movie.Path, movieFile.RelativePath);
 
             switch (_configService.FileDate)

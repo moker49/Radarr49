@@ -88,6 +88,11 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                     {
                         localMovie.DownloadItem = downloadClientItem ?? localMovie.DownloadItem;
                         _versionImports.ValidateForWrite(localMovie, localMovie.DownloadItem, newDownload);
+                        var sourceFiles = _mediaFileService.GetFilesWithRelativePath(localMovie.Movie.Id, Path.GetRelativePath(localMovie.Movie.Path, localMovie.Path));
+                        if (sourceFiles?.Any(f => f.IsUnmanaged) == true)
+                        {
+                            throw new MovieVersionImportException("This source is a retained unmanaged copy. Change its management through profile conversion before importing it.");
+                        }
 
                         // check if already imported
                         if (importResults.Any(r => r.Result == ImportResultType.Imported && r.ImportDecision.LocalMovie.Movie.Id == localMovie.Movie.Id &&

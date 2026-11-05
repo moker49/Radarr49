@@ -31,13 +31,18 @@ namespace NzbDrone.Core.Extras
         public Movie Resolve(Movie movie, string path, bool artwork = false)
         {
             var versions = _versions.Resolve(movie);
+            var files = _files.GetFilesByMovie(movie.Id);
+            if (files?.Any(f => f.IsUnmanaged && Matches(Path.Combine(movie.Path, f.RelativePath), path, artwork)) == true)
+            {
+                return null;
+            }
+
             if (!versions.Any(v => v.Id.HasValue))
             {
                 return movie;
             }
 
             // Match actual registered video paths, never labels or the primary summary.
-            var files = _files.GetFilesByMovie(movie.Id);
             var matches = versions.Where(v => v.Id.HasValue && v.MovieFileId.HasValue)
                 .Select(v => new { Version = v, File = files.SingleOrDefault(f => f.Id == v.MovieFileId) })
                 .Where(v => v.File != null && v.File.MovieId == movie.Id && Matches(Path.Combine(movie.Path, v.File.RelativePath), path, artwork))

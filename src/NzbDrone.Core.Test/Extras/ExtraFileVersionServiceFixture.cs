@@ -90,6 +90,18 @@ namespace NzbDrone.Core.Test.Extras
         }
 
         [Test]
+        public void single_file_audit_unmanaged_sidecars_must_not_be_claimed_by_the_ordinary_primary()
+        {
+            _versions.Clear();
+            _versions.Add(new ResolvedMovieVersion { MovieFileId = 11 });
+            _files[1].IsUnmanaged = true;
+
+            Assert.That(Subject.Resolve(_movie, Path.Combine(_movie.Path, "300 (2006) - HDR.en.srt")), Is.Null);
+            Assert.That(Subject.Resolve(_movie, Path.Combine(_movie.Path, "300 (2006) - HDR-poster.jpg"), true), Is.Null);
+            Assert.That(Subject.Resolve(_movie, Path.Combine(_movie.Path, "300 (2006) - SDR.en.srt")), Is.SameAs(_movie));
+        }
+
+        [Test]
         public void ordinary_movie_should_retain_existing_context()
         {
             _versions.Clear();

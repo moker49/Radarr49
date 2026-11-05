@@ -196,7 +196,7 @@ namespace NzbDrone.Core.Extras
 
         private List<MovieFile> GetMovieFiles(Movie movie)
         {
-            var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
+            var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id).Where(f => !f.IsUnmanaged).ToList();
             var versions = _versions.Resolve(movie);
 
             foreach (var movieFile in movieFiles)

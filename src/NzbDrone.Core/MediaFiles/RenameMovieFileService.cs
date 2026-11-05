@@ -97,8 +97,9 @@ namespace NzbDrone.Core.MediaFiles
             lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
             {
                 movie = _movieService.GetMovie(movie.Id) ?? movie;
+                MovieProfileConversion.Require(movieFiles.All(f => f.MovieId == movie.Id), "All selected files must belong to the requested movie. No files have been renamed.");
                 _deletions.CheckReady(movie.Id, null);
-                return RenameFilesCore(movieFiles, movie);
+                return RenameFilesCore(movieFiles.Where(f => !f.IsUnmanaged).ToList(), movie);
             }
         }
 
@@ -160,12 +161,15 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Execute(RenameFilesCommand message)
         {
-            var movie = _movieService.GetMovie(message.MovieId);
-            var movieFiles = _mediaFileService.GetMovies(message.Files).Where(f => !f.IsUnmanaged).ToList();
+            lock (MovieVersionImportSynchronization.ForMovie(message.MovieId))
+            {
+                var movie = _movieService.GetMovie(message.MovieId);
+                var movieFiles = _mediaFileService.GetMovies(message.Files);
 
-            _logger.ProgressInfo("Renaming {0} files for {1}", movieFiles.Count, movie.Title);
-            var renamedFiles = RenameFiles(movieFiles, movie);
-            _logger.ProgressInfo("{0} selected movie files renamed for {1}", renamedFiles.Count, movie.Title);
+                _logger.ProgressInfo("Renaming {0} files for {1}", movieFiles.Count, movie.Title);
+                var renamedFiles = RenameFiles(movieFiles, movie);
+                _logger.ProgressInfo("{0} selected movie files renamed for {1}", renamedFiles.Count, movie.Title);
+            }
 
             _eventAggregator.PublishEvent(new RenameCompletedEvent());
         }
@@ -177,10 +181,13 @@ namespace NzbDrone.Core.MediaFiles
 
             foreach (var movie in moviesToRename)
             {
-                var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id).Where(f => !f.IsUnmanaged).ToList();
-                _logger.ProgressInfo("Renaming movie files for {0}", movie.Title);
-                var renamedFiles = RenameFiles(movieFiles, movie);
-                _logger.ProgressInfo("{0} movie files renamed for {1}", renamedFiles.Count, movie.Title);
+                lock (MovieVersionImportSynchronization.ForMovie(movie.Id))
+                {
+                    var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
+                    _logger.ProgressInfo("Renaming movie files for {0}", movie.Title);
+                    var renamedFiles = RenameFiles(movieFiles, movie);
+                    _logger.ProgressInfo("{0} movie files renamed for {1}", renamedFiles.Count, movie.Title);
+                }
             }
 
             _eventAggregator.PublishEvent(new RenameCompletedEvent());

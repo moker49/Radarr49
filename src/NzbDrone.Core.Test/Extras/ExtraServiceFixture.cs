@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FizzWare.NBuilder;
 using Moq;
 using NUnit.Framework;
@@ -43,6 +44,7 @@ namespace NzbDrone.Core.Test.Extras
             _movieFile = Builder<MovieFile>.CreateNew()
                                                .With(f => f.Path = Path.Combine(_movie.Path, "Movie Title - 2022.mkv").AsOsAgnostic())
                                                .With(f => f.RelativePath = @"Movie Title - 2022.mkv".AsOsAgnostic())
+                                               .With(f => f.IsUnmanaged = false)
                                                .Build();
 
             _localMovie = Builder<LocalMovie>.CreateNew()
@@ -105,6 +107,24 @@ namespace NzbDrone.Core.Test.Extras
 
             Mocker.GetMock<IDiskProvider>().Setup(v => v.FileExists(path)).Returns(exists);
             Mocker.GetMock<IDiskProvider>().Setup(v => v.GetFileSize(path)).Returns(size);
+        }
+
+        [Test]
+        public void single_file_audit_scan_and_rename_must_not_manage_retained_copy_sidecars()
+        {
+            var files = new List<MovieFile>
+            {
+                new MovieFile { Id = 10, MovieId = _movie.Id, RelativePath = "Movie - SDR.mkv" },
+                new MovieFile { Id = 11, MovieId = _movie.Id, RelativePath = "Movie - HDR.mkv" },
+                new MovieFile { Id = 12, MovieId = _movie.Id, RelativePath = "Old copy.mkv", IsUnmanaged = true }
+            };
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetFilesByMovie(_movie.Id)).Returns(files);
+
+            Subject.Handle(new NzbDrone.Core.MediaFiles.Events.MovieScannedEvent(_movie, new List<string>()));
+            Subject.Handle(new NzbDrone.Core.MediaFiles.Events.MovieRenamedEvent(_movie, new List<RenamedMovieFile>()));
+
+            _subtitleService.Verify(s => s.CreateAfterMovieScan(It.IsAny<Movie>(), It.Is<List<MovieFile>>(f => f.Count == 2 && f.All(v => !v.IsUnmanaged))), Times.Once());
+            _subtitleService.Verify(s => s.MoveFilesAfterRename(It.IsAny<Movie>(), It.Is<List<MovieFile>>(f => f.Count == 2 && f.All(v => !v.IsUnmanaged))), Times.Once());
         }
 
         [Test]

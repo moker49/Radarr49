@@ -77,6 +77,31 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         }
 
         [Test]
+        public void single_file_audit_other_versions_history_must_not_reject_this_version()
+        {
+            _remoteMovie.MovieVersionId = 7;
+            _remoteMovie.Release.Title = TITLE;
+            GivenHistoryItem("same-download", TITLE, _hdtv720p, MovieHistoryEventType.Grabbed);
+            GivenHistoryItem("same-download", TITLE, _hdtv1080p, MovieHistoryEventType.DownloadFolderImported);
+            _history.ForEach(h => h.MovieVersionId = 8);
+
+            Subject.IsSatisfiedBy(_remoteMovie, new()).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void single_file_audit_newer_sibling_grab_must_not_bypass_this_versions_loop_guard()
+        {
+            _remoteMovie.MovieVersionId = 7;
+            _remoteMovie.Release.Title = TITLE;
+            GivenHistoryItem("this-download", TITLE, _hdtv720p, MovieHistoryEventType.Grabbed);
+            GivenHistoryItem("this-download", TITLE, _hdtv1080p, MovieHistoryEventType.DownloadFolderImported);
+            _history.ForEach(h => h.MovieVersionId = 7);
+            _history.Insert(0, new MovieHistory { DownloadId = "sibling-download", MovieVersionId = 8, EventType = MovieHistoryEventType.Grabbed });
+
+            Subject.IsSatisfiedBy(_remoteMovie, new()).Accepted.Should().BeFalse();
+        }
+
+        [Test]
         public void should_be_accepted_if_CDH_is_disabled()
         {
             GivenCdhDisabled();

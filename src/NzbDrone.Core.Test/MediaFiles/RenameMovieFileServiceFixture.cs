@@ -60,6 +60,32 @@ namespace NzbDrone.Core.Test.MediaFiles
                   .Returns(_movieFiles);
         }
 
+        [Test]
+        public void single_file_audit_rename_must_read_ownership_inside_the_movie_lock()
+        {
+            GivenMovieFiles();
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetMovies(It.IsAny<IEnumerable<int>>()))
+                .Callback(() => Assert.That(System.Threading.Monitor.IsEntered(MovieVersionImportSynchronization.ForMovie(_movie.Id)), Is.True))
+                .Returns(_movieFiles);
+            _movieFiles[1].IsUnmanaged = true;
+
+            Subject.Execute(new RenameFilesCommand(_movie.Id, _movieFiles.Select(f => f.Id).ToList()));
+
+            Mocker.GetMock<IMoveMovieFiles>().Verify(v => v.MoveMovieFile(_movieFiles[0], It.IsAny<Movie>()), Times.Once());
+            Mocker.GetMock<IMoveMovieFiles>().Verify(v => v.MoveMovieFile(_movieFiles[1], It.IsAny<Movie>()), Times.Never());
+        }
+
+        [Test]
+        public void single_file_audit_rename_must_reject_files_from_another_movie_before_any_move()
+        {
+            GivenMovieFiles();
+            _movieFiles[1].MovieId = _movie.Id + 100;
+
+            Assert.Throws<NzbDrone.Core.Exceptions.NzbDroneClientException>(() => Subject.Execute(new RenameFilesCommand(_movie.Id, _movieFiles.Select(f => f.Id).ToList())));
+
+            Mocker.GetMock<IMoveMovieFiles>().Verify(v => v.MoveMovieFile(It.IsAny<MovieFile>(), It.IsAny<Movie>()), Times.Never());
+        }
+
         private void GivenMovedFiles()
         {
             Mocker.GetMock<IMoveMovieFiles>()

@@ -21,6 +21,8 @@ namespace NzbDrone.Core.Housekeeping.Housekeepers
                              LEFT OUTER JOIN ""Movies""
                              ON ""MovieFiles"".""Id"" = ""Movies"".""MovieFileId""
                              WHERE ""Movies"".""Id"" IS NULL
+                             AND NOT (""MovieFiles"".""IsUnmanaged"" = TRUE AND EXISTS (
+                                 SELECT 1 FROM ""Movies"" owner WHERE owner.""Id"" = ""MovieFiles"".""MovieId""))
                              AND NOT EXISTS (
                                  SELECT 1 FROM ""MovieVersions"" v
                                  JOIN ""Movies"" m ON m.""Id"" = v.""MovieId""

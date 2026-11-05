@@ -1,5 +1,8 @@
 # Composite profile implementation
 
+The November 5 single-file-assumption audit and its fixes are recorded in
+[COMPOSITE_SINGLE_FILE_AUDIT.md](COMPOSITE_SINGLE_FILE_AUDIT.md).
+
 ## Live-test milestone
 
 Composite profile editing, ordinary API additions and existing-movie conversions are
