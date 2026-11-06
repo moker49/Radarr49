@@ -1,6 +1,6 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 rem Use the development tools installed for this checkout without changing system defaults.
 set "PATH=%NVM_HOME%\v24.14.0;%LOCALAPPDATA%\RadarrDev\dotnet;%PATH%"
@@ -9,19 +9,19 @@ if not exist "%NVM_HOME%\v24.14.0\node.exe" goto missing_tools
 if not exist "%LOCALAPPDATA%\RadarrDev\dotnet\dotnet.exe" goto missing_tools
 
 if not exist "_output\dev\Radarr.Console.exe" (
-    echo Backend build not found. Run build-backend.bat first.
+    echo Backend build not found. Run scripts\build-backend.bat first.
     goto failed
 )
 if not exist "_output\dev\Radarr.Windows.dll" (
-    echo Windows backend components not found. Run build-backend.bat first.
+    echo Windows backend components not found. Run scripts\build-backend.bat first.
     goto failed
 )
 if not exist "_output\UI\index.html" (
-    echo Frontend build not found. Run build-frontend.bat first.
+    echo Frontend build not found. Run scripts\build-frontend.bat first.
     goto failed
 )
 if not exist "node_modules\.bin\webpack.cmd" (
-    echo Frontend dependencies not found. Run build-frontend.bat first.
+    echo Frontend dependencies not found. Run scripts\build-frontend.bat first.
     goto failed
 )
 powershell -NoProfile -Command "$c = New-Object System.Net.Sockets.TcpClient; try { $c.Connect('localhost', 7878); exit 1 } catch { exit 0 } finally { $c.Dispose() }"

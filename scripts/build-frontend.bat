@@ -1,6 +1,6 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
 if not exist "%NVM_HOME%\v24.14.0\node.exe" (
     echo Node 24 not found at %NVM_HOME%\v24.14.0.
     goto failed

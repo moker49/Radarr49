@@ -9,14 +9,14 @@ Docker CLI must have access to a running Linux Docker engine, such as Docker Des
 in Linux-container mode. From this checkout:
 
 ```powershell
-.\build-container.bat
+.\scripts\build-container.bat
 ```
 
 To build and then move the verified deployment files directly to
 `\\server\Server\docker\radarr49`, use:
 
 ```powershell
-.\build-container-to-server.bat
+.\scripts\build-container-to-server.bat
 ```
 
 This checks share access first, stages and verifies every transferred file, then removes

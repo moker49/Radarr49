@@ -4,6 +4,8 @@ Build and export this fork's Docker image here, then deploy it on a separate hos
 See [CONTAINER.md](CONTAINER.md) for building and [CONTAINER_DEPLOY.md](CONTAINER_DEPLOY.md)
 for loading the image, configuring mounts and running it on the destination machine.
 
+Local build and development batch files are in [`scripts/`](scripts/).
+
 [![Build Status](https://dev.azure.com/Radarr/Radarr/_apis/build/status/Radarr.Radarr?branchName=develop)](https://dev.azure.com/Radarr/Radarr/_build/latest?definitionId=1&branchName=develop)
 [![Translation status](https://translate.servarr.com/widget/servarr/radarr/svg-badge.svg)](https://translate.servarr.com/engage/servarr/?utm_source=widget)
 [![Docker Pulls](https://img.shields.io/docker/pulls/linuxserver/radarr.svg)](https://wiki.servarr.com/radarr/installation/docker)
