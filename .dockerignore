@@ -1,0 +1,22 @@
+# Allow only build inputs. In particular, never send dev databases or API keys.
+**
+!Dockerfile
+!.dockerignore
+!.editorconfig
+!global.json
+!package.json
+!yarn.lock
+!.yarnrc
+!tsconfig.json
+!LICENSE
+!Logo/
+!Logo/64.png
+!frontend/
+!frontend/**
+!src/
+!src/**
+src/**/bin/
+src/**/obj/
+src/**/TestResults/
+src/**/*.user
+src/**/*.suo

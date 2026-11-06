@@ -1,0 +1,28 @@
+name: radarr-composite
+services:
+  radarr:
+    image: "${RADARR_IMAGE:-radarr-composite:local}"
+    platform: linux/amd64
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    ports:
+      - "${RADARR_PORT:-7878}:7878"
+    environment:
+      TZ: "${TZ:-America/New_York}"
+    volumes:
+      - config:/config
+      - type: bind
+        source: "${media_root:?Set media_root in .env to the destination movies folder}"
+        target: /movies
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${downloads:?Set downloads in .env to the destination completed-download parent folder}"
+        target: /downloads
+        bind:
+          create_host_path: false
+
+volumes:
+  config:

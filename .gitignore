@@ -177,3 +177,6 @@ node_modules.nosync
 
 # Ignore Jetbrains IntelliJ Workspace Directories
 .idea/
+
+# Local Docker Compose folder and port settings
+/.env
