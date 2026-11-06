@@ -5,6 +5,14 @@ containers) and Compose, but no source checkout, Node, .NET SDK or build tools.
 
 ## First deployment
 
+On the destination Windows machine, double-click **`run-container.bat`** in the exported
+folder. It checks the archive checksum, validates Compose, loads the image, then creates
+and starts the container using `.env`. It also works from a network share. Docker Desktop
+must be running in Linux-container mode. The same launcher recreates the container with
+the newly exported image for updates, preserving its config volume.
+
+For manual deployment instead:
+
 Copy the whole exported directory here. In PowerShell, from that directory:
 
 ```powershell

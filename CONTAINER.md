@@ -46,6 +46,7 @@ Copy the whole `_artifacts/container/` directory to the destination machine:
 | `compose.yaml` | Destination-only Compose configuration; no build step |
 | `.env` | Destination folders, port and image tag; created with defaults |
 | `README.md` | Destination instructions |
+| `run-container.bat` | Verify/load the image and create/start the destination container |
 
 Follow the exported README or [CONTAINER_DEPLOY.md](CONTAINER_DEPLOY.md) on the
 destination host. That machine needs Docker and Compose, but no source checkout,

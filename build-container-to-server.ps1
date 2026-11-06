@@ -18,7 +18,7 @@ $buildOptions = @{ ImageTag = $ImageTag; OutputDirectory = $source }
 if ($DockerContext) { $buildOptions.DockerContext = $DockerContext }
 & (Join-Path $PSScriptRoot 'build-container.ps1') @buildOptions
 
-$names = @('radarr-composite-linux-amd64.tar', 'radarr-composite-linux-amd64.tar.sha256', 'compose.yaml', 'README.md', '.env')
+$names = @('radarr-composite-linux-amd64.tar', 'radarr-composite-linux-amd64.tar.sha256', 'compose.yaml', 'README.md', 'run-container.bat', '.env')
 $transfers = @()
 $suffix = '.uploading-' + [guid]::NewGuid().ToString('N')
 try {

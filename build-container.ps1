@@ -42,6 +42,7 @@ $sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInv
 Set-Content -LiteralPath (Join-Path $output 'radarr-composite-linux-amd64.tar.sha256') -Value "$sha256  radarr-composite-linux-amd64.tar" -Encoding Ascii
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'compose.deploy.yaml') -Destination (Join-Path $output 'compose.yaml') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CONTAINER_DEPLOY.md') -Destination (Join-Path $output 'README.md') -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts/run-container.bat') -Destination (Join-Path $output 'run-container.bat') -Force
 $envPath = Join-Path $output '.env'
 if (-not (Test-Path -LiteralPath $envPath)) {
     $defaults = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'container.defaults.env') -Raw
