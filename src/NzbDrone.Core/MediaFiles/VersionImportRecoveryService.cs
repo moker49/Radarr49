@@ -81,6 +81,7 @@ namespace NzbDrone.Core.MediaFiles
 
                 try
                 {
+                    using var verification = new VersionImportVerificationScope();
                     Run(operation, recoveryIndex, retryPhysical, preserveChangedExtras, preserveChangedSources, note);
                     _operations.RecordRecoveryResult(operationId, null);
                 }

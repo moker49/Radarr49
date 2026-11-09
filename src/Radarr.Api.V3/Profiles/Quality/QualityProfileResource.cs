@@ -116,11 +116,11 @@ namespace Radarr.Api.V3.Profiles.Quality
                 Name = resource.Name,
                 UpgradeAllowed = resource.UpgradeAllowed,
                 Cutoff = resource.Cutoff,
-                Items = resource.Items.ConvertAll(ToModel),
+                Items = resource.Items?.ConvertAll(ToModel) ?? new List<QualityProfileQualityItem>(),
                 MinFormatScore = resource.MinFormatScore,
                 CutoffFormatScore = resource.CutoffFormatScore,
                 MinUpgradeFormatScore = resource.MinUpgradeFormatScore,
-                FormatItems = resource.FormatItems.ConvertAll(ToModel),
+                FormatItems = resource.FormatItems?.ConvertAll(ToModel) ?? new List<ProfileFormatItem>(),
                 Language = resource.Language,
                 SizeDefinitions = resource.SizeDefinitions,
                 UseGlobalSizeDefinitions = resource.UseGlobalSizeDefinitions
@@ -139,7 +139,7 @@ namespace Radarr.Api.V3.Profiles.Quality
                 Id = resource.Id,
                 Name = resource.Name,
                 Quality = resource.Quality != null ? (NzbDrone.Core.Qualities.Quality)resource.Quality.Id : null,
-                Items = resource.Items.ConvertAll(ToModel),
+                Items = resource.Items?.ConvertAll(ToModel) ?? new List<QualityProfileQualityItem>(),
                 Allowed = resource.Allowed
             };
         }

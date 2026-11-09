@@ -82,6 +82,11 @@ namespace NzbDrone.Core.Test.MediaFiles
                 _disk.Add(d, _disk[s]);
                 return TransferMode.Copy;
             });
+            Mocker.GetMock<IVersionImportFileVerifier>().Setup(v => v.CopyAndHash(It.IsAny<string>(), It.IsAny<string>())).Returns<string, string>((source, destination) =>
+            {
+                Mocker.Resolve<IDiskTransferService>().TransferFile(source, destination, TransferMode.Copy);
+                return _disk[source].Hash;
+            });
             Mocker.GetMock<IDiskProvider>().Setup(v => v.MoveFile(It.IsAny<string>(), It.IsAny<string>(), false)).Callback<string, string, bool>((s, d, o) => Move(s, d));
         }
 

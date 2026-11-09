@@ -51,6 +51,7 @@ namespace NzbDrone.Core.MediaFiles
         public MovieFile Previous { get; set; }
         public bool PreviousExisted { get; set; }
         public string SourceHash { get; set; }
+        public long? SourceLastWriteUtcTicks { get; set; }
         public string PreviousHash { get; set; }
         public ParsedMovieInfo FileMovieInfo { get; set; }
         public ParsedMovieInfo FolderMovieInfo { get; set; }

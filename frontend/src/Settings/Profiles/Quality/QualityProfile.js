@@ -69,6 +69,9 @@ class QualityProfile extends Component {
       upgradeAllowed,
       cutoff,
       items,
+      isComposite,
+      compositeVersions,
+      profiles,
       isDeleting
     } = this.props;
 
@@ -93,7 +96,17 @@ class QualityProfile extends Component {
 
         <div className={styles.qualities}>
           {
-            items.map((item) => {
+            isComposite ? [...compositeVersions]
+              .sort((a, b) => a.priority - b.priority)
+              .map((version) => {
+                const profile = profiles.find((p) => p.id === version.qualityProfileId);
+
+                return (
+                  <Label key={version.qualityProfileId}>
+                    {profile ? profile.name : version.label}
+                  </Label>
+                );
+              }) : items.map((item) => {
               if (!item.allowed) {
                 return null;
               }
@@ -179,9 +192,17 @@ QualityProfile.propTypes = {
   upgradeAllowed: PropTypes.bool.isRequired,
   cutoff: PropTypes.number.isRequired,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  isComposite: PropTypes.bool,
+  compositeVersions: PropTypes.arrayOf(PropTypes.object),
+  profiles: PropTypes.arrayOf(PropTypes.object).isRequired,
   isDeleting: PropTypes.bool.isRequired,
   onConfirmDeleteQualityProfile: PropTypes.func.isRequired,
   onCloneQualityProfilePress: PropTypes.func.isRequired
+};
+
+QualityProfile.defaultProps = {
+  isComposite: false,
+  compositeVersions: []
 };
 
 export default QualityProfile;

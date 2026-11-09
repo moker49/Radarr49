@@ -17,6 +17,7 @@ namespace NzbDrone.Core.MediaFiles
         List<VersionFileImport> Pending();
         void RecordRecoveryResult(int id, string error);
         VersionFileImport Begin(VersionFileImport intent);
+        void RecordSourceHash(int id, string hash);
         void Advance(int id, VersionFileImportState expected, VersionFileImportState next);
         MovieFile Register(int id);
         void CancelBeforeBackup(int id, string note);
@@ -65,7 +66,7 @@ namespace NzbDrone.Core.MediaFiles
         {
             Require(intent.Id == 0 && intent.NewMovieFileId == null && intent.Snapshot?.Incoming?.Id == 0 && intent.Snapshot.Incoming.Movie == null &&
                 intent.Snapshot.Incoming.MovieId == intent.MovieId && intent.Snapshot.Previous?.Id == intent.OldMovieFileId && intent.Snapshot.Previous?.Movie == null &&
-                ValidHash(intent.Snapshot.SourceHash) && (!intent.Snapshot.PreviousExisted || ValidHash(intent.Snapshot.PreviousHash)),
+                (ValidHash(intent.Snapshot.SourceHash) || (intent.Snapshot.SourceHash == null && intent.Snapshot.SourceLastWriteUtcTicks.HasValue)) && (!intent.Snapshot.PreviousExisted || ValidHash(intent.Snapshot.PreviousHash)),
                 "A detached incoming file, exact previous file and SHA-256 identities are required.");
             using var connection = _database.OpenConnection();
             using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
@@ -77,6 +78,19 @@ namespace NzbDrone.Core.MediaFiles
             Insert(connection, transaction, intent);
             transaction.Commit();
             return intent;
+        }
+
+        public void RecordSourceHash(int id, string hash)
+        {
+            Require(ValidHash(hash), "A valid source checksum is required.");
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            Require(row.State == VersionFileImportState.Staging && row.Snapshot.SourceHash == null, "The source checksum checkpoint changed.");
+            CheckOwnership(connection, transaction, row);
+            row.Snapshot.SourceHash = hash;
+            Save(connection, transaction, row);
+            transaction.Commit();
         }
 
         public void Advance(int id, VersionFileImportState expected, VersionFileImportState next)
@@ -91,6 +105,7 @@ namespace NzbDrone.Core.MediaFiles
             var row = Load(connection, transaction, id);
             Require(row.State == expected, "The import checkpoint changed. Refresh it before continuing.");
             CheckOwnership(connection, transaction, row);
+            Require(next != VersionFileImportState.Staged || ValidHash(row.Snapshot.SourceHash), "The staged file requires a captured source checksum.");
             row.State = next;
             Save(connection, transaction, row);
             transaction.Commit();

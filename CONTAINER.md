@@ -19,6 +19,10 @@ To build and then move the verified deployment files directly to
 .\scripts\build-container-to-server.bat
 ```
 
+Both batch launchers keep the window open after completion or failure and save a
+timestamped log in `_artifacts/build-logs/`. Docker build output uses plain progress
+so errors remain readable in the log.
+
 This checks share access first, stages and verifies every transferred file, then removes
 the local copies after publishing them successfully. An existing server `.env` is kept.
 A failed build or transfer keeps the local build outputs. This does not start or restart

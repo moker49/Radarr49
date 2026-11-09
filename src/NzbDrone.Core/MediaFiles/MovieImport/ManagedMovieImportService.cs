@@ -48,7 +48,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                         throw new MovieVersionImportException("A managed import requires an explicit version and a supported source import.");
                     }
 
-                    operation = _handoff.Prepare(local, incoming, copyOnly);
+                    operation = _handoff.Prepare(local, incoming, copyOnly, deferSourceHash: true);
                     _recovery.Resume(operation.MovieId, operation.Id);
                     var finished = _operations.Get(operation.Id);
                     if (finished.State != VersionFileImportState.Completed || !finished.NewMovieFileId.HasValue)

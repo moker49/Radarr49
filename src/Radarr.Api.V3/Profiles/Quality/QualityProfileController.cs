@@ -28,30 +28,33 @@ namespace Radarr.Api.V3.Profiles.Quality
 
             SharedValidator.RuleFor(c => c.Name).NotEmpty();
 
-            // TODO: Need to validate the cutoff is allowed and the ID/quality ID exists
-            // TODO: Need to validate the Items to ensure groups have names and at no item has no name, no items and no quality
-            SharedValidator.RuleFor(c => c.MinUpgradeFormatScore).GreaterThanOrEqualTo(1);
-            SharedValidator.RuleFor(c => c.Cutoff).ValidCutoff();
-            SharedValidator.RuleFor(c => c.Items).ValidItems();
-            SharedValidator.RuleFor(c => c.SizeDefinitions)
-                .SetValidator(new ProfileSizeDefinitionsValidator())
-                .When(c => c.SizeDefinitions != null);
-
-            SharedValidator.RuleFor(c => c.FormatItems).Must(items =>
+            SharedValidator.When(c => !c.IsComposite, () =>
             {
-                var all = formatService.All().Select(f => f.Id).ToList();
-                var ids = items.Select(i => i.Format);
+                // TODO: Need to validate the cutoff is allowed and the ID/quality ID exists
+                // TODO: Need to validate the Items to ensure groups have names and at no item has no name, no items and no quality
+                SharedValidator.RuleFor(c => c.MinUpgradeFormatScore).GreaterThanOrEqualTo(1);
+                SharedValidator.RuleFor(c => c.Cutoff).ValidCutoff();
+                SharedValidator.RuleFor(c => c.Items).ValidItems();
+                SharedValidator.RuleFor(c => c.SizeDefinitions)
+                    .SetValidator(new ProfileSizeDefinitionsValidator())
+                    .When(c => c.SizeDefinitions != null);
 
-                return all.Except(ids).Empty();
-            }).WithMessage("All Custom Formats and no extra ones need to be present inside your Profile! Try refreshing your browser.");
-
-            SharedValidator.RuleFor(c => c).Custom((profile, context) =>
-            {
-                if (profile.FormatItems.Where(x => x.Score > 0).Sum(x => x.Score) < profile.MinFormatScore &&
-                    profile.FormatItems.Max(x => x.Score) < profile.MinFormatScore)
+                SharedValidator.RuleFor(c => c.FormatItems).Must(items =>
                 {
-                    context.AddFailure("Minimum Custom Format Score can never be satisfied");
-                }
+                    var all = formatService.All().Select(f => f.Id).ToList();
+                    var ids = items.Select(i => i.Format);
+
+                    return all.Except(ids).Empty();
+                }).WithMessage("All Custom Formats and no extra ones need to be present inside your Profile! Try refreshing your browser.");
+
+                SharedValidator.RuleFor(c => c).Custom((profile, context) =>
+                {
+                    if (profile.FormatItems.Where(x => x.Score > 0).Sum(x => x.Score) < profile.MinFormatScore &&
+                        profile.FormatItems.Max(x => x.Score) < profile.MinFormatScore)
+                    {
+                        context.AddFailure("Minimum Custom Format Score can never be satisfied");
+                    }
+                });
             });
         }
 
@@ -59,6 +62,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         [Consumes("application/json")]
         public ActionResult<QualityProfileResource> Create([FromBody] QualityProfileResource resource)
         {
+            EnsureLegacyResourceIsSimple(resource);
             var model = resource.ToModel();
             model = _qualityProfileService.Add(model);
             return Created(model.Id);
@@ -75,6 +79,7 @@ namespace Radarr.Api.V3.Profiles.Quality
         public ActionResult<QualityProfileResource> Update([FromBody] QualityProfileResource resource)
         {
             _compositeProfilePolicy.EnsureLegacyProfileEditAllowed(resource.Id);
+            EnsureLegacyResourceIsSimple(resource);
             var model = resource.ToModel();
 
             _qualityProfileService.Update(model);
@@ -125,6 +130,14 @@ namespace Radarr.Api.V3.Profiles.Quality
             }
 
             return SaveEditor(resource);
+        }
+
+        private static void EnsureLegacyResourceIsSimple(QualityProfileResource resource)
+        {
+            if (resource.IsComposite)
+            {
+                throw new BadRequestException("Composite profiles must be saved through the profile editor.");
+            }
         }
 
         private QualityProfileResource SaveEditor(QualityProfileResource resource)

@@ -25,9 +25,23 @@ function Invoke-Docker {
     }
 }
 
-$engineOs = Invoke-Docker -DockerArguments @('info', '--format', '{{.OSType}}')
-if (($engineOs -join '').Trim() -ne 'linux') {
+$probeErrorPreference = $ErrorActionPreference
+try {
+    # Capture diagnostics even when Docker returns an empty OS and a zero exit code.
+    # Windows PowerShell represents native stderr as ErrorRecord objects.
+    $ErrorActionPreference = 'Continue'
+    $engineResponse = @(& docker @dockerOptions info --format '{{.OSType}}' 2>&1)
+    $engineExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $probeErrorPreference
+}
+$engineOs = ($engineResponse | ForEach-Object { $_.ToString() }) -join "`n"
+$engineOs = $engineOs.Trim()
+if ($engineExitCode -eq 0 -and $engineOs -eq 'windows') {
     throw 'The Docker builder must use Linux containers.'
+}
+if ($engineExitCode -ne 0 -or $engineOs -ne 'linux') {
+    throw "Docker's Linux engine is unavailable (exit code $engineExitCode). Start or restart Docker Desktop and wait for the engine to be ready. Docker response: $engineOs"
 }
 
 $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -35,7 +49,7 @@ New-Item -ItemType Directory -Path $output -Force | Out-Null
 $archive = Join-Path $output 'radarr-composite-linux-amd64.tar'
 
 Write-Host 'Building the Linux amd64 image. Radarr will not be launched on this machine.'
-Invoke-Docker -DockerArguments @('build', '--platform', 'linux/amd64', '--tag', $ImageTag, $PSScriptRoot)
+Invoke-Docker -DockerArguments @('build', '--platform', 'linux/amd64', '--tag', $ImageTag, '--progress', 'plain', $PSScriptRoot)
 Invoke-Docker -DockerArguments @('image', 'save', '--output', $archive, $ImageTag)
 
 $sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()

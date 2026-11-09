@@ -22,7 +22,7 @@ namespace NzbDrone.Core.MediaFiles
     // Main-file handoff stops at Registered; the coordinator runs later phases.
     public interface IVersionImportHandoffService
     {
-        VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly);
+        VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly, bool deferSourceHash = false);
         MovieFile Resume(int movieId, int operationId);
         void CancelBeforeBackup(int movieId, int operationId, string note);
     }
@@ -81,7 +81,7 @@ namespace NzbDrone.Core.MediaFiles
             _extraGuard = extraGuard;
         }
 
-        public VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly)
+        public VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly, bool deferSourceHash = false)
         {
             lock (MovieVersionImportSynchronization.ForMovie(local.Movie.Id))
             {
@@ -110,7 +110,8 @@ namespace NzbDrone.Core.MediaFiles
                 snapshot.Incoming.SceneName = local.SceneName;
                 snapshot.Incoming.Size = _disk.GetFileSize(source);
                 var sourceModified = _disk.FileGetLastWrite(source);
-                snapshot.SourceHash = _verifier.Hash(source);
+                snapshot.SourceLastWriteUtcTicks = sourceModified.ToUniversalTime().Ticks;
+                snapshot.SourceHash = deferSourceHash ? null : _verifier.Hash(source);
                 Require(snapshot.Incoming.Size > 0 && _disk.GetFileSize(source) == snapshot.Incoming.Size && _disk.FileGetLastWrite(source) == sourceModified, "The incoming source changed while its identity was captured.");
                 if (snapshot.Previous != null)
                 {
@@ -180,7 +181,7 @@ namespace NzbDrone.Core.MediaFiles
                 if (operation.State == VersionFileImportState.Prepared)
                 {
                     Require(!_disk.FileExists(stage), "The private staging path already exists before copying began.");
-                    Require(Matches(operation.SourcePath, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The original incoming source changed.");
+                    Require(SourceMatches(operation), "The original incoming source changed.");
                     _operations.Advance(operation.Id, operation.State, VersionFileImportState.Staging);
                     operation = _operations.Get(operation.Id);
                 }
@@ -189,11 +190,22 @@ namespace NzbDrone.Core.MediaFiles
                 {
                     if (!_disk.FileExists(stage))
                     {
-                        Require(Matches(operation.SourcePath, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The source is missing or changed; no staging copy was attempted.");
+                        Require(SourceMatches(operation), "The source is missing or changed; no staging copy was attempted.");
                         _disk.CreateFolder(Path.GetDirectoryName(stage));
-                        _transfer.TransferFile(operation.SourcePath, stage, TransferMode.Copy);
+                        if (operation.Snapshot.SourceHash == null)
+                        {
+                            var sourceHash = _verifier.CopyAndHash(operation.SourcePath, stage);
+                            Require(SourceMatches(operation), "The source changed during the staging copy.");
+                            _operations.RecordSourceHash(operation.Id, sourceHash);
+                            operation = _operations.Get(operation.Id);
+                        }
+                        else
+                        {
+                            _transfer.TransferFile(operation.SourcePath, stage, TransferMode.Copy);
+                        }
                     }
 
+                    Require(operation.Snapshot.SourceHash != null, "The staging copy was interrupted before its checksum was recorded. Cancel and start a fresh import; the source and existing movie are preserved.");
                     Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The staging file is incomplete or changed. The original version has not been moved; inspect or cancel this operation.");
                     _operations.Advance(operation.Id, operation.State, VersionFileImportState.Staged);
                     operation = _operations.Get(operation.Id);
@@ -218,7 +230,7 @@ namespace NzbDrone.Core.MediaFiles
                             Require(!_disk.FileExists(backup), "Both the original and backup paths exist. Inspect the handoff instead of overwriting either.");
                             Require(Matches(previous, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous file changed; it will not be backed up.");
                             _disk.CreateFolder(Path.GetDirectoryName(backup));
-                            _disk.MoveFile(previous, backup);
+                            VersionImportVerificationScope.Move(_disk, previous, backup);
                         }
 
                         Require(Matches(backup, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The original version is not present in its verified backup.");
@@ -239,7 +251,7 @@ namespace NzbDrone.Core.MediaFiles
                     {
                         Require(!_disk.FileExists(destination), "Both staging and destination exist. Inspect the installation before proceeding.");
                         Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The staging file changed before installation.");
-                        _disk.MoveFile(stage, destination);
+                        VersionImportVerificationScope.Move(_disk, stage, destination);
                     }
 
                     Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The installed destination does not match the verified source.");
@@ -295,6 +307,11 @@ namespace NzbDrone.Core.MediaFiles
                 (Path.GetFullPath(Path.Combine(movie.Path, f.RelativePath)).PathEquals(destination) || (previous != null && Path.GetFullPath(Path.Combine(movie.Path, f.RelativePath)).PathEquals(previous)))),
                 "Another file claims a handoff path.");
         }
+
+        private bool SourceMatches(VersionFileImport operation) => operation.Snapshot.SourceHash != null
+            ? Matches(operation.SourcePath, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash)
+            : _disk.FileExists(operation.SourcePath) && _disk.GetFileSize(operation.SourcePath) == operation.Snapshot.Incoming.Size &&
+                _disk.FileGetLastWrite(operation.SourcePath).ToUniversalTime().Ticks == operation.Snapshot.SourceLastWriteUtcTicks;
 
         private bool Matches(string path, long size, string hash) => _disk.FileExists(path) && _disk.GetFileSize(path) == size && string.Equals(_verifier.Hash(path), hash, StringComparison.OrdinalIgnoreCase);
 

@@ -64,6 +64,7 @@ class QualityProfiles extends Component {
                   <QualityProfile
                     key={item.id}
                     {...item}
+                    profiles={items}
                     isDeleting={isDeleting}
                     onConfirmDeleteQualityProfile={onConfirmDeleteQualityProfile}
                     onCloneQualityProfilePress={this.onCloneQualityProfilePress}
