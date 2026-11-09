@@ -21,6 +21,7 @@ interface QueueDetailsProps {
   trackedDownloadStatus?: QueueTrackedDownloadStatus;
   statusMessages?: StatusMessage[];
   errorMessage?: string;
+  importStage?: string;
   progressBar: React.ReactNode;
 }
 
@@ -34,6 +35,7 @@ function QueueDetails(props: QueueDetailsProps) {
     trackedDownloadStatus = 'ok',
     statusMessages,
     errorMessage,
+    importStage,
     progressBar,
   } = props;
 
@@ -74,6 +76,7 @@ function QueueDetails(props: QueueDetailsProps) {
       trackedDownloadState={trackedDownloadState}
       statusMessages={statusMessages}
       errorMessage={errorMessage}
+      importStage={importStage}
       position={tooltipPositions.LEFT}
     />
   );

@@ -2084,5 +2084,8 @@
   "YesCancel": "Yes, Cancel",
   "Yesterday": "Yesterday",
   "YesterdayAt": "Yesterday at {time}",
+  "Verifying": "Verifying",
+  "VerificationFailed": "Verification failed",
+  "PublishedVerifying": "Published, verifying file integrity",
   "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`"
 }

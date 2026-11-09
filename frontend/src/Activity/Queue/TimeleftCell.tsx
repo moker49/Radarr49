@@ -14,6 +14,7 @@ interface TimeleftCellProps {
   estimatedCompletionTime?: string;
   timeleft?: string;
   status: string;
+  importStage?: string;
   size: number;
   sizeleft: number;
   showRelativeDates: boolean;
@@ -26,12 +27,23 @@ function TimeleftCell(props: TimeleftCellProps) {
     estimatedCompletionTime,
     timeleft,
     status,
+    importStage,
     size,
     sizeleft,
     showRelativeDates,
     shortDateFormat,
     timeFormat,
   } = props;
+
+  if (importStage === 'verifying' || importStage === 'verificationFailed') {
+    return (
+      <TableRowCell className={styles.timeleft}>
+        {translate(
+          importStage === 'verifying' ? 'Verifying' : 'VerificationFailed'
+        )}
+      </TableRowCell>
+    );
+  }
 
   if (status === 'delay') {
     const date = getRelativeDate({

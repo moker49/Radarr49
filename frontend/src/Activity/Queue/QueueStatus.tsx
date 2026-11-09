@@ -40,6 +40,7 @@ interface QueueStatusProps {
   trackedDownloadState?: QueueTrackedDownloadState;
   statusMessages?: StatusMessage[];
   errorMessage?: string;
+  importStage?: string;
   position: TooltipPosition;
   canFlip?: boolean;
 }
@@ -52,6 +53,7 @@ function QueueStatus(props: QueueStatusProps) {
     trackedDownloadState = 'downloading',
     statusMessages = [],
     errorMessage,
+    importStage,
     position,
     canFlip = false,
   } = props;
@@ -138,6 +140,14 @@ function QueueStatus(props: QueueStatusProps) {
       iconKind = kinds.DANGER;
       title = translate('DownloadFailed');
     }
+  }
+
+  if (importStage === 'verifying') {
+    title = translate('PublishedVerifying');
+    iconKind = kinds.PRIMARY;
+  } else if (importStage === 'verificationFailed') {
+    title = translate('VerificationFailed');
+    iconKind = kinds.DANGER;
   }
 
   return (

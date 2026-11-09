@@ -28,6 +28,15 @@ namespace NzbDrone.Core.Test.MediaFiles
             var reads = new List<(string Path, long Size)>();
             Mocker.GetMock<IDiskProvider>().Setup(d => d.OpenReadStream(It.IsAny<string>())).Returns<string>(path =>
             {
+                if (path == Full(_old.RelativePath) && _disk[path].Size == 150)
+                {
+                    var publishing = _operations.All().Single();
+                    Assert.That(publishing.State, Is.EqualTo(VersionFileImportState.Installing));
+                    Assert.That(publishing.NewMovieFileId, Is.Null);
+                    Assert.That(_disk.ContainsKey(_source), Is.True);
+                    Assert.That(_disk.ContainsKey(Full(publishing.BackupRelativePath)), Is.True);
+                }
+
                 reads.Add((path, _disk[path].Size));
                 var physical = GetTempFilePath();
                 System.IO.File.WriteAllBytes(physical, content[_disk[path].Hash]);
@@ -48,8 +57,8 @@ namespace NzbDrone.Core.Test.MediaFiles
             var operation = _operations.All().Single();
             AssertCompletedImport(operation);
             Assert.That(reads.Count(p => p.Path == _source && p.Size == 150), Is.EqualTo(1), "Source checksum must be computed during the copy.");
-            Assert.That(reads.Count(p => p.Path == Full(operation.StagingRelativePath) && p.Size == 150), Is.EqualTo(1), "Staged destination must be verified independently once.");
-            Assert.That(reads.Count(p => p.Path == Full(operation.DestinationRelativePath) && p.Size == 150), Is.Zero, "Renaming a verified staging file must not restart hashing.");
+            Assert.That(reads.Count(p => p.Path == Full(operation.StagingRelativePath) && p.Size == 150), Is.Zero, "The staged file should be published before independent verification.");
+            Assert.That(reads.Count(p => p.Path == Full(operation.DestinationRelativePath) && p.Size == 150), Is.EqualTo(1), "The published destination must be independently verified once.");
         }
 
         [Test]

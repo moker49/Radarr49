@@ -105,7 +105,7 @@ namespace NzbDrone.Core.MediaFiles
                 var operation = Get(movieId, operationId);
                 CheckCheckpoint(operation, checkpoint, true);
                 Require(!string.IsNullOrWhiteSpace(note), "A cancellation note is required.");
-                Require(operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged, "The import may already have moved the previous file. It cannot be cancelled at this checkpoint.");
+                Require((operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || operation.Snapshot.RollbackCompleted, "The import may already have moved the previous file. It cannot be cancelled at this checkpoint.");
                 try
                 {
                     _handoff.CancelBeforeBackup(movieId, operationId, note);

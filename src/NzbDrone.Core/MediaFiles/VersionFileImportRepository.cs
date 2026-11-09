@@ -18,6 +18,8 @@ namespace NzbDrone.Core.MediaFiles
         void RecordRecoveryResult(int id, string error);
         VersionFileImport Begin(VersionFileImport intent);
         void RecordSourceHash(int id, string hash);
+        void BeginVerificationRollback(int id, string error);
+        void FinishVerificationRollback(int id);
         void Advance(int id, VersionFileImportState expected, VersionFileImportState next);
         MovieFile Register(int id);
         void CancelBeforeBackup(int id, string note);
@@ -93,6 +95,31 @@ namespace NzbDrone.Core.MediaFiles
             transaction.Commit();
         }
 
+        public void BeginVerificationRollback(int id, string error)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            Require(row.State == VersionFileImportState.Installing && row.Snapshot.PublishBeforeVerification, "Only an unregistered early publication can be rolled back.");
+            CheckOwnership(connection, transaction, row);
+            row.Snapshot.RollbackPending = true;
+            row.Snapshot.LastRecoveryError = error;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
+        public void FinishVerificationRollback(int id)
+        {
+            using var connection = _database.OpenConnection();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            var row = Load(connection, transaction, id);
+            Require(row.State == VersionFileImportState.Installing && row.Snapshot.RollbackPending, "There is no pending verification rollback.");
+            CheckOwnership(connection, transaction, row);
+            row.Snapshot.RollbackCompleted = true;
+            Save(connection, transaction, row);
+            transaction.Commit();
+        }
+
         public void Advance(int id, VersionFileImportState expected, VersionFileImportState next)
         {
             Require((expected == VersionFileImportState.Prepared && next == VersionFileImportState.Staging) ||
@@ -159,7 +186,7 @@ namespace NzbDrone.Core.MediaFiles
             using var connection = _database.OpenConnection();
             using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             var row = Load(connection, transaction, id);
-            Require(row.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged, "The import may already have moved the previous file. Reconcile that handoff before cancelling.");
+            Require((row.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || row.Snapshot.RollbackCompleted, "The import may already have moved the previous file. Reconcile that handoff before cancelling.");
             CheckOwnership(connection, transaction, row);
             row.State = VersionFileImportState.Cancelled;
             row.Note = note;

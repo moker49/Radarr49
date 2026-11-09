@@ -15,6 +15,7 @@ interface QueueStatusCellProps {
   trackedDownloadState?: QueueTrackedDownloadState;
   statusMessages?: StatusMessage[];
   errorMessage?: string;
+  importStage?: string;
 }
 
 function QueueStatusCell(props: QueueStatusCellProps) {
@@ -25,6 +26,7 @@ function QueueStatusCell(props: QueueStatusCellProps) {
     trackedDownloadState = 'downloading',
     statusMessages,
     errorMessage,
+    importStage,
   } = props;
 
   return (
@@ -36,6 +38,7 @@ function QueueStatusCell(props: QueueStatusCellProps) {
         trackedDownloadState={trackedDownloadState}
         statusMessages={statusMessages}
         errorMessage={errorMessage}
+        importStage={importStage}
         position="right"
       />
     </TableRowCell>

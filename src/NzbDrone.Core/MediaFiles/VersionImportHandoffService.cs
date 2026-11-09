@@ -96,6 +96,7 @@ namespace NzbDrone.Core.MediaFiles
                 var area = Path.Combine(".radarr-version-imports", Guid.NewGuid().ToString("N"));
                 var snapshot = new VersionFileImportSnapshot
                 {
+                    PublishBeforeVerification = deferSourceHash,
                     Incoming = Copy(incoming), Previous = local.Movie.MovieFile == null ? null : Copy(local.Movie.MovieFile),
                     FileMovieInfo = local.FileMovieInfo, FolderMovieInfo = local.FolderMovieInfo, SceneSource = local.SceneSource,
                     DownloadClientInfo = local.DownloadItem?.DownloadClientInfo, DownloadId = local.DownloadItem?.DownloadId,
@@ -170,6 +171,16 @@ namespace NzbDrone.Core.MediaFiles
                 var destination = OwnedPath(folder, operation.DestinationRelativePath);
                 var previous = operation.Snapshot.Previous == null ? null : OwnedPath(folder, operation.Snapshot.Previous.RelativePath);
                 CheckPaths(movie, operation, destination, previous);
+                if (operation.Snapshot.RollbackPending)
+                {
+                    RollbackPublication(movie, operation, destination, previous, backup);
+                    throw new InvalidOperationException("Published file verification failed. The new file is quarantined and the previous file restored where present. Inspect this import, then cancel it before starting a fresh import.");
+                }
+
+                DateTime? copiedStageModified = null;
+                bool StageMatches() => copiedStageModified.HasValue
+                    ? _disk.FileExists(stage) && _disk.GetFileSize(stage) == operation.Snapshot.Incoming.Size && _disk.FileGetLastWrite(stage) == copiedStageModified.Value
+                    : Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash);
                 if (operation.State == VersionFileImportState.Registered)
                 {
                     Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The registered destination changed; finalization must remain pending.");
@@ -198,6 +209,10 @@ namespace NzbDrone.Core.MediaFiles
                             Require(SourceMatches(operation), "The source changed during the staging copy.");
                             _operations.RecordSourceHash(operation.Id, sourceHash);
                             operation = _operations.Get(operation.Id);
+                            if (operation.Snapshot.PublishBeforeVerification)
+                            {
+                                copiedStageModified = _disk.FileGetLastWrite(stage);
+                            }
                         }
                         else
                         {
@@ -206,14 +221,14 @@ namespace NzbDrone.Core.MediaFiles
                     }
 
                     Require(operation.Snapshot.SourceHash != null, "The staging copy was interrupted before its checksum was recorded. Cancel and start a fresh import; the source and existing movie are preserved.");
-                    Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The staging file is incomplete or changed. The original version has not been moved; inspect or cancel this operation.");
+                    Require(StageMatches(), "The staging file is incomplete or changed. The original version has not been moved; inspect or cancel this operation.");
                     _operations.Advance(operation.Id, operation.State, VersionFileImportState.Staged);
                     operation = _operations.Get(operation.Id);
                 }
 
                 if (operation.State == VersionFileImportState.Staged)
                 {
-                    Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The verified staging file changed before backup.");
+                    Require(StageMatches(), "The verified staging file changed before backup.");
                     Require(backup == null || !_disk.FileExists(backup), "The private backup path is already occupied.");
                     ValidateProfile(movie, operation);
                     _operations.Advance(operation.Id, operation.State, VersionFileImportState.BackingUp);
@@ -222,7 +237,7 @@ namespace NzbDrone.Core.MediaFiles
 
                 if (operation.State == VersionFileImportState.BackingUp)
                 {
-                    Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The incoming staging file is not verified; the previous version will not be moved.");
+                    Require(StageMatches(), "The incoming staging file is not verified; the previous version will not be moved.");
                     if (operation.Snapshot.PreviousExisted)
                     {
                         if (_disk.FileExists(previous))
@@ -250,11 +265,22 @@ namespace NzbDrone.Core.MediaFiles
                     if (_disk.FileExists(stage))
                     {
                         Require(!_disk.FileExists(destination), "Both staging and destination exist. Inspect the installation before proceeding.");
-                        Require(Matches(stage, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The staging file changed before installation.");
+                        Require(StageMatches(), "The staging file changed before installation.");
                         VersionImportVerificationScope.Move(_disk, stage, destination);
                     }
 
-                    Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The installed destination does not match the verified source.");
+                    try
+                    {
+                        Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The published destination checksum does not match the source.");
+                    }
+                    catch (Exception ex) when (operation.Snapshot.PublishBeforeVerification && ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+                    {
+                        _operations.BeginVerificationRollback(operation.Id, ex.Message);
+                        operation = _operations.Get(operation.Id);
+                        RollbackPublication(movie, operation, destination, previous, backup);
+                        throw new InvalidOperationException("Published file verification failed. The new file was quarantined; the source and previous version have been preserved.", ex);
+                    }
+
                     if (operation.Snapshot.PreviousExisted)
                     {
                         Require(Matches(backup, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous backup changed before registration.");
@@ -278,6 +304,39 @@ namespace NzbDrone.Core.MediaFiles
                 // blindly deleted. The directory is excluded from ordinary media scans.
                 _operations.CancelBeforeBackup(operationId, note);
             }
+        }
+
+        private void RollbackPublication(Movie movie, VersionFileImport operation, string destination, string previous, string backup)
+        {
+            if (operation.Snapshot.RollbackCompleted)
+            {
+                return;
+            }
+
+            Require(_versions.Get(movie, operation.MovieVersionId).MovieFileId == operation.OldMovieFileId, "The version assignment changed. Publication rollback requires inspection.");
+            var quarantine = PrivatePath(movie.Path, Path.Combine(Path.GetDirectoryName(operation.StagingRelativePath), "failed" + Path.GetExtension(operation.DestinationRelativePath) + ".radarr-failed"));
+            var restored = previous != null && previous.PathEquals(destination) && !_disk.FileExists(backup) && operation.Snapshot.PreviousExisted &&
+                Matches(previous, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash);
+            if (_disk.FileExists(destination) && !restored)
+            {
+                Require(!_disk.FileExists(quarantine), "Both the publication and quarantine exist. Inspect them before resuming rollback.");
+                _disk.MoveFile(destination, quarantine);
+            }
+
+            Require(_disk.FileExists(quarantine), "The failed publication is missing. Inspect this rollback before restoring a backup.");
+            if (operation.Snapshot.PreviousExisted)
+            {
+                if (_disk.FileExists(backup))
+                {
+                    Require(!_disk.FileExists(previous), "The previous file path is occupied. Its backup will be preserved.");
+                    Require(Matches(backup, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous backup changed. It will not be restored automatically.");
+                    VersionImportVerificationScope.Move(_disk, backup, previous);
+                }
+
+                Require(Matches(previous, operation.Snapshot.Previous.Size, operation.Snapshot.PreviousHash), "The previous file could not be verified after rollback.");
+            }
+
+            _operations.FinishVerificationRollback(operation.Id);
         }
 
         private void ValidateProfile(Movie root, VersionFileImport operation)

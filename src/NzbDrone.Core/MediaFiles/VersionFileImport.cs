@@ -53,6 +53,9 @@ namespace NzbDrone.Core.MediaFiles
         public string SourceHash { get; set; }
         public long? SourceLastWriteUtcTicks { get; set; }
         public string PreviousHash { get; set; }
+        public bool PublishBeforeVerification { get; set; }
+        public bool RollbackPending { get; set; }
+        public bool RollbackCompleted { get; set; }
         public ParsedMovieInfo FileMovieInfo { get; set; }
         public ParsedMovieInfo FolderMovieInfo { get; set; }
         public bool SceneSource { get; set; }

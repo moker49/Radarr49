@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using FluentAssertions;
 using NUnit.Framework;
 using NzbDrone.Common.EnvironmentInfo;
@@ -19,6 +22,31 @@ namespace NzbDrone.Core.Test.Localization
             Mocker.GetMock<IConfigService>().Setup(m => m.UILanguage).Returns((int)Language.English);
 
             Mocker.GetMock<IAppFolderInfo>().Setup(m => m.StartUpFolder).Returns(TestContext.CurrentContext.TestDirectory);
+        }
+
+        [Test]
+        public void all_shipped_translations_must_be_valid_utf8_string_dictionaries()
+        {
+            var files = Directory.GetFiles(Path.Combine(TestContext.CurrentContext.TestDirectory, "Localization", "Core"), "*.json");
+            Assert.That(files, Is.Not.Empty);
+            foreach (var file in files)
+            {
+                Assert.DoesNotThrowAsync(
+                    async () =>
+                    {
+                        await using var stream = File.OpenRead(file);
+                        await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(stream);
+                    },
+                    file);
+            }
+        }
+
+        [TestCase("Verifying", "Verifying")]
+        [TestCase("VerificationFailed", "Verification failed")]
+        [TestCase("PublishedVerifying", "Published, verifying file integrity")]
+        public void import_status_translations_must_load_through_the_localization_service(string key, string expected)
+        {
+            Assert.That(Subject.GetLocalizationDictionary()[key], Is.EqualTo(expected));
         }
 
         [Test]

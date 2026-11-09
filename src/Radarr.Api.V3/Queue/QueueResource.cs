@@ -35,6 +35,7 @@ namespace Radarr.Api.V3.Queue
         public TrackedDownloadState? TrackedDownloadState { get; set; }
         public List<TrackedDownloadStatusMessage> StatusMessages { get; set; }
         public string ErrorMessage { get; set; }
+        public string ImportStage { get; set; }
         public string DownloadId { get; set; }
         public DownloadProtocol Protocol { get; set; }
         public string DownloadClient { get; set; }
@@ -85,6 +86,7 @@ namespace Radarr.Api.V3.Queue
                 TrackedDownloadState = model.TrackedDownloadState,
                 StatusMessages = model.StatusMessages,
                 ErrorMessage = model.ErrorMessage,
+                ImportStage = model.ImportStage,
                 DownloadId = model.DownloadId,
                 Protocol = model.Protocol,
                 DownloadClient = model.DownloadClient,

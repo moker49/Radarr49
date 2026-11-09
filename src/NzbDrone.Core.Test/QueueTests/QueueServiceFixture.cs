@@ -6,6 +6,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Queue;
@@ -59,6 +60,32 @@ namespace NzbDrone.Core.Test.QueueTests
             var distinct = queue.Select(v => v.Id).Distinct().ToArray();
 
             distinct.Should().HaveCount(1);
+        }
+
+        [TestCase(false, "verifying")]
+        [TestCase(true, "verificationFailed")]
+        public void queue_should_expose_published_verification_stage(bool failed, string stage)
+        {
+            var tracked = _trackedDownloads.Single();
+            tracked.RemoteMovie.MovieVersionId = 7;
+            var operation = new VersionFileImport
+            {
+                MovieId = tracked.RemoteMovie.Movie.Id,
+                MovieVersionId = 7,
+                State = VersionFileImportState.Installing,
+                Snapshot = new VersionFileImportSnapshot
+                {
+                    DownloadId = tracked.DownloadItem.DownloadId,
+                    PublishBeforeVerification = true,
+                    RollbackPending = failed
+                }
+            };
+            Mocker.GetMock<IVersionFileImportRepository>().Setup(i => i.Pending()).Returns(new List<VersionFileImport> { operation });
+            Subject.Handle(new TrackedDownloadRefreshedEvent(_trackedDownloads));
+            Assert.That(Subject.GetQueue().Single().ImportStage, Is.EqualTo(stage));
+            operation.State = VersionFileImportState.Completed;
+            operation.Snapshot.RollbackPending = false;
+            Assert.That(Subject.GetQueue().Single().ImportStage, Is.Null);
         }
     }
 }

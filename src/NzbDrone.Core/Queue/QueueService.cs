@@ -4,6 +4,7 @@ using System.Linq;
 using NzbDrone.Common.Crypto;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Qualities;
@@ -20,15 +21,27 @@ namespace NzbDrone.Core.Queue
     public class QueueService : IQueueService, IHandle<TrackedDownloadRefreshedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
+        private readonly IVersionFileImportRepository _imports;
         private static List<Queue> _queue = new();
 
-        public QueueService(IEventAggregator eventAggregator)
+        public QueueService(IEventAggregator eventAggregator, IVersionFileImportRepository imports)
         {
             _eventAggregator = eventAggregator;
+            _imports = imports;
         }
 
         public List<Queue> GetQueue()
         {
+            var pending = (_imports.Pending() ?? new List<VersionFileImport>()).ToLookup(i => i.MovieVersionId);
+            foreach (var item in _queue)
+            {
+                var operation = pending[item.RemoteMovie?.MovieVersionId ?? 0].FirstOrDefault(i =>
+                    i.MovieId == item.Movie?.Id && !string.IsNullOrEmpty(i.Snapshot?.DownloadId) &&
+                    string.Equals(i.Snapshot.DownloadId, item.DownloadId, StringComparison.OrdinalIgnoreCase));
+                item.ImportStage = operation?.Snapshot?.RollbackPending == true ? "verificationFailed" :
+                    operation?.State == VersionFileImportState.Installing && operation.Snapshot.PublishBeforeVerification ? "verifying" : null;
+            }
+
             return _queue;
         }
 
