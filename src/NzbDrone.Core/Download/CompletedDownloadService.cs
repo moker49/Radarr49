@@ -140,6 +140,18 @@ namespace NzbDrone.Core.Download
 
         public void Import(TrackedDownload trackedDownload)
         {
+            try
+            {
+                ImportTrackedDownload(trackedDownload);
+            }
+            finally
+            {
+                _eventAggregator.PublishEvent(new TrackedDownloadStateChangedEvent(trackedDownload));
+            }
+        }
+
+        private void ImportTrackedDownload(TrackedDownload trackedDownload)
+        {
             SetImportItem(trackedDownload);
 
             if (!ValidatePath(trackedDownload))
@@ -156,6 +168,7 @@ namespace NzbDrone.Core.Download
             }
 
             trackedDownload.State = TrackedDownloadState.Importing;
+            _eventAggregator.PublishEvent(new TrackedDownloadStateChangedEvent(trackedDownload));
 
             var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
             var importResults = _downloadedMovieImportService.ProcessPath(outputPath,

@@ -13,8 +13,10 @@ using NzbDrone.Core.Extras.Others;
 using NzbDrone.Core.Extras.Subtitles;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.MediaFiles.MovieImport.Specifications;
+using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Queue;
 using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.MediaFiles
@@ -45,6 +47,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IExtraFileRepository<MetadataFile> _metadata;
         private readonly IExtraFileRepository<OtherExtraFile> _others;
         private readonly IExtraFileDeletionGuard _extraGuard;
+        private readonly IEventAggregator _events;
 
         public VersionImportHandoffService(IVersionFileImportRepository operations,
                                           IMovieService movies,
@@ -61,7 +64,8 @@ namespace NzbDrone.Core.MediaFiles
                                           IExtraFileRepository<SubtitleFile> subtitles,
                                           IExtraFileRepository<MetadataFile> metadata,
                                           IExtraFileRepository<OtherExtraFile> others,
-                                          IExtraFileDeletionGuard extraGuard)
+                                          IExtraFileDeletionGuard extraGuard,
+                                          IEventAggregator events)
         {
             _operations = operations;
             _movies = movies;
@@ -79,6 +83,7 @@ namespace NzbDrone.Core.MediaFiles
             _metadata = metadata;
             _others = others;
             _extraGuard = extraGuard;
+            _events = events;
         }
 
         public VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly, bool deferSourceHash = false)
@@ -184,7 +189,9 @@ namespace NzbDrone.Core.MediaFiles
                 if (operation.State == VersionFileImportState.Registered)
                 {
                     Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The registered destination changed; finalization must remain pending.");
-                    return _operations.Register(operation.Id);
+                    var registered = _operations.Register(operation.Id);
+                    _events.PublishEvent(new QueueUpdatedEvent());
+                    return registered;
                 }
 
                 ValidateProfile(movie, operation);
@@ -267,6 +274,7 @@ namespace NzbDrone.Core.MediaFiles
                         Require(!_disk.FileExists(destination), "Both staging and destination exist. Inspect the installation before proceeding.");
                         Require(StageMatches(), "The staging file changed before installation.");
                         VersionImportVerificationScope.Move(_disk, stage, destination);
+                        _events.PublishEvent(new QueueUpdatedEvent());
                     }
 
                     try
@@ -276,6 +284,7 @@ namespace NzbDrone.Core.MediaFiles
                     catch (Exception ex) when (operation.Snapshot.PublishBeforeVerification && ex is InvalidOperationException or IOException or UnauthorizedAccessException)
                     {
                         _operations.BeginVerificationRollback(operation.Id, ex.Message);
+                        _events.PublishEvent(new QueueUpdatedEvent());
                         operation = _operations.Get(operation.Id);
                         RollbackPublication(movie, operation, destination, previous, backup);
                         throw new InvalidOperationException("Published file verification failed. The new file was quarantined; the source and previous version have been preserved.", ex);
@@ -287,7 +296,9 @@ namespace NzbDrone.Core.MediaFiles
                     }
 
                     ValidateProfile(movie, operation);
-                    return _operations.Register(operation.Id);
+                    var registered = _operations.Register(operation.Id);
+                    _events.PublishEvent(new QueueUpdatedEvent());
+                    return registered;
                 }
 
                 throw new InvalidOperationException("Unsupported handoff checkpoint.");

@@ -100,6 +100,27 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
+        public void should_notify_activity_before_file_processing_and_after_pending_status_is_updated()
+        {
+            var states = new List<TrackedDownloadState>();
+            Mocker.GetMock<IEventAggregator>()
+                .Setup(e => e.PublishEvent(It.IsAny<TrackedDownloadStateChangedEvent>()))
+                .Callback<TrackedDownloadStateChangedEvent>(e => states.Add(e.Download.State));
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Setup(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()))
+                .Returns(() =>
+                {
+                    Assert.That(states, Is.EqualTo(new[] { TrackedDownloadState.Importing }));
+                    return new List<ImportResult>();
+                });
+
+            Subject.Import(_trackedDownload);
+
+            Assert.That(states, Is.EqualTo(new[] { TrackedDownloadState.Importing, TrackedDownloadState.ImportPending }));
+            Assert.That(_trackedDownload.StatusMessages, Is.Not.Empty);
+        }
+
+        [Test]
         public void should_not_mark_as_imported_if_all_files_were_rejected()
         {
             Mocker.GetMock<IDownloadedMovieImportService>()

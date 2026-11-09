@@ -8,6 +8,8 @@ using NUnit.Framework;
 using NzbDrone.Common.Disk;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
+using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.Queue;
 
 namespace NzbDrone.Core.Test.MediaFiles
 {
@@ -33,6 +35,7 @@ namespace NzbDrone.Core.Test.MediaFiles
                     var publishing = _operations.All().Single();
                     Assert.That(publishing.State, Is.EqualTo(VersionFileImportState.Installing));
                     Assert.That(publishing.NewMovieFileId, Is.Null);
+                    Mocker.GetMock<IEventAggregator>().Verify(e => e.PublishEvent(It.IsAny<QueueUpdatedEvent>()), Times.AtLeastOnce());
                     Assert.That(_disk.ContainsKey(_source), Is.True);
                     Assert.That(_disk.ContainsKey(Full(publishing.BackupRelativePath)), Is.True);
                 }

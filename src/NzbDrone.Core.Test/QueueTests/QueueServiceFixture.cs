@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Queue;
@@ -60,6 +62,40 @@ namespace NzbDrone.Core.Test.QueueTests
             var distinct = queue.Select(v => v.Id).Distinct().ToArray();
 
             distinct.Should().HaveCount(1);
+        }
+
+        [Test]
+        public void state_change_must_update_the_cached_row_and_notify_activity_without_polling_clients()
+        {
+            var tracked = _trackedDownloads.Single();
+            tracked.State = TrackedDownloadState.ImportPending;
+            var other = new TrackedDownload
+            {
+                IsTrackable = true,
+                DownloadClient = tracked.DownloadClient + 1,
+                DownloadItem = tracked.DownloadItem,
+                RemoteMovie = tracked.RemoteMovie,
+                State = TrackedDownloadState.ImportPending
+            };
+            Subject.Handle(new TrackedDownloadRefreshedEvent(new List<TrackedDownload> { tracked, other }));
+            var changedId = Subject.GetQueue().First().Id;
+            Mocker.GetMock<IEventAggregator>().Invocations.Clear();
+
+            tracked.State = TrackedDownloadState.Importing;
+            Subject.Handle(new TrackedDownloadStateChangedEvent(tracked));
+
+            Assert.That(Subject.Find(changedId).TrackedDownloadState, Is.EqualTo(TrackedDownloadState.Importing));
+            Assert.That(Subject.GetQueue().Single(q => q.Id != changedId).TrackedDownloadState, Is.EqualTo(TrackedDownloadState.ImportPending));
+            Mocker.GetMock<IEventAggregator>().Verify(e => e.PublishEvent(It.IsAny<QueueUpdatedEvent>()), Times.Once());
+        }
+
+        [Test]
+        public void late_import_state_change_must_not_reintroduce_a_removed_queue_row()
+        {
+            Subject.Handle(new TrackedDownloadRefreshedEvent(_trackedDownloads));
+            Subject.Remove(Subject.GetQueue().Single().Id);
+            Subject.Handle(new TrackedDownloadStateChangedEvent(_trackedDownloads.Single()));
+            Assert.That(Subject.GetQueue(), Is.Empty);
         }
 
         [TestCase(false, "verifying")]

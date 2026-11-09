@@ -18,7 +18,7 @@ namespace NzbDrone.Core.Queue
         void Remove(int id);
     }
 
-    public class QueueService : IQueueService, IHandle<TrackedDownloadRefreshedEvent>
+    public class QueueService : IQueueService, IHandle<TrackedDownloadRefreshedEvent>, IHandle<TrackedDownloadStateChangedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
         private readonly IVersionFileImportRepository _imports;
@@ -101,6 +101,16 @@ namespace NzbDrone.Core.Queue
             }
 
             return queue;
+        }
+
+        public void Handle(TrackedDownloadStateChangedEvent message)
+        {
+            var updated = MapQueue(message.Download).Single();
+            _queue = _queue
+                .Where(q => q.Id != updated.Id || message.Download.IsTrackable)
+                .Select(q => q.Id == updated.Id ? updated : q)
+                .ToList();
+            _eventAggregator.PublishEvent(new QueueUpdatedEvent());
         }
 
         public void Handle(TrackedDownloadRefreshedEvent message)
