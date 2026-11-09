@@ -15,8 +15,9 @@ namespace NzbDrone.Core.Test.MediaFiles
 {
     public partial class VersionImportHandoffFixture
     {
-        [Test]
-        public void complete_runtime_import_should_read_incoming_video_only_for_copy_and_independent_verification()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void complete_runtime_import_should_read_incoming_video_only_for_copy_and_independent_verification(bool deferVerification)
         {
             var content = new Dictionary<string, byte[]>();
             foreach (var path in _disk.Keys.ToList())
@@ -54,7 +55,19 @@ namespace NzbDrone.Core.Test.MediaFiles
                 }));
             Mocker.SetConstant<IVersionImportFileVerifier>(Mocker.Resolve<VersionImportFileVerifier>());
 
-            var result = RuntimeImporter().Import(new List<ImportDecision> { new ImportDecision(RuntimeLocal()) }, true).Single();
+            ImportResult result;
+            using (deferVerification ? new VersionImportCopyScope() : null)
+            {
+                result = RuntimeImporter().Import(new List<ImportDecision> { new ImportDecision(RuntimeLocal()) }, true).Single();
+            }
+
+            if (deferVerification)
+            {
+                Assert.That(result.Result, Is.EqualTo(ImportResultType.PendingVerification));
+                Assert.That(_operations.All().Single().State, Is.EqualTo(VersionFileImportState.Installing));
+                Recovery().CompletePublished(result.PendingImport);
+                result.PendingImport = null;
+            }
 
             Assert.That(result.Result, Is.EqualTo(ImportResultType.Imported));
             var operation = _operations.All().Single();

@@ -2084,6 +2084,7 @@
   "YesCancel": "Yes, Cancel",
   "Yesterday": "Yesterday",
   "YesterdayAt": "Yesterday at {time}",
+  "WaitingToVerify": "Waiting to verify",
   "Verifying": "Verifying",
   "VerificationFailed": "Verification failed",
   "PublishedVerifying": "Published, verifying file integrity",

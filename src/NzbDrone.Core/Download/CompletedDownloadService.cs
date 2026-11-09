@@ -37,6 +37,8 @@ namespace NzbDrone.Core.Download
         private readonly Logger _logger;
         private readonly IDownloadReservationRepository _reservations;
         private readonly IVersionFileImportRepository _imports;
+        private readonly IDownloadImportPipeline _pipeline;
+        private readonly IVersionImportRecoveryService _recovery;
 
         public CompletedDownloadService(IEventAggregator eventAggregator,
                                         IHistoryService historyService,
@@ -48,7 +50,9 @@ namespace NzbDrone.Core.Download
                                         IRejectedImportService rejectedImportService,
                                         Logger logger,
                                         IDownloadReservationRepository reservations,
-                                        IVersionFileImportRepository imports)
+                                        IVersionFileImportRepository imports,
+                                        IDownloadImportPipeline pipeline,
+                                        IVersionImportRecoveryService recovery)
         {
             _eventAggregator = eventAggregator;
             _historyService = historyService;
@@ -61,6 +65,8 @@ namespace NzbDrone.Core.Download
             _logger = logger;
             _reservations = reservations;
             _imports = imports;
+            _pipeline = pipeline;
+            _recovery = recovery;
         }
 
         public void Check(TrackedDownload trackedDownload)
@@ -176,6 +182,13 @@ namespace NzbDrone.Core.Download
                 trackedDownload.RemoteMovie.Movie,
                 trackedDownload.ImportItem);
 
+            if (importResults.Any(r => r.PendingImport != null))
+            {
+                var key = $"{trackedDownload.DownloadClient}:{trackedDownload.DownloadItem.DownloadId}";
+                _pipeline.QueueVerification(key, () => CompletePublishedImports(trackedDownload, importResults));
+                return;
+            }
+
             if (VerifyImport(trackedDownload, importResults))
             {
                 return;
@@ -220,6 +233,38 @@ namespace NzbDrone.Core.Download
             {
                 trackedDownload.Warn(statusMessages.ToArray());
                 SetStateToImportBlocked(trackedDownload);
+            }
+        }
+
+        private void CompletePublishedImports(TrackedDownload trackedDownload, List<ImportResult> results)
+        {
+            try
+            {
+                foreach (var result in results.Where(r => r.PendingImport != null))
+                {
+                    _recovery.CompletePublished(result.PendingImport);
+                    result.PendingImport = null;
+                }
+
+                lock (trackedDownload)
+                {
+                    if (!VerifyImport(trackedDownload, results))
+                    {
+                        trackedDownload.Warn("Published files were verified, but download completion requires inspection.");
+                        trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                trackedDownload.Warn("Published file verification requires inspection: {0}", ex.Message);
+                trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                _logger.Debug(ex, "Published file verification failed for {0}", trackedDownload.DownloadItem.Title);
+            }
+            finally
+            {
+                _eventAggregator.PublishEvent(new TrackedDownloadStateChangedEvent(trackedDownload));
+                _eventAggregator.PublishEvent(new DownloadsProcessedEvent());
             }
         }
 

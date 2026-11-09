@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NzbDrone.Common.Disk;
 
 namespace NzbDrone.Core.MediaFiles
@@ -12,11 +13,20 @@ namespace NzbDrone.Core.MediaFiles
 
         private readonly Dictionary<string, (long Size, DateTime Modified, string Hash)> _previous;
 
-        public VersionImportVerificationScope()
+        public VersionImportVerificationScope(IReadOnlyList<VersionImportVerifiedFile> evidence = null)
         {
             _previous = _verified;
             _verified = new Dictionary<string, (long, DateTime, string)>(StringComparer.Ordinal);
+            foreach (var file in evidence ?? Array.Empty<VersionImportVerifiedFile>())
+            {
+                _verified[file.Path] = (file.Size, file.Modified, file.Hash);
+            }
         }
+
+        public IReadOnlyList<VersionImportVerifiedFile> Capture() => _verified.Select(entry => new VersionImportVerifiedFile
+        {
+            Path = entry.Key, Size = entry.Value.Size, Modified = entry.Value.Modified, Hash = entry.Value.Hash
+        }).ToList();
 
         public static string Find(IDiskProvider disk, string path)
         {

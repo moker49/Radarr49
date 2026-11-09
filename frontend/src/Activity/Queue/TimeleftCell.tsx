@@ -35,6 +35,14 @@ function TimeleftCell(props: TimeleftCellProps) {
     timeFormat,
   } = props;
 
+  if (importStage === 'verificationPending') {
+    return (
+      <TableRowCell className={styles.timeleft}>
+        {translate('WaitingToVerify')}
+      </TableRowCell>
+    );
+  }
+
   if (importStage === 'verifying' || importStage === 'verificationFailed') {
     return (
       <TableRowCell className={styles.timeleft}>

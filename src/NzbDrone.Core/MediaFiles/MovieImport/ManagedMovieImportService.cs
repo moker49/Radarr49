@@ -48,7 +48,15 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                         throw new MovieVersionImportException("A managed import requires an explicit version and a supported source import.");
                     }
 
+                    using var evidence = new VersionImportVerificationScope();
                     operation = _handoff.Prepare(local, incoming, copyOnly, deferSourceHash: true);
+                    if (VersionImportCopyScope.IsActive)
+                    {
+                        _handoff.Publish(operation.MovieId, operation.Id);
+                        local.PendingImport = new PendingVersionImport { MovieId = operation.MovieId, OperationId = operation.Id, Evidence = evidence.Capture() };
+                        return incoming;
+                    }
+
                     _recovery.Resume(operation.MovieId, operation.Id);
                     var finished = _operations.Get(operation.Id);
                     if (finished.State != VersionFileImportState.Completed || !finished.NewMovieFileId.HasValue)

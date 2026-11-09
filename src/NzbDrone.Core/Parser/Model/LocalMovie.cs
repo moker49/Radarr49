@@ -25,6 +25,7 @@ namespace NzbDrone.Core.Parser.Model
         public Movie Movie { get; set; }
         public int? MovieVersionId { get; set; }
         public int? DownloadReservationId { get; set; }
+        public PendingVersionImport PendingImport { get; set; }
         public List<DeletedMovieFile> OldFiles { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }

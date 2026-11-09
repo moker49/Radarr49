@@ -98,9 +98,10 @@ namespace NzbDrone.Core.Test.QueueTests
             Assert.That(Subject.GetQueue(), Is.Empty);
         }
 
-        [TestCase(false, "verifying")]
-        [TestCase(true, "verificationFailed")]
-        public void queue_should_expose_published_verification_stage(bool failed, string stage)
+        [TestCase(false, false, "verificationPending")]
+        [TestCase(false, true, "verifying")]
+        [TestCase(true, true, "verificationFailed")]
+        public void queue_should_expose_published_verification_stage(bool failed, bool running, string stage)
         {
             var tracked = _trackedDownloads.Single();
             tracked.RemoteMovie.MovieVersionId = 7;
@@ -117,6 +118,7 @@ namespace NzbDrone.Core.Test.QueueTests
                 }
             };
             Mocker.GetMock<IVersionFileImportRepository>().Setup(i => i.Pending()).Returns(new List<VersionFileImport> { operation });
+            using var lease = running ? new VersionImportOperationLease(operation.Id) : null;
             Subject.Handle(new TrackedDownloadRefreshedEvent(_trackedDownloads));
             Assert.That(Subject.GetQueue().Single().ImportStage, Is.EqualTo(stage));
             operation.State = VersionFileImportState.Completed;

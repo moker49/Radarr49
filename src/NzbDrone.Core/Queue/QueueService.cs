@@ -39,7 +39,9 @@ namespace NzbDrone.Core.Queue
                     i.MovieId == item.Movie?.Id && !string.IsNullOrEmpty(i.Snapshot?.DownloadId) &&
                     string.Equals(i.Snapshot.DownloadId, item.DownloadId, StringComparison.OrdinalIgnoreCase));
                 item.ImportStage = operation?.Snapshot?.RollbackPending == true ? "verificationFailed" :
-                    operation?.State == VersionFileImportState.Installing && operation.Snapshot.PublishBeforeVerification ? "verifying" : null;
+                    operation?.State == VersionFileImportState.Installing && operation.Snapshot.PublishBeforeVerification
+                        ? VersionImportOperationLease.IsRunning(operation.Id) ? "verifying" : "verificationPending"
+                        : null;
             }
 
             return _queue;

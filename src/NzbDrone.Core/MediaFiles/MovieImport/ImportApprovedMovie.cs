@@ -159,7 +159,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                             if (localMovie.MovieVersionId.HasValue)
                             {
                                 _managedImports.Import(localMovie, movieFile, copyOnly);
-                                importResults.Add(new ImportResult(importDecision));
+                                importResults.Add(new ImportResult(importDecision) { PendingImport = localMovie.PendingImport });
                                 continue;
                             }
 

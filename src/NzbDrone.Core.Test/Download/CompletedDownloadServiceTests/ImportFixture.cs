@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
@@ -97,6 +99,34 @@ namespace NzbDrone.Core.Test.Download
             Mocker.GetMock<IParsingService>()
                   .Setup(s => s.GetMovie(It.IsAny<string>()))
                   .Returns(_trackedDownload.RemoteMovie.Movie);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void published_import_must_stay_importing_until_separate_verification_finishes(bool fails)
+        {
+            var pending = new PendingVersionImport { MovieId = _trackedDownload.RemoteMovie.Movie.Id, OperationId = 42 };
+            _trackedDownload.MovieVersionId = 7;
+            var result = new ImportResult(new ImportDecision(new LocalMovie { Movie = _trackedDownload.RemoteMovie.Movie, MovieVersionId = 7 })) { PendingImport = pending };
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Setup(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()))
+                .Returns(new List<ImportResult> { result });
+            Action verify = null;
+            Mocker.GetMock<IDownloadImportPipeline>().Setup(p => p.QueueVerification(It.IsAny<string>(), It.IsAny<Action>()))
+                .Callback<string, Action>((_, work) => verify = work).Returns(true);
+            if (fails)
+            {
+                Mocker.GetMock<IVersionImportRecoveryService>().Setup(r => r.CompletePublished(pending)).Throws(new IOException("Verification failed"));
+            }
+
+            Subject.Import(_trackedDownload);
+            Assert.That(_trackedDownload.State, Is.EqualTo(TrackedDownloadState.Importing));
+            Assert.That(result.Result, Is.EqualTo(ImportResultType.PendingVerification));
+            Mocker.GetMock<IEventAggregator>().Verify(e => e.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Never());
+            Assert.That(verify, Is.Not.Null);
+            verify();
+            Assert.That(_trackedDownload.State, Is.EqualTo(fails ? TrackedDownloadState.ImportBlocked : TrackedDownloadState.Imported));
+            Mocker.GetMock<IEventAggregator>().Verify(e => e.PublishEvent(It.IsAny<DownloadCompletedEvent>()), fails ? Times.Never() : Times.Once());
         }
 
         [Test]

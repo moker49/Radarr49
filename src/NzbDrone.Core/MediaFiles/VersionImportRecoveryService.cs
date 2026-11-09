@@ -1,12 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using NLog;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Queue;
 
 namespace NzbDrone.Core.MediaFiles
 {
@@ -14,6 +17,7 @@ namespace NzbDrone.Core.MediaFiles
     {
         VersionFileImport Get(int movieId, int operationId);
         void Resume(int movieId, int operationId, string checkpoint = null, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null);
+        void CompletePublished(PendingVersionImport pending);
         void Cancel(int movieId, int operationId, string checkpoint, string note);
     }
 
@@ -25,13 +29,17 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IVersionImportCleanupService _cleanup;
         private readonly IVersionImportCompletionService _completion;
         private readonly Logger _logger;
+        private readonly IVersionImportFileVerifier _verifier;
+        private readonly IEventAggregator _events;
 
         public VersionImportRecoveryService(IVersionFileImportRepository operations,
                                             IVersionImportHandoffService handoff,
                                             IVersionImportSidecarService sidecars,
                                             IVersionImportCleanupService cleanup,
                                             IVersionImportCompletionService completion,
-                                            Logger logger)
+                                            Logger logger,
+                                            IVersionImportFileVerifier verifier,
+                                            IEventAggregator events)
         {
             _operations = operations;
             _handoff = handoff;
@@ -39,6 +47,8 @@ namespace NzbDrone.Core.MediaFiles
             _cleanup = cleanup;
             _completion = completion;
             _logger = logger;
+            _verifier = verifier;
+            _events = events;
         }
 
         public VersionFileImport Get(int movieId, int operationId)
@@ -53,6 +63,12 @@ namespace NzbDrone.Core.MediaFiles
         }
 
         public void Resume(int movieId, int operationId, string checkpoint = null, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null)
+        {
+            using var lease = new VersionImportOperationLease(operationId);
+            ResumeCore(movieId, operationId, checkpoint, retryPhysical, preserveChangedExtras, preserveChangedSources, note, null);
+        }
+
+        private void ResumeCore(int movieId, int operationId, string checkpoint, bool retryPhysical, bool preserveChangedExtras, bool preserveChangedSources, string note, IReadOnlyList<VersionImportVerifiedFile> evidence)
         {
             lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
@@ -81,7 +97,7 @@ namespace NzbDrone.Core.MediaFiles
 
                 try
                 {
-                    using var verification = new VersionImportVerificationScope();
+                    using var verification = new VersionImportVerificationScope(evidence);
                     Run(operation, recoveryIndex, retryPhysical, preserveChangedExtras, preserveChangedSources, note);
                     _operations.RecordRecoveryResult(operationId, null);
                 }
@@ -98,8 +114,50 @@ namespace NzbDrone.Core.MediaFiles
             }
         }
 
+        public void CompletePublished(PendingVersionImport pending)
+        {
+            using var lease = new VersionImportOperationLease(pending.OperationId);
+            using var evidence = new VersionImportVerificationScope(pending.Evidence);
+            var operation = Get(pending.MovieId, pending.OperationId);
+            if (operation.State == VersionFileImportState.Completed)
+            {
+                return;
+            }
+
+            if (operation.State == VersionFileImportState.Installing && !operation.Snapshot.RollbackPending)
+            {
+                var checkpoint = VersionImportRecoveryCheckpoint.For(operation);
+                var destination = Path.GetFullPath(Path.Combine(operation.MoviePath, operation.DestinationRelativePath));
+                Require(Path.GetFullPath(operation.MoviePath).IsParentPath(destination), "The publication path escapes its movie folder.");
+                _events.PublishEvent(new QueueUpdatedEvent());
+                string error = null;
+                try
+                {
+                    if (!string.Equals(_verifier.Hash(destination), operation.Snapshot.SourceHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        error = "The published destination checksum does not match the source.";
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    error = ex.Message;
+                }
+
+                if (error != null)
+                {
+                    _handoff.RejectPublication(pending.MovieId, pending.OperationId, error);
+                    throw new InvalidOperationException("Published file verification failed. The failed copy was quarantined and recoverable files were preserved: " + error);
+                }
+
+                CheckCheckpoint(Get(pending.MovieId, pending.OperationId), checkpoint, true);
+            }
+
+            ResumeCore(pending.MovieId, pending.OperationId, null, false, false, false, null, evidence.Capture());
+        }
+
         public void Cancel(int movieId, int operationId, string checkpoint, string note)
         {
+            using var lease = new VersionImportOperationLease(operationId);
             lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
                 var operation = Get(movieId, operationId);

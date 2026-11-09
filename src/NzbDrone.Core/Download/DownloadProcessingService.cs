@@ -16,13 +16,15 @@ namespace NzbDrone.Core.Download
         private readonly ITrackedDownloadService _trackedDownloadService;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+        private readonly IDownloadImportPipeline _pipeline;
 
         public DownloadProcessingService(IConfigService configService,
                                          ICompletedDownloadService completedDownloadService,
                                          IFailedDownloadService failedDownloadService,
                                          ITrackedDownloadService trackedDownloadService,
                                          IEventAggregator eventAggregator,
-                                         Logger logger)
+                                         Logger logger,
+                                         IDownloadImportPipeline pipeline)
         {
             _configService = configService;
             _completedDownloadService = completedDownloadService;
@@ -30,6 +32,7 @@ namespace NzbDrone.Core.Download
             _trackedDownloadService = trackedDownloadService;
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _pipeline = pipeline;
         }
 
         private void RemoveCompletedDownloads()
@@ -40,7 +43,13 @@ namespace NzbDrone.Core.Download
 
             foreach (var trackedDownload in trackedDownloads)
             {
-                _eventAggregator.PublishEvent(new DownloadCanBeRemovedEvent(trackedDownload));
+                lock (trackedDownload)
+                {
+                    if (!trackedDownload.DownloadItem.Removed && trackedDownload.DownloadItem.CanBeRemoved && trackedDownload.State == TrackedDownloadState.Imported)
+                    {
+                        _eventAggregator.PublishEvent(new DownloadCanBeRemovedEvent(trackedDownload));
+                    }
+                }
             }
         }
 
@@ -60,7 +69,30 @@ namespace NzbDrone.Core.Download
 
                     if (enableCompletedDownloadHandling && trackedDownload.State == TrackedDownloadState.ImportPending)
                     {
-                        _completedDownloadService.Import(trackedDownload);
+                        var key = $"{trackedDownload.DownloadClient}:{trackedDownload.DownloadItem.DownloadId}";
+                        _pipeline.QueueCopy(key, () =>
+                        {
+                            try
+                            {
+                                if (!trackedDownload.DownloadItem.Removed && trackedDownload.State == TrackedDownloadState.ImportPending &&
+                                    _trackedDownloadService.GetTrackedDownloads().Any(t => ReferenceEquals(t, trackedDownload) && t.IsTrackable))
+                                {
+                                    _completedDownloadService.Import(trackedDownload);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                                trackedDownload.Warn("Import failed: {0}", ex.Message);
+                                _logger.Debug(ex, "Failed to import download: {0}", trackedDownload.DownloadItem.Title);
+                            }
+                            finally
+                            {
+                                RemoveCompletedDownloads();
+                                _eventAggregator.PublishEvent(new TrackedDownloadStateChangedEvent(trackedDownload));
+                                _eventAggregator.PublishEvent(new DownloadsProcessedEvent());
+                            }
+                        });
                     }
 
                     if (trackedDownload.State == TrackedDownloadState.FailedPending)

@@ -4,6 +4,7 @@
     {
         Imported,
         Rejected,
-        Skipped
+        Skipped,
+        PendingVerification
     }
 }

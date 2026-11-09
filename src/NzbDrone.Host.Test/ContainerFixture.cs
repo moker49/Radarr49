@@ -76,6 +76,10 @@ namespace NzbDrone.App.Test
             _container.GetRequiredService<IEnumerable<IIndexer>>().Should().NotBeEmpty();
         }
 
+        [TestCase(typeof(ICompletedDownloadService))]
+        [TestCase(typeof(DownloadProcessingService))]
+        [TestCase(typeof(IDownloadImportPipeline))]
+        [TestCase(typeof(NzbDrone.Core.MediaFiles.IVersionImportRecoveryService))]
         [TestCase(typeof(IMovieService))]
         [TestCase(typeof(IMovieVersionService))]
         [TestCase(typeof(IBuildFileNames))]

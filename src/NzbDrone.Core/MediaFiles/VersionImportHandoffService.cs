@@ -26,6 +26,8 @@ namespace NzbDrone.Core.MediaFiles
     {
         VersionFileImport Prepare(LocalMovie local, MovieFile incoming, bool copyOnly, bool deferSourceHash = false);
         MovieFile Resume(int movieId, int operationId);
+        void Publish(int movieId, int operationId);
+        void RejectPublication(int movieId, int operationId, string error);
         void CancelBeforeBackup(int movieId, int operationId, string note);
     }
 
@@ -159,7 +161,11 @@ namespace NzbDrone.Core.MediaFiles
             }
         }
 
-        public MovieFile Resume(int movieId, int operationId)
+        public MovieFile Resume(int movieId, int operationId) => ResumeCore(movieId, operationId, false);
+
+        public void Publish(int movieId, int operationId) => ResumeCore(movieId, operationId, true);
+
+        private MovieFile ResumeCore(int movieId, int operationId, bool publishOnly)
         {
             lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
@@ -277,6 +283,12 @@ namespace NzbDrone.Core.MediaFiles
                         _events.PublishEvent(new QueueUpdatedEvent());
                     }
 
+                    if (publishOnly)
+                    {
+                        Require(operation.Snapshot.PublishBeforeVerification, "Only early-publication imports can defer verification.");
+                        return null;
+                    }
+
                     try
                     {
                         Require(Matches(destination, operation.Snapshot.Incoming.Size, operation.Snapshot.SourceHash), "The published destination checksum does not match the source.");
@@ -302,6 +314,23 @@ namespace NzbDrone.Core.MediaFiles
                 }
 
                 throw new InvalidOperationException("Unsupported handoff checkpoint.");
+            }
+        }
+
+        public void RejectPublication(int movieId, int operationId, string error)
+        {
+            lock (MovieVersionImportSynchronization.ForMovie(movieId))
+            {
+                var operation = GetOwned(movieId, operationId);
+                var movie = _movies.GetMovie(movieId);
+                Require(movie.Path == operation.MoviePath, "The movie path changed. Publication rollback requires inspection.");
+                var destination = OwnedPath(movie.Path, operation.DestinationRelativePath);
+                var previous = operation.Snapshot.Previous == null ? null : OwnedPath(movie.Path, operation.Snapshot.Previous.RelativePath);
+                var backup = operation.BackupRelativePath == null ? null : PrivatePath(movie.Path, operation.BackupRelativePath);
+                CheckPaths(movie, operation, destination, previous);
+                _operations.BeginVerificationRollback(operation.Id, error);
+                _events.PublishEvent(new QueueUpdatedEvent());
+                RollbackPublication(movie, _operations.Get(operation.Id), destination, previous, backup);
             }
         }
 

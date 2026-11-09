@@ -8,6 +8,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
     {
         public ImportDecision ImportDecision { get; private set; }
         public List<string> Errors { get; private set; }
+        public PendingVersionImport PendingImport { get; set; }
 
         public ImportResultType Result
         {
@@ -23,7 +24,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                     return ImportResultType.Rejected;
                 }
 
-                return ImportResultType.Imported;
+                return PendingImport == null ? ImportResultType.Imported : ImportResultType.PendingVerification;
             }
         }
 

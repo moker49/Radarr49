@@ -142,7 +142,10 @@ function QueueStatus(props: QueueStatusProps) {
     }
   }
 
-  if (importStage === 'verifying') {
+  if (importStage === 'verificationPending') {
+    title = translate('WaitingToVerify');
+    iconKind = kinds.PRIMARY;
+  } else if (importStage === 'verifying') {
     title = translate('PublishedVerifying');
     iconKind = kinds.PRIMARY;
   } else if (importStage === 'verificationFailed') {
