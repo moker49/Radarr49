@@ -12,6 +12,7 @@ namespace NzbDrone.Core.Blocklisting
     public class Blocklist : ModelBase
     {
         public int MovieId { get; set; }
+        public int? MovieVersionId { get; set; }
         public Movie Movie { get; set; }
         public string SourceTitle { get; set; }
         public QualityModel Quality { get; set; }

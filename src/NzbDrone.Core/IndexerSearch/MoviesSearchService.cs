@@ -55,7 +55,7 @@ namespace NzbDrone.Core.IndexerSearch
                 .Where(m => (m.Monitored && m.IsAvailable()) || userInvokedSearch)
                 .ToList();
 
-            SearchForBulkMovies(movies, userInvokedSearch).GetAwaiter().GetResult();
+            SearchForBulkMovies(movies, userInvokedSearch, targetVersionId: message.MovieVersionId).GetAwaiter().GetResult();
         }
 
         public void Execute(MissingMoviesSearchCommand message)
@@ -92,7 +92,7 @@ namespace NzbDrone.Core.IndexerSearch
             SearchForBulkMovies(movies, message.Trigger == CommandTrigger.Manual, WantedSearch.QualityCutoff).GetAwaiter().GetResult();
         }
 
-        private async Task SearchForBulkMovies(List<Movie> movies, bool userInvokedSearch, WantedSearch wanted = WantedSearch.None)
+        private async Task SearchForBulkMovies(List<Movie> movies, bool userInvokedSearch, WantedSearch wanted = WantedSearch.None, int? targetVersionId = null)
         {
             _logger.ProgressInfo("Performing search for {0} movies", movies.Count);
             var downloadedCount = 0;
@@ -129,6 +129,11 @@ namespace NzbDrone.Core.IndexerSearch
                 {
                     _logger.Error(ex, "Unable to search for movie: [{0}]", movieId.Key);
                     continue;
+                }
+
+                if (targetVersionId.HasValue)
+                {
+                    decisions = decisions.Where(d => d.RemoteMovie.MovieVersionId == targetVersionId).ToList();
                 }
 
                 var processDecisions = await _processDownloadDecisions.ProcessDecisions(decisions);

@@ -26,6 +26,35 @@ namespace NzbDrone.Core.Test.MediaFiles
 
         [TestCase(false)]
         [TestCase(true)]
+        public void cancelling_abandoned_handoff_must_preserve_files_and_refuse_a_published_destination(bool destinationExists)
+        {
+            Db.Update(_sdr);
+            Db.Delete(_old);
+            _disk.Remove(Full(_old.RelativePath));
+            var local = RuntimeLocal();
+            local.Movie = Root().WithVersion(Resolve(_sdr.Id), null);
+            var operation = Subject.Prepare(local, File(null), false);
+            _operations.Advance(operation.Id, VersionFileImportState.Prepared, VersionFileImportState.Staging);
+            _operations.Advance(operation.Id, VersionFileImportState.Staging, VersionFileImportState.Staged);
+            _operations.Advance(operation.Id, VersionFileImportState.Staged, VersionFileImportState.BackingUp);
+            if (destinationExists)
+            {
+                _disk.Add(Full(operation.DestinationRelativePath), (100, new string('E', 64)));
+                Assert.Throws<System.InvalidOperationException>(() => Subject.CancelBeforeBackup(_movie.Id, operation.Id, "Abandoned download"));
+                Assert.That(_operations.Get(operation.Id).State, Is.EqualTo(VersionFileImportState.BackingUp));
+                Assert.That(_disk.ContainsKey(Full(operation.DestinationRelativePath)), Is.True);
+            }
+            else
+            {
+                Subject.CancelBeforeBackup(_movie.Id, operation.Id, "Abandoned download");
+                Assert.That(_operations.Get(operation.Id).State, Is.EqualTo(VersionFileImportState.Cancelled));
+            }
+
+            Assert.That(_disk.ContainsKey(_source), Is.True);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
         public void first_version_publication_must_complete_or_quarantine_without_a_previous_backup(bool corrupt)
         {
             Db.Update(_sdr);

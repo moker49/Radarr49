@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using NLog;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Lifecycle;
@@ -18,6 +19,7 @@ namespace NzbDrone.Core.MediaFiles
         VersionFileImport Get(int movieId, int operationId);
         void Resume(int movieId, int operationId, string checkpoint = null, bool retryPhysical = false, bool preserveChangedExtras = false, bool preserveChangedSources = false, string note = null);
         void CompletePublished(PendingVersionImport pending);
+        bool PrepareCopyRetry(PendingVersionImport pending);
         void Cancel(int movieId, int operationId, string checkpoint, string note);
     }
 
@@ -31,6 +33,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly Logger _logger;
         private readonly IVersionImportFileVerifier _verifier;
         private readonly IEventAggregator _events;
+        private readonly IDiskProvider _disk;
 
         public VersionImportRecoveryService(IVersionFileImportRepository operations,
                                             IVersionImportHandoffService handoff,
@@ -39,7 +42,8 @@ namespace NzbDrone.Core.MediaFiles
                                             IVersionImportCompletionService completion,
                                             Logger logger,
                                             IVersionImportFileVerifier verifier,
-                                            IEventAggregator events)
+                                            IEventAggregator events,
+                                            IDiskProvider disk)
         {
             _operations = operations;
             _handoff = handoff;
@@ -49,6 +53,7 @@ namespace NzbDrone.Core.MediaFiles
             _logger = logger;
             _verifier = verifier;
             _events = events;
+            _disk = disk;
         }
 
         public VersionFileImport Get(int movieId, int operationId)
@@ -117,6 +122,19 @@ namespace NzbDrone.Core.MediaFiles
         public void CompletePublished(PendingVersionImport pending)
         {
             using var lease = new VersionImportOperationLease(pending.OperationId);
+            try
+            {
+                CompletePublishedCore(pending);
+            }
+            catch (Exception ex)
+            {
+                TryRecordFailure(pending.OperationId, ex.Message);
+                throw;
+            }
+        }
+
+        private void CompletePublishedCore(PendingVersionImport pending)
+        {
             using var evidence = new VersionImportVerificationScope(pending.Evidence);
             var operation = Get(pending.MovieId, pending.OperationId);
             if (operation.State == VersionFileImportState.Completed)
@@ -131,11 +149,13 @@ namespace NzbDrone.Core.MediaFiles
                 Require(Path.GetFullPath(operation.MoviePath).IsParentPath(destination), "The publication path escapes its movie folder.");
                 _events.PublishEvent(new QueueUpdatedEvent());
                 string error = null;
+                var mismatch = false;
                 try
                 {
                     if (!string.Equals(_verifier.Hash(destination), operation.Snapshot.SourceHash, StringComparison.OrdinalIgnoreCase))
                     {
                         error = "The published destination checksum does not match the source.";
+                        mismatch = true;
                     }
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -146,6 +166,11 @@ namespace NzbDrone.Core.MediaFiles
                 if (error != null)
                 {
                     _handoff.RejectPublication(pending.MovieId, pending.OperationId, error);
+                    if (mismatch)
+                    {
+                        throw new PublishedChecksumMismatchException(pending);
+                    }
+
                     throw new InvalidOperationException("Published file verification failed. The failed copy was quarantined and recoverable files were preserved: " + error);
                 }
 
@@ -153,6 +178,32 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             ResumeCore(pending.MovieId, pending.OperationId, null, false, false, false, null, evidence.Capture());
+        }
+
+        public bool PrepareCopyRetry(PendingVersionImport pending)
+        {
+            using var lease = new VersionImportOperationLease(pending.OperationId);
+            lock (MovieVersionImportSynchronization.ForMovie(pending.MovieId))
+            {
+                var operation = Get(pending.MovieId, pending.OperationId);
+                if (!operation.Snapshot.RollbackCompleted || operation.State != VersionFileImportState.Installing ||
+                    string.IsNullOrEmpty(operation.Snapshot.DownloadId) ||
+                    _operations.ForMovie(pending.MovieId).Count(i => i.MovieVersionId == operation.MovieVersionId && i.Snapshot.RollbackCompleted &&
+                        i.Snapshot.DownloadId == operation.Snapshot.DownloadId && i.Snapshot.DownloadClientInfo?.Id == operation.Snapshot.DownloadClientInfo?.Id) > 1)
+                {
+                    return false;
+                }
+
+                using var verification = new VersionImportVerificationScope();
+                if (!_disk.FileExists(operation.SourcePath) || _disk.GetFileSize(operation.SourcePath) != operation.Snapshot.Incoming.Size ||
+                    !string.Equals(_verifier.Hash(operation.SourcePath), operation.Snapshot.SourceHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                _handoff.CancelBeforeBackup(operation.MovieId, operation.Id, "Automatically retrying the copy once after a destination checksum mismatch; the source checksum was verified.");
+                return true;
+            }
         }
 
         public void Cancel(int movieId, int operationId, string checkpoint, string note)
@@ -163,7 +214,9 @@ namespace NzbDrone.Core.MediaFiles
                 var operation = Get(movieId, operationId);
                 CheckCheckpoint(operation, checkpoint, true);
                 Require(!string.IsNullOrWhiteSpace(note), "A cancellation note is required.");
-                Require((operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || operation.Snapshot.RollbackCompleted, "The import may already have moved the previous file. It cannot be cancelled at this checkpoint.");
+                var canCancel = (operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || operation.Snapshot.RollbackCompleted ||
+                    (operation.State == VersionFileImportState.BackingUp && operation.OldMovieFileId == null && !operation.Snapshot.PreviousExisted && operation.NewMovieFileId == null);
+                Require(canCancel, "The import may already have moved the previous file. It cannot be cancelled at this checkpoint.");
                 try
                 {
                     _handoff.CancelBeforeBackup(movieId, operationId, note);

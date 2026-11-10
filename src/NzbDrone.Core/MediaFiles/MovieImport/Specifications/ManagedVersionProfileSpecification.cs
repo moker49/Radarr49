@@ -39,7 +39,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
                 language = language == Language.Original ? localMovie.Movie.MovieMetadata.Value.OriginalLanguage : language;
                 if (localMovie.Languages?.Contains(language) != true)
                 {
-                    return ImportSpecDecision.Reject(ImportRejectionReason.VersionProfileNotSatisfied, "File language does not satisfy the selected version's profile.");
+                    if (language == null || language.Id <= 0 || localMovie.Languages?.Any(l => l != null && l.Id > 0) != true)
+                    {
+                        return ImportSpecDecision.Reject(ImportRejectionReason.VersionProfileNotSatisfied, "File language could not be determined for the selected version's profile.");
+                    }
+
+                    return ImportSpecDecision.Reject(ImportRejectionReason.VersionLanguageNotSatisfied, "File language does not satisfy the selected version's profile.");
                 }
             }
 

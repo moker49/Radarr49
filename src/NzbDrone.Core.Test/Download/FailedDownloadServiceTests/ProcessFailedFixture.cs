@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using FizzWare.NBuilder;
 using FluentAssertions;
@@ -7,6 +8,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
+using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
@@ -39,6 +41,7 @@ namespace NzbDrone.Core.Test.Download.FailedDownloadServiceTests
 
             _trackedDownload = Builder<TrackedDownload>.CreateNew()
                     .With(c => c.State = TrackedDownloadState.FailedPending)
+                    .With(c => c.ImportFailureReason = null)
                     .With(c => c.DownloadItem = completed)
                     .With(c => c.RemoteMovie = remoteMovie)
                     .Build();
@@ -46,6 +49,23 @@ namespace NzbDrone.Core.Test.Download.FailedDownloadServiceTests
             Mocker.GetMock<IHistoryService>()
                   .Setup(s => s.Find(_trackedDownload.DownloadItem.DownloadId, MovieHistoryEventType.Grabbed))
                   .Returns(_grabHistory);
+        }
+
+        [Test]
+        public void import_failure_must_select_matching_version_history_and_preserve_its_failure_reason()
+        {
+            _trackedDownload.ImportFailureReason = ImportRejectionReason.NoImportableVideo;
+            _trackedDownload.MovieVersionId = 7;
+            _trackedDownload.RemoteMovie.Movie.Id = 1;
+            _grabHistory[0].MovieId = 1;
+            _grabHistory[0].MovieVersionId = 7;
+            _grabHistory[1].MovieId = 1;
+            _grabHistory[1].MovieVersionId = 8;
+            _grabHistory[1].Date = DateTime.UtcNow.AddMinutes(1);
+            Subject.ProcessFailed(_trackedDownload);
+            Mocker.GetMock<IEventAggregator>().Verify(
+                e => e.PublishEvent(It.Is<DownloadFailedEvent>(f => f.MovieVersionId == 7 && f.SourceTitle == _grabHistory[0].SourceTitle && f.Message.Contains("NoImportableVideo"))),
+                Times.Once());
         }
 
         [Test]

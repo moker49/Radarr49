@@ -338,7 +338,13 @@ namespace NzbDrone.Core.MediaFiles
         {
             lock (MovieVersionImportSynchronization.ForMovie(movieId))
             {
-                GetOwned(movieId, operationId);
+                var operation = GetOwned(movieId, operationId);
+                if (operation.State == VersionFileImportState.BackingUp)
+                {
+                    Require(operation.OldMovieFileId == null && !operation.Snapshot.PreviousExisted && operation.NewMovieFileId == null &&
+                        !_disk.FileExists(OwnedPath(operation.MoviePath, operation.DestinationRelativePath)),
+                        "The handoff may have published or backed up a file. Reconcile it before cancelling.");
+                }
 
                 // Private staging files are deliberately retained for inspection, not
                 // blindly deleted. The directory is excluded from ordinary media scans.

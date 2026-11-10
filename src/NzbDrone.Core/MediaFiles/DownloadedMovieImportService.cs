@@ -246,7 +246,7 @@ namespace NzbDrone.Core.MediaFiles
             }
             else if (importResults.Empty())
             {
-                importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName));
+                importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName, downloadClientItem?.Status == DownloadItemStatus.Completed));
             }
 
             return importResults;
@@ -357,7 +357,7 @@ namespace NzbDrone.Core.MediaFiles
             return new ImportResult(new ImportDecision(null, new ImportRejection(reason, message)), message);
         }
 
-        private ImportResult CheckEmptyResultForIssue(string folder)
+        private ImportResult CheckEmptyResultForIssue(string folder, bool completed = false)
         {
             var files = _diskProvider.GetFiles(folder, true);
 
@@ -374,6 +374,11 @@ namespace NzbDrone.Core.MediaFiles
             if (files.Any(file => FileExtensions.ArchiveExtensions.Contains(Path.GetExtension(file))))
             {
                 return RejectionResult(ImportRejectionReason.ArchiveFile, "Found archive file, might need to be extracted");
+            }
+
+            if (completed && files.Any() && !files.Any(file => MediaFileExtensions.Extensions.Contains(Path.GetExtension(file))))
+            {
+                return RejectionResult(ImportRejectionReason.NoImportableVideo, "Completed download contains no importable video files (only unsupported files).");
             }
 
             return null;

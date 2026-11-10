@@ -78,6 +78,10 @@ namespace NzbDrone.Core.Download
                                     _trackedDownloadService.GetTrackedDownloads().Any(t => ReferenceEquals(t, trackedDownload) && t.IsTrackable))
                                 {
                                     _completedDownloadService.Import(trackedDownload);
+                                    if (trackedDownload.State == TrackedDownloadState.FailedPending)
+                                    {
+                                        _failedDownloadService.ProcessFailed(trackedDownload);
+                                    }
                                 }
                             }
                             catch (Exception ex)

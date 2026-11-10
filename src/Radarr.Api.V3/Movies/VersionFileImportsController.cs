@@ -49,7 +49,7 @@ namespace Radarr.Api.V3.Movies
                 NewMovieFileId = operation.NewMovieFileId, MoviePath = operation.MoviePath, SourcePath = operation.SourcePath,
                 DestinationRelativePath = operation.DestinationRelativePath, StagingRelativePath = operation.StagingRelativePath,
                 BackupRelativePath = operation.BackupRelativePath, CopyOnly = operation.CopyOnly, State = operation.State,
-                IsActive = operation.IsActive, CanCancel = operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged,
+                IsActive = operation.IsActive, CanCancel = (operation.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || snapshot.RollbackCompleted || (operation.State == VersionFileImportState.BackingUp && operation.OldMovieFileId == null && !snapshot.PreviousExisted && operation.NewMovieFileId == null),
                 Checkpoint = VersionImportRecoveryCheckpoint.For(operation), SourceSize = snapshot.Incoming.Size,
                 SourceHash = snapshot.SourceHash, PreviousSize = snapshot.Previous?.Size, PreviousHash = snapshot.PreviousHash,
                 Created = operation.Created, Updated = operation.Updated, Note = operation.Note,

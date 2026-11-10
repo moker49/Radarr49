@@ -186,7 +186,9 @@ namespace NzbDrone.Core.MediaFiles
             using var connection = _database.OpenConnection();
             using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             var row = Load(connection, transaction, id);
-            Require((row.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || row.Snapshot.RollbackCompleted, "The import may already have moved the previous file. Reconcile that handoff before cancelling.");
+            var canCancel = (row.State is VersionFileImportState.Prepared or VersionFileImportState.Staging or VersionFileImportState.Staged) || row.Snapshot.RollbackCompleted ||
+                    (row.State == VersionFileImportState.BackingUp && row.OldMovieFileId == null && !row.Snapshot.PreviousExisted && row.NewMovieFileId == null);
+            Require(canCancel, "The import may already have moved the previous file. Reconcile that handoff before cancelling.");
             CheckOwnership(connection, transaction, row);
             row.State = VersionFileImportState.Cancelled;
             row.Note = note;

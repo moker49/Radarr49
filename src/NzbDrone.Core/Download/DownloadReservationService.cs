@@ -253,7 +253,7 @@ namespace NzbDrone.Core.Download
                 .Where(r => r.MovieId == message.MovieId && r.MovieVersionId == tracked.MovieVersionId.Value).ToList();
             if (rows.Count == 1)
             {
-                _repository.MarkFailed(rows[0].Id, "Download client reported failure: " + message.Message);
+                _repository.MarkFailed(rows[0].Id, "Download failed: " + message.Message);
             }
         }
 

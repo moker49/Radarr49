@@ -16,7 +16,9 @@ namespace NzbDrone.Core.Blocklisting
     public interface IBlocklistService
     {
         bool Blocklisted(int movieId, ReleaseInfo release);
+        bool Blocklisted(int movieId, ReleaseInfo release, int? movieVersionId);
         bool BlocklistedTorrentHash(int movieId, string hash);
+        bool BlocklistedTorrentHash(int movieId, string hash, int? movieVersionId);
         PagingSpec<Blocklist> Paged(PagingSpec<Blocklist> pagingSpec);
         List<Blocklist> GetByMovieId(int movieId);
         void Block(RemoteMovie remoteMovie, string message);
@@ -37,7 +39,9 @@ namespace NzbDrone.Core.Blocklisting
             _blocklistRepository = blocklistRepository;
         }
 
-        public bool Blocklisted(int movieId, ReleaseInfo release)
+        public bool Blocklisted(int movieId, ReleaseInfo release) => Blocklisted(movieId, release, null);
+
+        public bool Blocklisted(int movieId, ReleaseInfo release, int? movieVersionId)
         {
             if (release.DownloadProtocol == DownloadProtocol.Torrent)
             {
@@ -50,22 +54,24 @@ namespace NzbDrone.Core.Blocklisting
                 {
                     var blocklistedByTorrentInfohash = _blocklistRepository.BlocklistedByTorrentInfoHash(movieId, torrentInfo.InfoHash);
 
-                    return blocklistedByTorrentInfohash.Any(b => SameTorrent(b, torrentInfo));
+                    return blocklistedByTorrentInfohash.Where(b => b.MovieVersionId == null || b.MovieVersionId == movieVersionId).Any(b => SameTorrent(b, torrentInfo));
                 }
 
                 return _blocklistRepository.BlocklistedByTitle(movieId, release.Title)
-                    .Where(b => b.Protocol == DownloadProtocol.Torrent)
+                    .Where(b => b.Protocol == DownloadProtocol.Torrent && (b.MovieVersionId == null || b.MovieVersionId == movieVersionId))
                     .Any(b => SameTorrent(b, torrentInfo));
             }
 
             return _blocklistRepository.BlocklistedByTitle(movieId, release.Title)
-                .Where(b => b.Protocol == DownloadProtocol.Usenet)
+                .Where(b => b.Protocol == DownloadProtocol.Usenet && (b.MovieVersionId == null || b.MovieVersionId == movieVersionId))
                 .Any(b => SameNzb(b, release));
         }
 
-        public bool BlocklistedTorrentHash(int movieId, string hash)
+        public bool BlocklistedTorrentHash(int movieId, string hash) => BlocklistedTorrentHash(movieId, hash, null);
+
+        public bool BlocklistedTorrentHash(int movieId, string hash, int? movieVersionId)
         {
-            return _blocklistRepository.BlocklistedByTorrentInfoHash(movieId, hash).Any(b =>
+            return _blocklistRepository.BlocklistedByTorrentInfoHash(movieId, hash).Where(b => b.MovieVersionId == null || b.MovieVersionId == movieVersionId).Any(b =>
                 b.TorrentInfoHash.Equals(hash, StringComparison.InvariantCultureIgnoreCase));
         }
 
@@ -133,6 +139,7 @@ namespace NzbDrone.Core.Blocklisting
             var blocklist = new Blocklist
             {
                 MovieId = message.MovieId,
+                MovieVersionId = message.MovieVersionId,
                 SourceTitle = message.SourceTitle,
                 Quality = message.Quality,
                 Date = DateTime.UtcNow,

@@ -264,7 +264,9 @@ namespace NzbDrone.Core.Download
 
                 if (remoteMovie.ReleaseSource != ReleaseSourceType.InteractiveSearch &&
                     indexerSettings?.RejectBlocklistedTorrentHashesWhileGrabbing == true &&
-                    _blocklistService.BlocklistedTorrentHash(remoteMovie.Movie.Id, hash))
+                    (remoteMovie.MovieVersionId.HasValue
+                        ? _blocklistService.BlocklistedTorrentHash(remoteMovie.Movie.Id, hash, remoteMovie.MovieVersionId)
+                        : _blocklistService.BlocklistedTorrentHash(remoteMovie.Movie.Id, hash)))
                 {
                     throw new ReleaseBlockedException(remoteMovie.Release, "Release previously added to blocklist");
                 }

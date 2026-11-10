@@ -102,7 +102,17 @@ namespace NzbDrone.Core.Download
             {
                 if (trackedDownload.RemoteMovie?.Movie?.ManagedVersion?.Id != trackedDownload.MovieVersionId)
                 {
-                    trackedDownload.Warn("The managed version could not be verified. Reconcile its download assignment before importing.");
+                    var pending = _imports.ForMovie(trackedDownload.RemoteMovie?.Movie?.Id ?? 0)?
+                        .FirstOrDefault(i => i.MovieVersionId == trackedDownload.MovieVersionId && i.IsActive);
+                    if (pending != null)
+                    {
+                        trackedDownload.Warn("Managed import operation {0} requires recovery ({1}): {2}", pending.Id, pending.State, pending.Snapshot.LastRecoveryError ?? "The previous import did not finish. Inspect its files and resume or cancel it.");
+                    }
+                    else
+                    {
+                        trackedDownload.Warn("The managed version could not be verified. Reconcile its download assignment before importing.");
+                    }
+
                     SetStateToImportBlocked(trackedDownload);
                     return;
                 }
@@ -203,6 +213,11 @@ namespace NzbDrone.Core.Download
                 return;
             }
 
+            if (importResults.Count > 1 && _rejectedImportService.Process(trackedDownload, importResults))
+            {
+                return;
+            }
+
             if (importResults.Count == 1)
             {
                 var firstResult = importResults.First();
@@ -253,6 +268,29 @@ namespace NzbDrone.Core.Download
                         trackedDownload.Warn("Published files were verified, but download completion requires inspection.");
                         trackedDownload.State = TrackedDownloadState.ImportBlocked;
                     }
+                }
+            }
+            catch (PublishedChecksumMismatchException ex)
+            {
+                try
+                {
+                    if (_recovery.PrepareCopyRetry(ex.Pending))
+                    {
+                        trackedDownload.State = TrackedDownloadState.ImportPending;
+                        _logger.Info("Retrying copy of {0} from its verified source after a destination checksum mismatch", trackedDownload.DownloadItem.Title);
+                        var key = $"{trackedDownload.DownloadClient}:{trackedDownload.DownloadItem.DownloadId}:recopy:{ex.Pending.OperationId}";
+                        _pipeline.QueueCopy(key, () => Import(trackedDownload));
+                    }
+                    else
+                    {
+                        trackedDownload.Warn("Destination verification failed; automatic copy retry is exhausted or the source changed. Inspect the retained files.");
+                        trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    }
+                }
+                catch (Exception retryError)
+                {
+                    trackedDownload.Warn("The source could not be verified for a copy retry: {0}", retryError.Message);
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
                 }
             }
             catch (Exception ex)

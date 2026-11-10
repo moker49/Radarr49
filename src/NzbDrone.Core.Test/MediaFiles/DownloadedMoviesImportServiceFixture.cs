@@ -94,6 +94,20 @@ namespace NzbDrone.Core.Test.MediaFiles
                   .Returns(System.Array.Empty<string>());
         }
 
+        [TestCase("file.aac", true)]
+        [TestCase("file.mkv.MediaInfo.html", true)]
+        [TestCase("file.rar", false)]
+        [TestCase("file.mkv", false)]
+        public void completed_accessible_folder_without_video_should_report_a_structured_content_failure(string file, bool retry)
+        {
+            _trackedDownload.DownloadItem.Status = DownloadItemStatus.Completed;
+            Mocker.GetMock<IDiskScanService>().Setup(d => d.GetVideoFiles(It.IsAny<string>(), It.IsAny<bool>())).Returns(System.Array.Empty<string>());
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.GetFiles(It.IsAny<string>(), true)).Returns(new[] { file });
+            Mocker.GetMock<IImportApprovedMovie>().Setup(i => i.Import(It.IsAny<List<ImportDecision>>(), true, It.IsAny<DownloadClientItem>(), ImportMode.Auto)).Returns(new List<ImportResult>());
+            var results = Subject.ProcessPath(_droneFactory, ImportMode.Auto, _trackedDownload.RemoteMovie.Movie, _trackedDownload.DownloadItem);
+            Assert.That(results.Any(r => r.ImportDecision.Rejections.Any(x => x.Reason == ImportRejectionReason.NoImportableVideo)), Is.EqualTo(retry));
+        }
+
         [Test]
         public void managed_folder_import_should_leave_uncaptured_or_preserved_files_in_place()
         {

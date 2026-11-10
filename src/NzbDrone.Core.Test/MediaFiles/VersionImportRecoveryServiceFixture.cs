@@ -143,7 +143,19 @@ namespace NzbDrone.Core.Test.MediaFiles
             Subject.Cancel(1, 42, checkpoint, "Cancel unstarted import");
             Mocker.GetMock<IVersionImportHandoffService>().Verify(v => v.CancelBeforeBackup(1, 42, "Cancel unstarted import"), Times.Once());
             _operation.State = VersionFileImportState.BackingUp;
+            _operation.OldMovieFileId = 12;
+            _operation.Snapshot.PreviousExisted = true;
             Assert.Throws<NzbDroneClientException>(() => Subject.Cancel(1, 42, VersionImportRecoveryCheckpoint.For(_operation), "Too late"));
+        }
+
+        [Test]
+        public void abandoned_handoff_without_previous_or_registered_file_can_be_cancelled()
+        {
+            _operation.State = VersionFileImportState.BackingUp;
+            _operation.OldMovieFileId = null;
+            _operation.NewMovieFileId = null;
+            _operation.Snapshot.PreviousExisted = false;
+            Assert.DoesNotThrow(() => Subject.Cancel(1, 42, VersionImportRecoveryCheckpoint.For(_operation), "Abandoned unpublished import"));
         }
 
         [Test]

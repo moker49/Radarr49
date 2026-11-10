@@ -92,7 +92,20 @@ namespace NzbDrone.Core.Download
                 return;
             }
 
-            var failure = "Failed download detected";
+            if (trackedDownload.ImportFailureReason.HasValue && trackedDownload.MovieVersionId.HasValue)
+            {
+                grabbedItems = grabbedItems.Where(h => h.MovieVersionId == trackedDownload.MovieVersionId && h.MovieId == trackedDownload.RemoteMovie?.Movie?.Id).ToList();
+                if (grabbedItems.Empty())
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn("Cannot automatically fail this import: matching version-specific grab history is missing.");
+                    return;
+                }
+            }
+
+            var failure = trackedDownload.ImportFailureReason.HasValue
+                ? $"Import rejected ({trackedDownload.ImportFailureReason}): {string.Join("; ", trackedDownload.StatusMessages.SelectMany(m => m.Messages))}"
+                : "Failed download detected";
 
             if (trackedDownload.DownloadItem.IsEncrypted)
             {
@@ -104,6 +117,7 @@ namespace NzbDrone.Core.Download
             }
 
             trackedDownload.State = TrackedDownloadState.Failed;
+            _eventAggregator.PublishEvent(new TrackedDownloadStateChangedEvent(trackedDownload));
             PublishDownloadFailedEvent(grabbedItems.First(), failure, trackedDownload);
         }
 
@@ -114,6 +128,7 @@ namespace NzbDrone.Core.Download
             var downloadFailedEvent = new DownloadFailedEvent
             {
                 MovieId = historyItem.MovieId,
+                MovieVersionId = trackedDownload?.ImportFailureReason.HasValue == true ? trackedDownload.MovieVersionId : null,
                 Quality = historyItem.Quality,
                 SourceTitle = historyItem.SourceTitle,
                 DownloadClient = historyItem.Data.GetValueOrDefault(MovieHistory.DOWNLOAD_CLIENT),
