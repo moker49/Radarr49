@@ -451,7 +451,7 @@ export const actionHandlers = handleThunks({
   [SAVE_MOVIE]: createSaveProviderHandler(section, '/movie', { getAjaxOptions: getSaveAjaxOptions }),
   'movies/saveMovieProfile': createSaveProviderHandler(section, '/movie/profile'),
   [DELETE_MOVIE]: (getState, payload, dispatch) => {
-    createRemoveItemHandler(section, '/movie')(getState, payload, dispatch);
+    createRemoveItemHandler(section, '/movie/managed')(getState, payload, dispatch);
 
     if (!payload.collectionTmdbId) {
       return;
@@ -561,7 +561,7 @@ export const actionHandlers = handleThunks({
     }));
 
     const promise = createAjaxRequest({
-      url: '/movie/editor',
+      url: '/movie/managed',
       method: 'DELETE',
       data: JSON.stringify(payload),
       dataType: 'json'

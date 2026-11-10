@@ -18,6 +18,7 @@ namespace NzbDrone.Core.Movies
     {
         bool MoviePathExists(string path);
         void InsertWithVersions(IList<Movie> movies);
+        void DeleteWithVersions(IList<int> movieIds);
         List<Movie> FindByTitles(List<string> titles);
         Movie FindByImdbId(string imdbid);
         Movie FindByTmdbId(int tmdbid);
@@ -36,7 +37,7 @@ namespace NzbDrone.Core.Movies
         HashSet<int> AllMovieWithCollectionsTmdbIds();
     }
 
-    public class MovieRepository : BasicRepository<Movie>, IMovieRepository
+    public partial class MovieRepository : BasicRepository<Movie>, IMovieRepository
     {
         private readonly IQualityProfileRepository _profileRepository;
         private readonly IAlternativeTitleRepository _alternativeTitleRepository;

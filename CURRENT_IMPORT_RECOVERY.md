@@ -1,5 +1,20 @@
 # Deploying selective import retries
 
+## Deleting a movie instead of recovering its download
+
+The updated UI uses a version-aware whole-movie delete action, including bulk
+deletion. Abandoned imports are retired with the movie and cannot resume on the
+next startup. Select **delete files** to remove the movie folder, including its
+private staging files; leave it unchecked to retain that folder. Download-client
+source files are not removed by this action. Legacy API deletion of composite
+movies remains blocked.
+
+If a copy or verification is actively running, deletion reports a conflict; wait
+for that phase to finish and retry. An abandoned operation such as The Resident's
+operation 81 does not require manual checksums before whole-movie deletion.
+
+## Existing-download recovery
+
 1. Before deploying, check Settings > Profiles > SDR/HDR > Language. Both currently
    use **Original**. Your database interprets this as Korean for Snowpiercer and
    French for Two Prosecutors. Keep that if intended; choose English or Any if those
