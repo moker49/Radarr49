@@ -96,6 +96,7 @@ interface Movie extends ModelBase {
   hasFile: boolean;
   grabbed?: boolean;
   lastSearchTime?: string;
+  lastNoReleasesSearchTime?: string;
   isAvailable: boolean;
   isSaving?: boolean;
   addOptions: MovieAddOptions;

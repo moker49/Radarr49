@@ -29,13 +29,15 @@ namespace NzbDrone.Core.IndexerSearch
         private readonly IMovieTranslationService _movieTranslationService;
         private readonly IQualityProfileService _qualityProfileService;
         private readonly Logger _logger;
+        private readonly IIndexerStatusRepository _indexerStatus;
 
         public ReleaseSearchService(IIndexerFactory indexerFactory,
                                 IMakeDownloadDecision makeDownloadDecision,
                                 IMovieService movieService,
                                 IMovieTranslationService movieTranslationService,
                                 IQualityProfileService qualityProfileService,
-                                Logger logger)
+                                Logger logger,
+                                IIndexerStatusRepository indexerStatus)
         {
             _indexerFactory = indexerFactory;
             _makeDownloadDecision = makeDownloadDecision;
@@ -43,6 +45,7 @@ namespace NzbDrone.Core.IndexerSearch
             _movieTranslationService = movieTranslationService;
             _qualityProfileService = qualityProfileService;
             _logger = logger;
+            _indexerStatus = indexerStatus;
         }
 
         public async Task<List<DownloadDecision>> MovieSearch(int movieId, bool userInvokedSearch, bool interactiveSearch)
@@ -110,7 +113,7 @@ namespace NzbDrone.Core.IndexerSearch
 
             var batch = await Task.WhenAll(tasks);
 
-            var reports = batch.SelectMany(x => x).ToList();
+            var reports = batch.SelectMany(x => x.Reports).ToList();
 
             _logger.ProgressDebug("Total of {0} reports were found for {1} from {2} indexers", reports.Count, criteriaBase, indexers.Count);
 
@@ -121,24 +124,39 @@ namespace NzbDrone.Core.IndexerSearch
                 _logger.Debug("Setting last search time to: {0}", lastSearchTime);
 
                 criteriaBase.Movie.LastSearchTime = lastSearchTime;
+                if (reports.Any())
+                {
+                    criteriaBase.Movie.LastNoReleasesSearchTime = null;
+                }
+                else if (batch.All(result => result.Succeeded))
+                {
+                    criteriaBase.Movie.LastNoReleasesSearchTime = lastSearchTime;
+                }
+
                 _movieService.UpdateLastSearchTime(criteriaBase.Movie);
             }
 
             return _makeDownloadDecision.GetSearchDecision(reports, criteriaBase).ToList();
         }
 
-        private async Task<IList<ReleaseInfo>> DispatchIndexer(Func<IIndexer, Task<IList<ReleaseInfo>>> searchAction, IIndexer indexer, SearchCriteriaBase criteriaBase)
+        private async Task<(IList<ReleaseInfo> Reports, bool Succeeded)> DispatchIndexer(Func<IIndexer, Task<IList<ReleaseInfo>>> searchAction, IIndexer indexer, SearchCriteriaBase criteriaBase)
         {
+            var started = DateTime.UtcNow;
             try
             {
-                return await searchAction(indexer);
+                var reports = await searchAction(indexer);
+
+                // HTTP indexers may record a failure and return an empty list instead
+                // of throwing. That is not evidence that no releases exist.
+                var failure = _indexerStatus.FindByProviderId(indexer.Definition.Id)?.MostRecentFailure;
+                return (reports, !failure.HasValue || failure.Value < started);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error while searching for {0}", criteriaBase);
             }
 
-            return Array.Empty<ReleaseInfo>();
+            return (Array.Empty<ReleaseInfo>(), false);
         }
 
         private List<DownloadDecision> DeDupeDecisions(List<DownloadDecision> decisions)

@@ -84,6 +84,7 @@ import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
 import fonts from 'Styles/Variables/fonts';
 import sortByProp from 'Utilities/Array/sortByProp';
 import { findCommand, isCommandExecuting } from 'Utilities/Command';
+import formatDate from 'Utilities/Date/formatDate';
 import formatRuntime from 'Utilities/Date/formatRuntime';
 import getPathWithUrlBase from 'Utilities/getPathWithUrlBase';
 import formatBytes from 'Utilities/Number/formatBytes';
@@ -171,7 +172,9 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
   const { isMovieCreditsFetching, movieCreditsError } = useSelector(
     createMovieCreditsSelector()
   );
-  const { movieRuntimeFormat } = useSelector(createUISettingsSelector());
+  const { movieRuntimeFormat, shortDateFormat } = useSelector(
+    createUISettingsSelector()
+  );
   const isSidebarVisible = useSelector(
     (state: AppState) => state.app.isSidebarVisible
   );
@@ -533,6 +536,7 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
     path,
     statistics = {} as Statistics,
     qualityProfileId,
+    lastNoReleasesSearchTime,
     monitored,
     studio,
     originalLanguage,
@@ -809,6 +813,22 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
                     />
                   </span>
                 </InfoLabel>
+
+                {lastNoReleasesSearchTime ? (
+                  <InfoLabel
+                    className={styles.detailsInfoLabel}
+                    name={translate('Search')}
+                    title={translate('NoReleasesSearchHelpText')}
+                    size={sizes.LARGE}
+                  >
+                    {translate('NoReleasesSearchResult', {
+                      date: formatDate(
+                        lastNoReleasesSearchTime,
+                        shortDateFormat
+                      ),
+                    })}
+                  </InfoLabel>
+                ) : null}
 
                 <InfoLabel
                   className={styles.detailsInfoLabel}

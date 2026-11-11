@@ -369,7 +369,8 @@ namespace NzbDrone.Core.Movies
 
         public void UpdateLastSearchTime(Movie movie)
         {
-            _movieRepository.SetFields(movie, e => e.LastSearchTime);
+            _movieRepository.SetFields(movie, e => e.LastSearchTime, e => e.LastNoReleasesSearchTime);
+            _eventAggregator.PublishEvent(new MovieUpdatedEvent(movie));
         }
 
         public bool MoviePathExists(string folder)
