@@ -30,7 +30,7 @@ public class RejectedImportService : IRejectedImportService
         _definitions = definitions;
     }
 
-    private static bool Retryable(ImportRejectionReason reason) => reason is ImportRejectionReason.NoImportableVideo or ImportRejectionReason.UnsupportedExtension or ImportRejectionReason.VersionLanguageNotSatisfied;
+    private static bool Retryable(ImportRejectionReason reason) => reason is ImportRejectionReason.NoImportableVideo or ImportRejectionReason.UnsupportedExtension or ImportRejectionReason.VersionLanguageNotSatisfied or ImportRejectionReason.VersionSizeNotSatisfied;
 
     public bool Process(TrackedDownload trackedDownload, List<ImportResult> importResults)
     {

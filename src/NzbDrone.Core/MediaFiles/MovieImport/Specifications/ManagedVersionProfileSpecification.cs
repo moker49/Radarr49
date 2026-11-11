@@ -51,10 +51,13 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
             var size = profile.GetSizeDefinition(quality, _qualities.Get(quality));
             var runtime = localMovie.Movie.MovieMetadata.Value.Runtime;
             runtime = runtime > 0 ? runtime : 110;
-            if ((size.MinSize.HasValue && localMovie.Size < size.MinSize.Value.Megabytes() * runtime) ||
-                (size.MaxSize.HasValue && size.MaxSize.Value > 0 && localMovie.Size > size.MaxSize.Value.Megabytes() * runtime))
+
+            // Indexer sizes can include packaging and extras. Allow a modest difference
+            // in the actual video without relaxing the limits used to select releases.
+            if ((size.MinSize.HasValue && localMovie.Size < size.MinSize.Value.Megabytes() * runtime * 0.9) ||
+                (size.MaxSize.HasValue && size.MaxSize.Value > 0 && localMovie.Size > size.MaxSize.Value.Megabytes() * runtime * 1.1))
             {
-                return ImportSpecDecision.Reject(ImportRejectionReason.VersionProfileNotSatisfied, "File size does not satisfy the selected version's profile.");
+                return ImportSpecDecision.Reject(ImportRejectionReason.VersionSizeNotSatisfied, "File size is outside the selected version's profile limits, including the 10% import tolerance.");
             }
 
             return ImportSpecDecision.Accept();

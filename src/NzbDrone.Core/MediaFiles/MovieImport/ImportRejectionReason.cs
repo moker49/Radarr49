@@ -29,5 +29,6 @@ public enum ImportRejectionReason
     InvalidMovieVersion,
     VersionProfileNotSatisfied,
     VersionLanguageNotSatisfied,
-    NoImportableVideo
+    NoImportableVideo,
+    VersionSizeNotSatisfied
 }

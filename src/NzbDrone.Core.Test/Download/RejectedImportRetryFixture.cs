@@ -18,6 +18,7 @@ namespace NzbDrone.Core.Test.Download
         [TestCase(ImportRejectionReason.NoImportableVideo, true)]
         [TestCase(ImportRejectionReason.UnsupportedExtension, true)]
         [TestCase(ImportRejectionReason.VersionLanguageNotSatisfied, true)]
+        [TestCase(ImportRejectionReason.VersionSizeNotSatisfied, true)]
         [TestCase(ImportRejectionReason.VersionProfileNotSatisfied, false)]
         [TestCase(ImportRejectionReason.ArchiveFile, false)]
         [TestCase(ImportRejectionReason.InvalidMovieVersion, false)]
@@ -31,11 +32,12 @@ namespace NzbDrone.Core.Test.Download
             Assert.That(tracked.ImportFailureReason, Is.EqualTo(retry ? reason : (ImportRejectionReason?)null));
         }
 
-        [Test]
-        public void operational_rejection_must_override_a_retryable_content_rejection()
+        [TestCase(ImportRejectionReason.VersionLanguageNotSatisfied)]
+        [TestCase(ImportRejectionReason.VersionSizeNotSatisfied)]
+        public void operational_rejection_must_override_a_retryable_content_rejection(ImportRejectionReason reason)
         {
             var tracked = Download();
-            var result = new ImportResult(new ImportDecision(null, new ImportRejection(ImportRejectionReason.VersionLanguageNotSatisfied, "Language"), new ImportRejection(ImportRejectionReason.MinimumFreeSpace, "Disk full")), "Rejected");
+            var result = new ImportResult(new ImportDecision(null, new ImportRejection(reason, "Content"), new ImportRejection(ImportRejectionReason.MinimumFreeSpace, "Disk full")), "Rejected");
             Subject.Process(tracked, result);
             Assert.That(tracked.State, Is.Not.EqualTo(TrackedDownloadState.FailedPending));
         }
