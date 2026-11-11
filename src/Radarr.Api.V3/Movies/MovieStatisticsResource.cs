@@ -7,6 +7,7 @@ namespace Radarr.Api.V3.Movies
     public class MovieStatisticsResource
     {
         public int MovieFileCount { get; set; }
+        public int MissingVersionCount { get; set; }
         public long SizeOnDisk { get; set; }
         public List<string> ReleaseGroups { get; set; }
         public List<Quality> MovieFileQualities { get; set; }
@@ -24,6 +25,7 @@ namespace Radarr.Api.V3.Movies
             return new MovieStatisticsResource
             {
                 MovieFileCount = model.MovieFileCount,
+                MissingVersionCount = model.MissingVersionCount,
                 SizeOnDisk = model.SizeOnDisk,
                 ReleaseGroups = model.ReleaseGroups,
                 MovieFileQualities = model.MovieFileQualities,

@@ -54,13 +54,19 @@ export const filters = [
     label: () => translate('Missing'),
     filters: [
       {
-        key: 'monitored',
-        value: true,
-        type: filterTypes.EQUAL
-      },
-      {
         key: 'hasFile',
         value: false,
+        type: filterTypes.EQUAL
+      }
+    ]
+  },
+  {
+    key: 'partial',
+    label: () => translate('Partial'),
+    filters: [
+      {
+        key: 'partial',
+        value: true,
         type: filterTypes.EQUAL
       }
     ]
@@ -110,6 +116,11 @@ export const filters = [
 ];
 
 export const filterPredicates = {
+  partial: function(item, filterValue, type) {
+    const { missingVersionCount = 0, movieFileCount = 0 } = item.statistics ?? {};
+    return filterTypePredicates[type](missingVersionCount > 0 && movieFileCount > 0, filterValue);
+  },
+
   added: function(item, filterValue, type) {
     return dateFilterPredicate(item.added, filterValue, type);
   },

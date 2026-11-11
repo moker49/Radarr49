@@ -43,6 +43,7 @@ namespace NzbDrone.Core.MovieStats
             {
                 var file = filesResult.SingleOrDefault(f => f.MovieId == e.MovieId);
 
+                e.MovieFileCount = file?.MovieFileCount ?? 0;
                 e.SizeOnDisk = file?.SizeOnDisk ?? 0;
                 e.ReleaseGroupsString = file?.ReleaseGroupsString;
                 e.MovieFileQualitiesString = file?.MovieFileQualitiesString;
@@ -63,8 +64,11 @@ namespace NzbDrone.Core.MovieStats
         private SqlBuilder MoviesBuilder()
         {
             return new SqlBuilder(_database.DatabaseType)
-                .Select(@"""Movies"".""Id"" AS MovieId,
-                        SUM(CASE WHEN ""MovieFileId"" > 0 THEN 1 ELSE 0 END) AS MovieFileCount")
+                .Select(@"""Movies"".""Id"" AS MovieId")
+                .Select(@"(SELECT COUNT(*) FROM ""CompositeProfileVersions"" AS d
+                        LEFT JOIN ""MovieVersions"" AS v ON v.""CompositeProfileVersionId"" = d.""Id"" AND v.""MovieId"" = ""Movies"".""Id""
+                        LEFT JOIN ""MovieFiles"" AS f ON f.""Id"" = v.""MovieFileId"" AND f.""MovieId"" = ""Movies"".""Id"" AND COALESCE(f.""IsUnmanaged"", FALSE) = FALSE
+                        WHERE d.""CompositeProfileId"" = ""Movies"".""QualityProfileId"" AND f.""Id"" IS NULL) AS MissingVersionCount")
                 .GroupBy<Movie>(x => x.Id);
         }
 
@@ -74,6 +78,7 @@ namespace NzbDrone.Core.MovieStats
             {
                 return new SqlBuilder(_database.DatabaseType)
                     .Select(@"""MovieId"",
+                            COUNT(*) AS MovieFileCount,
                             SUM(COALESCE(""Size"", 0)) AS SizeOnDisk,
                             GROUP_CONCAT(""ReleaseGroup"", '|') AS ReleaseGroupsString,
                             GROUP_CONCAT(JSON_EXTRACT(""Quality"", '$.quality'), '|') AS MovieFileQualitiesString")
@@ -82,6 +87,7 @@ namespace NzbDrone.Core.MovieStats
 
             return new SqlBuilder(_database.DatabaseType)
                 .Select(@"""MovieId"",
+                        COUNT(*) AS MovieFileCount,
                         SUM(COALESCE(""Size"", 0)) AS SizeOnDisk,
                         string_agg(DISTINCT ""ReleaseGroup"", '|') AS ReleaseGroupsString,
                         string_agg(DISTINCT ""Quality""::json->>'quality', '|') AS MovieFileQualitiesString")

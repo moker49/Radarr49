@@ -11,6 +11,7 @@ namespace NzbDrone.Core.MovieStats
     {
         public int MovieId { get; set; }
         public int MovieFileCount { get; set; }
+        public int MissingVersionCount { get; set; }
         public long SizeOnDisk { get; set; }
         public string ReleaseGroupsString { get; set; }
         public string MovieFileQualitiesString { get; set; }

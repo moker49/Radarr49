@@ -1,5 +1,6 @@
 {
   "About": "About",
+  "Partial": "Partial",
   "NoReleasesSearchResult": "No releases ({date})",
   "NoReleasesSearchHelpText": "The last completed search returned no releases from the searched indexers. This clears when a later search finds releases, even if they are rejected by your profiles.",
   "Actions": "Actions",
