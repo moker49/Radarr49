@@ -212,6 +212,23 @@ function MediaManagement() {
 
             {showAdvancedSettings ? (
               <FieldSet legend={translate('Importing')}>
+                <FormGroup size={sizes.MEDIUM}>
+                  <FormLabel>{translate('AutomaticImportFailures')}</FormLabel>
+
+                  <div>
+                    <p>{translate('AutomaticImportFailuresHelpText')}</p>
+
+                    <ul>
+                      <li>{translate('AutomaticImportFailureNoVideo')}</li>
+                      <li>{translate('AutomaticImportFailureExtension')}</li>
+                      <li>{translate('AutomaticImportFailureLanguage')}</li>
+                      <li>{translate('AutomaticImportFailureSize')}</li>
+                    </ul>
+
+                    <p>{translate('AutomaticImportFailuresReadOnly')}</p>
+                  </div>
+                </FormGroup>
+
                 <FormGroup
                   advancedSettings={showAdvancedSettings}
                   isAdvanced={true}
