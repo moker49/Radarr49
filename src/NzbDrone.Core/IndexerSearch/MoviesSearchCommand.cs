@@ -7,6 +7,7 @@ namespace NzbDrone.Core.IndexerSearch
     {
         public List<int> MovieIds { get; set; }
         public int? MovieVersionId { get; set; }
+        public bool IsFailureRetry { get; set; }
 
         public override bool SendUpdatesToClient => true;
     }

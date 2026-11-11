@@ -49,7 +49,9 @@ namespace NzbDrone.Core.IndexerSearch
 
         public void Execute(MoviesSearchCommand message)
         {
-            var userInvokedSearch = message.Trigger == CommandTrigger.Manual;
+            // A failed download was already selected for this movie. Its replacement
+            // must not silently disappear behind the scheduled-search eligibility gate.
+            var userInvokedSearch = message.Trigger == CommandTrigger.Manual || message.IsFailureRetry;
 
             var movies = _movieService.GetMovies(message.MovieIds)
                 .Where(m => (m.Monitored && m.IsAvailable()) || userInvokedSearch)

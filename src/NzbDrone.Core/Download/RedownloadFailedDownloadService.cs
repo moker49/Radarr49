@@ -47,8 +47,9 @@ namespace NzbDrone.Core.Download
 
             if (message.MovieId != 0)
             {
-                _logger.Debug("Failed download contains a movie, searching again.");
-                _commandQueueManager.Push(new MoviesSearchCommand { MovieIds = new List<int> { message.MovieId }, MovieVersionId = message.MovieVersionId });
+                var versionId = message.MovieVersionId ?? message.TrackedDownload?.MovieVersionId;
+                _logger.Debug("Queueing replacement search for movie {0}, version {1}", message.MovieId, versionId);
+                _commandQueueManager.Push(new MoviesSearchCommand { MovieIds = new List<int> { message.MovieId }, MovieVersionId = versionId, IsFailureRetry = true });
             }
         }
     }

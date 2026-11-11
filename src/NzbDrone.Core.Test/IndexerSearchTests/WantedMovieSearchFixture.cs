@@ -51,6 +51,36 @@ namespace NzbDrone.Core.Test.IndexerSearchTests
         private void Missing() => Subject.Execute(new MissingMoviesSearchCommand { Trigger = CommandTrigger.Manual });
         private void Cutoff() => Subject.Execute(new CutoffUnmetMoviesSearchCommand { Trigger = CommandTrigger.Manual });
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void failure_retry_should_search_unmonitored_or_unavailable_movie_and_only_its_failed_version(bool unavailable)
+        {
+            _movie.Monitored = unavailable;
+            if (unavailable)
+            {
+                _movie.MinimumAvailability = MovieStatusType.Released;
+                _movie.MovieMetadata.Value.Status = MovieStatusType.Announced;
+            }
+
+            Mocker.GetMock<IMovieService>().Setup(m => m.GetMovies(It.IsAny<IEnumerable<int>>())).Returns(new List<Movie> { _movie });
+
+            Subject.Execute(new MoviesSearchCommand { MovieIds = new List<int> { 1 }, MovieVersionId = 7, IsFailureRetry = true });
+
+            Mocker.GetMock<ISearchForReleases>().Verify(s => s.MovieSearch(1, true, false), Times.Once());
+            Assert.That(_selected.Single().RemoteMovie.MovieVersionId, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void ordinary_automatic_search_should_still_skip_unmonitored_movies()
+        {
+            _movie.Monitored = false;
+            Mocker.GetMock<IMovieService>().Setup(m => m.GetMovies(It.IsAny<IEnumerable<int>>())).Returns(new List<Movie> { _movie });
+
+            Subject.Execute(new MoviesSearchCommand { MovieIds = new List<int> { 1 } });
+
+            Mocker.GetMock<ISearchForReleases>().Verify(s => s.MovieSearch(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Never());
+        }
+
         [Test]
         public void missing_search_should_only_process_missing_version_not_primary_upgrade()
         {
